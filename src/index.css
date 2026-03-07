@@ -1,0 +1,55 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --cyber-base: 10 15 31;
+  --cyber-panel: 17 26 43;
+  --cyber-line: 31 54 88;
+  --cyber-neon: 0 255 209;
+  --cyber-electric: 67 184 255;
+  --cyber-warn: 255 95 109;
+  --cyber-glow: 182 255 47;
+}
+
+:root[data-theme='kawaii'] {
+  --cyber-base: 34 18 44;
+  --cyber-panel: 54 28 69;
+  --cyber-line: 121 86 152;
+  --cyber-neon: 255 156 224;
+  --cyber-electric: 128 220 255;
+  --cyber-warn: 255 124 177;
+  --cyber-glow: 255 221 145;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Rajdhani', sans-serif;
+  background:
+    radial-gradient(circle at 15% 10%, rgb(var(--cyber-electric) / 0.25), transparent 30%),
+    radial-gradient(circle at 90% 80%, rgb(var(--cyber-neon) / 0.20), transparent 28%),
+    rgb(var(--cyber-base));
+  transition: background 240ms ease;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--cyber-electric) / 0.6);
+  border-radius: 9999px;
+}
+
+pre {
+  margin: 0;
+}

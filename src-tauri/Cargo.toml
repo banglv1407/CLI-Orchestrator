@@ -1,0 +1,26 @@
+[package]
+name = "ai-cli-manager"
+version = "0.1.0"
+description = "Desktop orchestrator for AI CLI tools"
+authors = ["AI CLI Manager"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "process", "io-util", "sync"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+dirs = "6.0"
+portable-pty = "0.8"
+uuid = { version = "1.12", features = ["v4", "serde"] }
+which = "8.0"
+rfd = "0.15"
+tauri-plugin-dialog = "2.6.0"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

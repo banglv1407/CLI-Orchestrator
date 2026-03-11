@@ -1,6 +1,8 @@
 use std::{
     collections::HashMap,
+    fs::OpenOptions,
     io::Write,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -36,6 +38,7 @@ struct Session {
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Arc<Mutex<Box<dyn portable_pty::Child + Send>>>,
     status: Arc<Mutex<String>>,
+    log_file: Arc<Mutex<Option<std::fs::File>>>,
     /// Prevent the MasterPty from being dropped (kills session on Windows).
     _master: Arc<Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
 }
@@ -77,6 +80,7 @@ impl SessionManager {
         let (spawn_command, startup_input) =
             prepare_interactive_spawn_command(&cli_name, command);
 
+        let log_cwd = spawn_command.cwd.clone();
         let handle = interactive_runner::start_interactive_session(
             app.clone(),
             session_id.clone(),
@@ -84,6 +88,12 @@ impl SessionManager {
             spawn_command,
         )
         .map_err(|error| SessionError::Runner(error.to_string()))?;
+
+        let mut log_file = open_session_log(&cli_name, &session_id);
+        if let Some(ref mut file) = log_file {
+            let cwd = log_cwd.as_deref().unwrap_or_else(|| Path::new("unknown"));
+            let _ = writeln!(file, "# Session: {} | {} | `{}`\n", cli_name, session_id, cwd.display());
+        }
 
         if let Some(input) = startup_input {
             let mut writer = handle.writer.lock().map_err(|_| SessionError::LockPoisoned)?;
@@ -99,6 +109,7 @@ impl SessionManager {
             writer: handle.writer,
             child: handle.child,
             status: handle.status,
+            log_file: Arc::new(Mutex::new(log_file)),
             _master: handle._master,
         });
 
@@ -147,6 +158,12 @@ impl SessionManager {
             ));
         }
 
+        if let Ok(mut log_guard) = session.log_file.lock() {
+            if let Some(ref mut file) = *log_guard {
+                let _ = writeln!(file, "**🧑 User:** `{}`", input.trim_end_matches('\n').trim_end_matches('\r'));
+            }
+        }
+
         let mut writer = session.writer.lock().map_err(|_| SessionError::LockPoisoned)?;
         if let Err(error) = writer.write_all(input.as_bytes()) {
             if let Ok(mut status_guard) = session.status.lock() {
@@ -171,7 +188,7 @@ impl SessionManager {
         }
         .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
 
-        let mut master = session._master.lock().map_err(|_| SessionError::LockPoisoned)?;
+        let master = session._master.lock().map_err(|_| SessionError::LockPoisoned)?;
         master.resize(portable_pty::PtySize {
             rows,
             cols,
@@ -295,4 +312,32 @@ fn quote_windows_cmd_arg(value: &str) -> String {
 
     let escaped = value.replace('"', "\"\"");
     format!("\"{}\"", escaped)
+}
+
+fn default_logs_dir() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| home.join(".ai-cli-manager").join("logs"))
+}
+
+fn open_session_log(cli_name: &str, session_id: &str) -> Option<std::fs::File> {
+    let logs_dir = default_logs_dir()?;
+    if std::fs::create_dir_all(&logs_dir).is_err() {
+        return None;
+    }
+
+    let safe_cli_name = cli_name
+        .chars()
+        .map(|value| {
+            if value.is_ascii_alphanumeric() || value == '-' || value == '_' {
+                value
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    let file_name = format!("{}-{}.md", safe_cli_name, session_id);
+    OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(logs_dir.join(file_name))
+        .ok()
 }

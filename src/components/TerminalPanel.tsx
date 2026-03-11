@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { FitAddon } from '@xterm/addon-fit';
@@ -18,9 +18,14 @@ interface TerminalPanelProps {
 interface TerminalHandle {
   term: Terminal;
   fit: FitAddon;
+  writeQueue: string[];
+  isWriting: boolean;
+  isAtBottom: boolean;
+  cleanupScroll: () => void;
 }
 
 const INPUT_FLUSH_MS = 16;
+const MOUNT_DELAY_MS = 50;
 
 export function TerminalPanel({
   sessions,
@@ -35,6 +40,34 @@ export function TerminalPanel({
   const inputBuffers = useRef<Record<string, string>>({});
   const inputTimers = useRef<Record<string, number>>({});
   const pendingTerminalWrites = useRef<Record<string, string[]>>({});
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const initializedRef = useRef<Record<string, boolean>>({});
+  const containerToSessionRef = useRef<WeakMap<Element, string>>(new WeakMap());
+
+  const processWriteQueue = async (sessionId: string) => {
+    const handle = terminalRefs.current[sessionId];
+    if (!handle || handle.isWriting || handle.writeQueue.length === 0) {
+      return;
+    }
+
+    handle.isWriting = true;
+    const wasAtBottom = handle.isAtBottom;
+
+    while (handle.writeQueue.length > 0) {
+      const chunk = handle.writeQueue.shift();
+      if (chunk) {
+        await new Promise<void>((resolve) => {
+          handle.term.write(chunk, () => resolve());
+        });
+      }
+    }
+
+    if (wasAtBottom) {
+      handle.term.scrollToBottom();
+    }
+
+    handle.isWriting = false;
+  };
 
   const visibleSessionId = useMemo(() => {
     if (activeSessionId && sessions.some((session) => session.id === activeSessionId)) {
@@ -57,15 +90,6 @@ export function TerminalPanel({
     [onSendInput],
   );
 
-  const handleResetView = useCallback(() => {
-    if (!visibleSessionId) return;
-    const handle = terminalRefs.current[visibleSessionId];
-    if (!handle) return;
-
-    handle.term.clear();
-    handle.fit.fit();
-  }, [visibleSessionId]);
-
   const handleSaveTag = useCallback(async () => {
     if (!visibleSessionId) return;
     const session = sessions.find((s) => s.id === visibleSessionId);
@@ -80,9 +104,16 @@ export function TerminalPanel({
     await onSaveTag(session.cliName, trimmed, session.workingDir);
   }, [visibleSessionId, sessions, onSaveTag]);
 
+  const fitTerminal = useCallback((sessionId: string) => {
+    const handle = terminalRefs.current[sessionId];
+    if (handle) {
+      handle.fit.fit();
+    }
+  }, []);
+
   const ensureTerminal = useCallback(
     (session: SessionInfo) => {
-      if (terminalRefs.current[session.id]) {
+      if (initializedRef.current[session.id]) {
         return;
       }
 
@@ -91,11 +122,7 @@ export function TerminalPanel({
         return;
       }
 
-      // Guard against React StrictMode double-invocation:
-      // xterm adds the class 'xterm' to the node after opening.
-      if (mountNode.classList.contains('xterm')) {
-        return;
-      }
+      initializedRef.current[session.id] = true;
 
       const term = new Terminal({
         cursorBlink: true,
@@ -103,6 +130,8 @@ export function TerminalPanel({
         scrollback: 5000,
         fontFamily: 'Fira Code, monospace',
         fontSize: 13,
+        disableStdin: false,
+        scrollOnUserInput: true,
         theme: {
           background: '#0a0f1f',
           foreground: '#d8f7ff',
@@ -130,7 +159,49 @@ export function TerminalPanel({
       const fit = new FitAddon();
       term.loadAddon(fit);
       term.open(mountNode);
-      fit.fit();
+
+      terminalRefs.current[session.id] = { term, fit, writeQueue: [], isWriting: false, isAtBottom: true, cleanupScroll: () => {} };
+      const handle = terminalRefs.current[session.id];
+
+      if (mountNode) {
+        const viewport = mountNode.querySelector('.xterm-viewport') as HTMLElement;
+        if (viewport) {
+          viewport.style.overflowY = 'auto';
+        }
+      }
+
+      let scrollTimeout: number | null = null;
+      const handleScroll = () => {
+        if (scrollTimeout) {
+          window.clearTimeout(scrollTimeout);
+        }
+        handle.fit.fit();
+        scrollTimeout = window.setTimeout(() => {
+          handle.fit.fit();
+          if (viewport) {
+            const atBottom = Math.abs(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight) < 50;
+            handle.isAtBottom = atBottom;
+          }
+        }, 150);
+      };
+      const viewport = mountNode?.querySelector('.xterm-viewport');
+      if (viewport) {
+        viewport.addEventListener('scroll', handleScroll);
+      }
+
+      handle.cleanupScroll = () => {
+        if (viewport) {
+          viewport.removeEventListener('scroll', handleScroll);
+        }
+        if (scrollTimeout) {
+          window.clearTimeout(scrollTimeout);
+        }
+      };
+
+      setTimeout(() => {
+        fit.fit();
+      }, MOUNT_DELAY_MS);
+
       term.onResize((dim) => {
         invoke('resize_cli', {
           request: { sessionId: session.id, rows: dim.rows, cols: dim.cols },
@@ -142,8 +213,6 @@ export function TerminalPanel({
         term.writeln(projectLine);
       }
 
-      // Use onData for PTY: xterm does NOT echo locally; the PTY backend
-      // echoes input back as output which we display via cli-output events.
       term.onData((data) => {
         inputBuffers.current[session.id] = `${inputBuffers.current[session.id] ?? ''}${data}`;
 
@@ -162,8 +231,6 @@ export function TerminalPanel({
         }
         delete pendingTerminalWrites.current[session.id];
       }
-
-      terminalRefs.current[session.id] = { term, fit };
     },
     [flushInput],
   );
@@ -174,11 +241,15 @@ export function TerminalPanel({
     const existingIds = Object.keys(terminalRefs.current);
     existingIds.forEach((sessionId) => {
       if (!sessions.some((session) => session.id === sessionId)) {
+        terminalRefs.current[sessionId].cleanupScroll();
         terminalRefs.current[sessionId].term.dispose();
+        terminalRefs.current[sessionId].writeQueue = [];
+        terminalRefs.current[sessionId].isWriting = false;
         delete terminalRefs.current[sessionId];
         delete containerRefs.current[sessionId];
         delete inputBuffers.current[sessionId];
         delete pendingTerminalWrites.current[sessionId];
+        delete initializedRef.current[sessionId];
         if (inputTimers.current[sessionId]) {
           window.clearTimeout(inputTimers.current[sessionId]);
           delete inputTimers.current[sessionId];
@@ -206,7 +277,8 @@ export function TerminalPanel({
           pendingTerminalWrites.current[payload.sessionId].push(payload.chunk);
           return;
         }
-        handle.term.write(payload.chunk);
+        handle.writeQueue.push(payload.chunk);
+        void processWriteQueue(payload.sessionId);
       });
 
       if (isCancelled) {
@@ -227,7 +299,8 @@ export function TerminalPanel({
           pendingTerminalWrites.current[payload.sessionId].push(`\r\n[${payload.status}]${statusText}`);
           return;
         }
-        handle.term.writeln(`\r\n[${payload.status}]${statusText}`);
+        handle.writeQueue.push(`\r\n[${payload.status}]${statusText}`);
+        void processWriteQueue(payload.sessionId);
       });
 
       if (isCancelled) {
@@ -254,19 +327,68 @@ export function TerminalPanel({
       return;
     }
 
-    const timer = window.setTimeout(() => handle.fit.fit(), 0);
-    return () => window.clearTimeout(timer);
+    handle.fit.fit();
+    
+    const timer1 = window.setTimeout(() => handle.fit.fit(), 0);
+    const timer2 = window.setTimeout(() => handle.fit.fit(), MOUNT_DELAY_MS);
+    const timer3 = window.setTimeout(() => handle.fit.fit(), 100);
+
+    return () => {
+      window.clearTimeout(timer1);
+      window.clearTimeout(timer2);
+      window.clearTimeout(timer3);
+    };
   }, [visibleSessionId]);
+
+  useEffect(() => {
+    const containers = containerRefs.current;
+    const sessionIds = Object.keys(containers);
+
+    if (sessionIds.length === 0) {
+      return;
+    }
+
+    const observerCallback = (entries: ResizeObserverEntry[]) => {
+      for (const entry of entries) {
+        const sessionId = containerToSessionRef.current.get(entry.target);
+        if (sessionId) {
+          fitTerminal(sessionId);
+        }
+      }
+    };
+
+    resizeObserverRef.current = new ResizeObserver(observerCallback);
+
+    sessionIds.forEach((sessionId) => {
+      const container = containers[sessionId];
+      if (container) {
+        resizeObserverRef.current?.observe(container);
+      }
+    });
+
+    return () => {
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+    };
+  }, [sessions, fitTerminal, visibleSessionId]);
 
   useEffect(() => {
     return () => {
       Object.values(inputTimers.current).forEach((timer) => window.clearTimeout(timer));
-      Object.values(terminalRefs.current).forEach((item) => item.term.dispose());
+      Object.values(terminalRefs.current).forEach((item) => {
+        item.cleanupScroll();
+        item.term.dispose();
+        item.writeQueue = [];
+        item.isWriting = false;
+      });
       terminalRefs.current = {};
       inputBuffers.current = {};
       inputTimers.current = {};
       pendingTerminalWrites.current = {};
       containerRefs.current = {};
+      initializedRef.current = {};
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
     };
   }, []);
 
@@ -300,13 +422,6 @@ export function TerminalPanel({
             </button>
             <button
               type="button"
-              onClick={handleResetView}
-              className="rounded border border-cyber-electric/70 px-3 py-1 text-xs uppercase tracking-wider text-cyber-electric transition hover:bg-cyber-electric/10"
-            >
-              Reset View
-            </button>
-            <button
-              type="button"
               onClick={() => onStopSession(visibleSessionId)}
               className="rounded border border-cyber-warn/70 px-3 py-1 text-xs uppercase tracking-wider text-cyber-warn transition hover:bg-cyber-warn/10"
             >
@@ -331,6 +446,7 @@ export function TerminalPanel({
                 ref={(node) => {
                   containerRefs.current[session.id] = node;
                   if (node) {
+                    containerToSessionRef.current.set(node, session.id);
                     ensureTerminal(session);
                   }
                 }}

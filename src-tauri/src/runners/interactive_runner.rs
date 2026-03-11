@@ -1,8 +1,7 @@
 use std::{
     fs::{self, File, OpenOptions},
-    io::Read,
-    io::Write,
-    path::PathBuf,
+    io::{Read, Write},
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -54,14 +53,12 @@ pub fn start_interactive_session(
     let thread_app = app.clone();
     let thread_session_id = session_id.clone();
     let thread_cli_name = cli_name.clone();
+    let thread_cwd = command.cwd.clone();
     let mut log_file = open_session_log(&cli_name, &session_id);
-    write_log_line(
-        &mut log_file,
-        &format!(
-            "session={} cli={} command={} args={:?} cwd={:?}",
-            session_id, cli_name, command.command, command.args, command.cwd
-        ),
-    );
+    if let Some(ref mut file) = log_file {
+        let cwd = thread_cwd.as_deref().unwrap_or_else(|| Path::new("unknown"));
+        let _ = writeln!(file, "# Session: {} | {} | `{}`\n", cli_name, session_id, cwd.display());
+    }
 
     thread::Builder::new()
         .name(format!("pty-reader-{}", &session_id))
@@ -69,17 +66,26 @@ pub fn start_interactive_session(
             let mut reader = pty_process.reader;
             let mut buffer = vec![0_u8; 4096];
             let mut thread_log_file = log_file;
+            let mut output_buffer = String::new();
 
             loop {
                 match reader.read(&mut buffer) {
                     Ok(0) => {
+                        if !output_buffer.is_empty() {
+                            let line = output_buffer.trim_end_matches('\n').trim_end_matches('\r').to_string();
+                            if !line.is_empty() {
+                                write_log_line(&mut thread_log_file, &format!("**🤖 CLI:** `{}`", line));
+                            }
+                            output_buffer.clear();
+                        }
+
                         let exit_status = {
                             let mut child_guard = match thread_child.lock() {
                                 Ok(guard) => guard,
                                 Err(_) => {
                                     write_log_line(
                                         &mut thread_log_file,
-                                        &format!("session={} status=error message=child lock poisoned", thread_session_id),
+                                        &format!("**❌ Error:** session={} message=child lock poisoned", thread_session_id),
                                     );
                                     if let Ok(mut guard) = thread_status.lock() {
                                         *guard = "error".to_string();
@@ -106,7 +112,7 @@ pub fn start_interactive_session(
                                     write_log_line(
                                         &mut thread_log_file,
                                         &format!(
-                                            "session={} status=error message=try_wait failed: {}",
+                                            "**❌ Error:** session={} message=try_wait failed: {}",
                                             thread_session_id, error
                                         ),
                                     );
@@ -145,11 +151,7 @@ pub fn start_interactive_session(
 
                         write_log_line(
                             &mut thread_log_file,
-                            &format!(
-                                "session={} status=completed exit_code={:?}",
-                                thread_session_id,
-                                exit_status.exit_code()
-                            ),
+                            &format!("\n**Session ended:** `{:?}`\n", exit_status.exit_code()),
                         );
                         if let Ok(mut guard) = thread_status.lock() {
                             *guard = "completed".to_string();
@@ -170,7 +172,16 @@ pub fn start_interactive_session(
                     }
                     Ok(size) => {
                         let chunk = String::from_utf8_lossy(&buffer[..size]).to_string();
-                        write_log_chunk(&mut thread_log_file, &chunk);
+                        output_buffer.push_str(&chunk);
+
+                        while let Some (newline_pos) = output_buffer.find('\n') {
+                            let line = output_buffer[..newline_pos].to_string();
+                            output_buffer.drain(..=newline_pos);
+                            if !line.is_empty() || line.is_empty() {
+                                write_log_line(&mut thread_log_file, &format!("**🤖 CLI:** `{}`", line));
+                            }
+                        }
+
                         emit_output(
                             &thread_app,
                             CliOutputEvent {
@@ -183,9 +194,17 @@ pub fn start_interactive_session(
                         );
                     }
                     Err(error) => {
+                        if !output_buffer.is_empty() {
+                            let line = output_buffer.trim_end_matches('\n').trim_end_matches('\r').to_string();
+                            if !line.is_empty() {
+                                write_log_line(&mut thread_log_file, &format!("**🤖 CLI:** `{}`", line));
+                            }
+                            output_buffer.clear();
+                        }
+
                         write_log_line(
                             &mut thread_log_file,
-                            &format!("session={} status=error message={}", thread_session_id, error),
+                            &format!("**❌ Error:** session={} message={}", thread_session_id, error),
                         );
                         if let Ok(mut guard) = thread_status.lock() {
                             *guard = "error".to_string();
@@ -233,7 +252,7 @@ fn open_session_log(cli_name: &str, session_id: &str) -> Option<File> {
             }
         })
         .collect::<String>();
-    let file_name = format!("{}-{}.log", safe_cli_name, session_id);
+    let file_name = format!("{}-{}.md", safe_cli_name, session_id);
     OpenOptions::new()
         .create(true)
         .append(true)
@@ -248,12 +267,5 @@ fn default_logs_dir() -> Option<PathBuf> {
 fn write_log_line(log_file: &mut Option<File>, line: &str) {
     if let Some(file) = log_file.as_mut() {
         let _ = writeln!(file, "{}", line);
-    }
-}
-
-fn write_log_chunk(log_file: &mut Option<File>, chunk: &str) {
-    if let Some(file) = log_file.as_mut() {
-        let _ = file.write_all(chunk.as_bytes());
-        let _ = file.flush();
     }
 }

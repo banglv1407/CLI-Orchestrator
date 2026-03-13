@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -44,6 +45,8 @@ pub enum AccountError {
     Io(#[from] std::io::Error),
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
+    #[error("Database lock poisoned")]
+    DbLockPoisoned,
     #[error("Missing home directory")]
     MissingHomeDirectory,
     #[error("Profile not found: {0}")]
@@ -56,7 +59,7 @@ pub enum AccountError {
 
 pub struct AccountManager {
     vault_dir: PathBuf,
-    db: Connection,
+    db: Mutex<Connection>,
 }
 
 impl AccountManager {
@@ -69,14 +72,18 @@ impl AccountManager {
         fs::create_dir_all(&vault_dir)?;
 
         let db = Connection::open(&db_path)?;
-        let manager = Self { vault_dir, db };
+        let manager = Self {
+            vault_dir,
+            db: Mutex::new(db),
+        };
         manager.init_schema()?;
 
         Ok(manager)
     }
 
     fn init_schema(&self) -> Result<(), AccountError> {
-        self.db.execute(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        db.execute(
             "CREATE TABLE IF NOT EXISTS accounts (
                 id TEXT PRIMARY KEY,
                 cli_name TEXT NOT NULL,
@@ -88,7 +95,7 @@ impl AccountManager {
             [],
         )?;
 
-        self.db.execute(
+        db.execute(
             "CREATE TABLE IF NOT EXISTS account_auth_files (
                 id TEXT PRIMARY KEY,
                 account_id TEXT NOT NULL,
@@ -99,7 +106,7 @@ impl AccountManager {
             [],
         )?;
 
-        self.db.execute(
+        db.execute(
             "CREATE TABLE IF NOT EXISTS cooldown (
                 cli_name TEXT NOT NULL,
                 profile_name TEXT NOT NULL,
@@ -143,7 +150,8 @@ impl AccountManager {
         let profile_id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
 
-        self.db.execute(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        db.execute(
             "INSERT OR REPLACE INTO accounts (id, cli_name, profile_name, created_at, last_used) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![profile_id, cli_name, profile_name, now, now],
         )?;
@@ -154,7 +162,7 @@ impl AccountManager {
                 fs::copy(source_path, &dest)?;
 
                 let file_id = Uuid::new_v4().to_string();
-                self.db.execute(
+                db.execute(
                     "INSERT INTO account_auth_files (id, account_id, original_path, vault_path) VALUES (?1, ?2, ?3, ?4)",
                     params![file_id, profile_id, source_path.to_string_lossy().to_string(), dest.to_string_lossy().to_string()],
                 )?;
@@ -190,7 +198,8 @@ impl AccountManager {
         }
 
         let now = Utc::now().to_rfc3339();
-        self.db.execute(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        db.execute(
             "UPDATE accounts SET last_used = ?1 WHERE cli_name = ?2 AND profile_name = ?3",
             params![now, cli_name, profile_name],
         )?;
@@ -205,7 +214,8 @@ impl AccountManager {
             fs::remove_dir_all(&vault_dir)?;
         }
 
-        self.db.execute(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        db.execute(
             "DELETE FROM accounts WHERE cli_name = ?1 AND profile_name = ?2",
             params![cli_name, profile_name],
         )?;
@@ -214,7 +224,8 @@ impl AccountManager {
     }
 
     pub fn list_accounts(&self, cli_name: &str) -> Result<Vec<AccountProfile>, AccountError> {
-        let mut stmt = self.db.prepare(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        let mut stmt = db.prepare(
             "SELECT id, cli_name, profile_name, created_at, last_used FROM accounts WHERE cli_name = ?1 ORDER BY last_used DESC"
         )?;
 
@@ -298,7 +309,8 @@ impl AccountManager {
     pub fn set_cooldown(&self, cli_name: &str, profile_name: &str, minutes: i64) -> Result<(), AccountError> {
         let until = Utc::now() + chrono::Duration::minutes(minutes);
         
-        self.db.execute(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        db.execute(
             "INSERT OR REPLACE INTO cooldown (cli_name, profile_name, until) VALUES (?1, ?2, ?3)",
             params![cli_name, profile_name, until.to_rfc3339()],
         )?;
@@ -307,7 +319,8 @@ impl AccountManager {
     }
 
     pub fn get_cooldown(&self, cli_name: &str, profile_name: &str) -> Result<Option<CooldownEntry>, AccountError> {
-        let mut stmt = self.db.prepare(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        let mut stmt = db.prepare(
             "SELECT cli_name, profile_name, until FROM cooldown WHERE cli_name = ?1 AND profile_name = ?2"
         )?;
 
@@ -335,7 +348,8 @@ impl AccountManager {
     }
 
     pub fn clear_cooldown(&self, cli_name: &str, profile_name: &str) -> Result<(), AccountError> {
-        self.db.execute(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        db.execute(
             "DELETE FROM cooldown WHERE cli_name = ?1 AND profile_name = ?2",
             params![cli_name, profile_name],
         )?;
@@ -343,7 +357,8 @@ impl AccountManager {
     }
 
     pub fn list_cooldowns(&self) -> Result<Vec<CooldownEntry>, AccountError> {
-        let mut stmt = self.db.prepare(
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        let mut stmt = db.prepare(
             "SELECT cli_name, profile_name, until FROM cooldown"
         )?;
 
@@ -382,7 +397,8 @@ impl AccountManager {
     }
 
     pub fn get_all_cli_names(&self) -> Result<Vec<String>, AccountError> {
-        let mut stmt = self.db.prepare("SELECT DISTINCT cli_name FROM accounts")?;
+        let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
+        let mut stmt = db.prepare("SELECT DISTINCT cli_name FROM accounts")?;
         let names: Vec<String> = stmt.query_map([], |row| row.get(0))?
             .filter_map(Result::ok)
             .collect();

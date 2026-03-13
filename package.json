@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "predev": "node -e \"try { require('child_process').execSync('netstat -ano | findstr :1407') && require('child_process').execSync('taskkill /F /IM vite.exe /T') } catch (e) {}\"",
-    "dev": "vite",
+    "dev": "vite --configLoader native",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri"

@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use thiserror::Error;
 
 #[derive(Debug, Serialize)]
@@ -58,6 +59,8 @@ pub enum CassIndexError {
     Io(#[from] std::io::Error),
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
+    #[error("Database lock poisoned")]
+    DbLockPoisoned,
     #[error("Missing home directory")]
     MissingHomeDirectory,
 }
@@ -77,7 +80,7 @@ struct CassSourceFile {
 }
 
 pub struct CassIndex {
-    db: Connection,
+    db: Mutex<Connection>,
     sources: Vec<CassSourceDefinition>,
 }
 
@@ -93,15 +96,19 @@ impl CassIndex {
 
         let db = Connection::open(&db_path)?;
         let sources = default_sources(&home);
-        let index = Self { db, sources };
+        let index = Self {
+            db: Mutex::new(db),
+            sources,
+        };
         index.init_schema()?;
         Ok(index)
     }
 
     fn init_schema(&self) -> Result<(), CassIndexError> {
-        self.db.execute("PRAGMA foreign_keys = ON", [])?;
+        let db = self.db.lock().map_err(|_| CassIndexError::DbLockPoisoned)?;
+        db.execute("PRAGMA foreign_keys = ON", [])?;
 
-        self.db.execute(
+        db.execute(
             "CREATE TABLE IF NOT EXISTS cass_sessions (
                 session_id TEXT PRIMARY KEY,
                 cli_name TEXT NOT NULL,
@@ -115,7 +122,7 @@ impl CassIndex {
             [],
         )?;
 
-        self.db.execute(
+        db.execute(
             "CREATE TABLE IF NOT EXISTS cass_tokens (
                 token TEXT NOT NULL,
                 session_id TEXT NOT NULL,
@@ -126,12 +133,12 @@ impl CassIndex {
             [],
         )?;
 
-        self.db.execute(
+        db.execute(
             "CREATE INDEX IF NOT EXISTS cass_tokens_token_idx ON cass_tokens(token)",
             [],
         )?;
 
-        self.db.execute(
+        db.execute(
             "CREATE TABLE IF NOT EXISTS cass_meta (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -143,20 +150,21 @@ impl CassIndex {
     }
 
     pub fn stats(&self) -> Result<CassIndexStats, CassIndexError> {
-        let sessions_total: usize = self
-            .db
-            .query_row("SELECT COUNT(*) FROM cass_sessions", [], |row| row.get(0))?;
-        let tokens_total: usize = self
-            .db
-            .query_row("SELECT COUNT(*) FROM cass_tokens", [], |row| row.get(0))?;
-        let last_indexed_at: Option<String> = self
-            .db
-            .query_row(
-                "SELECT value FROM cass_meta WHERE key = 'last_indexed_at'",
-                [],
-                |row| row.get(0),
-            )
-            .optional()?;
+        let (sessions_total, tokens_total, last_indexed_at) = {
+            let db = self.db.lock().map_err(|_| CassIndexError::DbLockPoisoned)?;
+            let sessions_total: usize = db
+                .query_row("SELECT COUNT(*) FROM cass_sessions", [], |row| row.get(0))?;
+            let tokens_total: usize = db
+                .query_row("SELECT COUNT(*) FROM cass_tokens", [], |row| row.get(0))?;
+            let last_indexed_at: Option<String> = db
+                .query_row(
+                    "SELECT value FROM cass_meta WHERE key = 'last_indexed_at'",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            (sessions_total, tokens_total, last_indexed_at)
+        };
         let (_files, sources, _errors) = self.collect_sources()?;
 
         Ok(CassIndexStats {
@@ -231,6 +239,7 @@ impl CassIndex {
             });
         }
 
+        let mut db = self.db.lock().map_err(|_| CassIndexError::DbLockPoisoned)?;
         let mut seen_paths = HashSet::new();
 
         for source in source_files {
@@ -247,8 +256,7 @@ impl CassIndex {
             let cli_name = source.cli_name;
 
             let hash = sha256_hex(&content);
-            let existing_hash: Option<String> = self
-                .db
+            let existing_hash: Option<String> = db
                 .query_row(
                     "SELECT content_hash FROM cass_sessions WHERE session_id = ?1",
                     params![session_id],
@@ -277,7 +285,7 @@ impl CassIndex {
             let cwd = extract_cwd(&content);
             let title = extract_title(&content);
 
-            self.db.execute(
+            db.execute(
                 "INSERT OR REPLACE INTO cass_sessions (session_id, cli_name, path, updated_at, content_hash, size_bytes, cwd, title)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 params![
@@ -292,13 +300,13 @@ impl CassIndex {
                 ],
             )?;
 
-            self.db.execute(
+            db.execute(
                 "DELETE FROM cass_tokens WHERE session_id = ?1",
                 params![session_id],
             )?;
 
             let token_map = tokenize_for_index(&content);
-            let tx = self.db.transaction()?;
+            let tx = db.transaction()?;
             {
                 let mut stmt = tx.prepare(
                     "INSERT OR REPLACE INTO cass_tokens (token, session_id, weight) VALUES (?1, ?2, ?3)",
@@ -315,8 +323,7 @@ impl CassIndex {
 
         let mut to_remove = Vec::new();
         {
-            let mut stmt = self
-                .db
+            let mut stmt = db
                 .prepare("SELECT session_id, path FROM cass_sessions")?;
             let rows = stmt.query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -330,7 +337,7 @@ impl CassIndex {
         }
 
         for session_id in to_remove {
-            self.db.execute(
+            db.execute(
                 "DELETE FROM cass_sessions WHERE session_id = ?1",
                 params![session_id],
             )?;
@@ -338,20 +345,23 @@ impl CassIndex {
         }
 
         let last_indexed_at = Utc::now().to_rfc3339();
-        self.db.execute(
+        db.execute(
             "INSERT OR REPLACE INTO cass_meta (key, value) VALUES ('last_indexed_at', ?1)",
             params![last_indexed_at],
         )?;
 
-        let stats = self.stats()?;
+        let sessions_total: usize = db
+            .query_row("SELECT COUNT(*) FROM cass_sessions", [], |row| row.get(0))?;
+        let tokens_total: usize = db
+            .query_row("SELECT COUNT(*) FROM cass_tokens", [], |row| row.get(0))?;
 
         Ok(CassIndexSummary {
             indexed,
             skipped,
             removed,
             tokens: tokens_indexed,
-            sessions_total: stats.sessions_total,
-            tokens_total: stats.tokens_total,
+            sessions_total,
+            tokens_total,
             sources,
             last_indexed_at: last_indexed_at,
             errors,
@@ -359,6 +369,7 @@ impl CassIndex {
     }
 
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<CassSearchResult>, CassIndexError> {
+        let db = self.db.lock().map_err(|_| CassIndexError::DbLockPoisoned)?;
         let query = query.trim();
         if query.is_empty() {
             return Ok(Vec::new());
@@ -370,11 +381,9 @@ impl CassIndex {
         }
 
         let mut scores: HashMap<String, i64> = HashMap::new();
-        let mut stmt_exact = self
-            .db
+        let mut stmt_exact = db
             .prepare("SELECT session_id, weight FROM cass_tokens WHERE token = ?1")?;
-        let mut stmt_like = self
-            .db
+        let mut stmt_like = db
             .prepare("SELECT session_id, weight FROM cass_tokens WHERE token LIKE ?1")?;
 
         for token in &query_tokens {
@@ -407,7 +416,7 @@ impl CassIndex {
         scored.truncate(limit.max(1));
 
         let mut results = Vec::new();
-        let mut stmt = self.db.prepare(
+        let mut stmt = db.prepare(
             "SELECT session_id, cli_name, path, updated_at, cwd FROM cass_sessions WHERE session_id = ?1",
         )?;
 

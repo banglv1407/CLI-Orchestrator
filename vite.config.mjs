@@ -8,4 +8,9 @@ export default defineConfig({
     port: 1407,
     strictPort: true,
   },
+  esbuild: false,
+  optimizeDeps: {
+    noDiscovery: true,
+    include: [],
+  },
 });

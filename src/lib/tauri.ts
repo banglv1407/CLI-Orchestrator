@@ -9,6 +9,10 @@ import type {
   StopCliRequest,
   UpsertCliRequest,
   CooldownEntry,
+  CassIndexStats,
+  CassIndexSummary,
+  CassSearchRequest,
+  CassSearchResult,
 } from '../types';
 
 export function listClis(): Promise<CliDefinition[]> {
@@ -101,4 +105,16 @@ export function clearAccountCooldown(cliName: string, profileName: string): Prom
 
 export function listAccountCooldowns(): Promise<CooldownEntry[]> {
   return invoke('list_account_cooldowns');
+}
+
+export function cassIndexLogs(): Promise<CassIndexSummary> {
+  return invoke('cass_index_logs');
+}
+
+export function cassStats(): Promise<CassIndexStats> {
+  return invoke('cass_stats');
+}
+
+export function cassSearch(request: CassSearchRequest): Promise<CassSearchResult[]> {
+  return invoke('cass_search', { request });
 }

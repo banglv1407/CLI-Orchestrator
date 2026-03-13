@@ -1,4 +1,5 @@
 pub mod account_manager;
+pub mod cass_index;
 pub mod cli_registry;
 pub mod events;
 pub mod execution_engine;

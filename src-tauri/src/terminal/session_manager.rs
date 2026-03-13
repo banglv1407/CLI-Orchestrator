@@ -1,8 +1,7 @@
 use std::{
     collections::HashMap,
-    fs::OpenOptions,
     io::Write,
-    path::{Path, PathBuf},
+    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -314,30 +313,7 @@ fn quote_windows_cmd_arg(value: &str) -> String {
     format!("\"{}\"", escaped)
 }
 
-fn default_logs_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| home.join(".ai-cli-manager").join("logs"))
-}
-
 fn open_session_log(cli_name: &str, session_id: &str) -> Option<std::fs::File> {
-    let logs_dir = default_logs_dir()?;
-    if std::fs::create_dir_all(&logs_dir).is_err() {
-        return None;
-    }
-
-    let safe_cli_name = cli_name
-        .chars()
-        .map(|value| {
-            if value.is_ascii_alphanumeric() || value == '-' || value == '_' {
-                value
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>();
-    let file_name = format!("{}-{}.md", safe_cli_name, session_id);
-    OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(logs_dir.join(file_name))
-        .ok()
+    let _ = (cli_name, session_id);
+    None
 }

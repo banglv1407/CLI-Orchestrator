@@ -100,3 +100,45 @@ export interface SetCooldownRequest {
   profileName: string;
   minutes: number;
 }
+
+export interface CassIndexSummary {
+  indexed: number;
+  skipped: number;
+  removed: number;
+  tokens: number;
+  sessionsTotal: number;
+  tokensTotal: number;
+  sources: CassSourceInfo[];
+  lastIndexedAt: string;
+  errors: number;
+}
+
+export interface CassIndexStats {
+  sessionsTotal: number;
+  tokensTotal: number;
+  sources: CassSourceInfo[];
+  lastIndexedAt?: string;
+}
+
+export interface CassSourceInfo {
+  name: string;
+  path: string;
+  exists: boolean;
+  files: number;
+}
+
+export interface CassSearchResult {
+  sessionId: string;
+  cliName: string;
+  path: string;
+  updatedAt: string;
+  score: number;
+  snippet: string;
+  cwd?: string;
+}
+
+export interface CassSearchRequest {
+  query: string;
+  limit?: number;
+  refresh?: boolean;
+}

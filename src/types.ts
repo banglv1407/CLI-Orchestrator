@@ -59,3 +59,44 @@ export interface UpsertCliRequest {
   cli: CliDefinition;
   originalName?: string;
 }
+
+export interface AccountProfile {
+  id: string;
+  cliName: string;
+  profileName: string;
+  createdAt: string;
+  lastUsed?: string;
+}
+
+export interface AccountStatus {
+  cliName: string;
+  activeProfile?: string;
+  availableProfiles: string[];
+}
+
+export interface CooldownEntry {
+  cliName: string;
+  profileName: string;
+  until: string;
+}
+
+export interface SaveAccountRequest {
+  cliName: string;
+  profileName: string;
+}
+
+export interface ActivateAccountRequest {
+  cliName: string;
+  profileName: string;
+}
+
+export interface DeleteAccountRequest {
+  cliName: string;
+  profileName: string;
+}
+
+export interface SetCooldownRequest {
+  cliName: string;
+  profileName: string;
+  minutes: number;
+}

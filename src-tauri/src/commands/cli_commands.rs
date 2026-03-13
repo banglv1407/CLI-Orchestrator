@@ -8,6 +8,7 @@ use tauri::{AppHandle, State};
 use crate::{
     app_state::AppState,
     core::{
+        account_manager::{AccountProfile, AccountStatus, CooldownEntry},
         cli_registry::{CliDefinition, CliMode, DetectedCli},
         execution_engine::ExecutionEngine,
         project_store::ProjectTag,
@@ -310,4 +311,168 @@ fn open_folder(path: &PathBuf) -> Result<(), String> {
 
     #[allow(unreachable_code)]
     Err("unsupported platform".to_string())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveAccountRequest {
+    pub cli_name: String,
+    pub profile_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivateAccountRequest {
+    pub cli_name: String,
+    pub profile_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteAccountRequest {
+    pub cli_name: String,
+    pub profile_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCooldownRequest {
+    pub cli_name: String,
+    pub profile_name: String,
+    pub minutes: i64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetAccountStatusRequest {
+    pub cli_name: String,
+}
+
+#[tauri::command]
+pub async fn list_accounts(
+    state: State<'_, AppState>,
+    cli_name: String,
+) -> Result<Vec<AccountProfile>, String> {
+    state
+        .account_manager
+        .list_accounts(&cli_name)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn save_account(
+    state: State<'_, AppState>,
+    request: SaveAccountRequest,
+) -> Result<AccountProfile, String> {
+    state
+        .account_manager
+        .backup_account(&request.cli_name, &request.profile_name)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn activate_account(
+    state: State<'_, AppState>,
+    request: ActivateAccountRequest,
+) -> Result<(), String> {
+    state
+        .account_manager
+        .activate_account(&request.cli_name, &request.profile_name)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_account(
+    state: State<'_, AppState>,
+    request: DeleteAccountRequest,
+) -> Result<(), String> {
+    state
+        .account_manager
+        .delete_account(&request.cli_name, &request.profile_name)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn get_account_status(
+    state: State<'_, AppState>,
+    request: GetAccountStatusRequest,
+) -> Result<AccountStatus, String> {
+    state
+        .account_manager
+        .get_account_status(&request.cli_name)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn switch_to_next_account(
+    state: State<'_, AppState>,
+    cli_name: String,
+) -> Result<Option<String>, String> {
+    let next = state
+        .account_manager
+        .select_next_profile(&cli_name)
+        .map_err(|error| error.to_string())?;
+
+    if let Some(profile_name) = &next {
+        state
+            .account_manager
+            .activate_account(&cli_name, profile_name)
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(next)
+}
+
+#[tauri::command]
+pub async fn set_account_cooldown(
+    state: State<'_, AppState>,
+    request: SetCooldownRequest,
+) -> Result<(), String> {
+    state
+        .account_manager
+        .set_cooldown(&request.cli_name, &request.profile_name, request.minutes)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn clear_account_cooldown(
+    state: State<'_, AppState>,
+    cli_name: String,
+    profile_name: String,
+) -> Result<(), String> {
+    state
+        .account_manager
+        .clear_cooldown(&cli_name, &profile_name)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn list_account_cooldowns(
+    state: State<'_, AppState>,
+) -> Result<Vec<CooldownEntry>, String> {
+    state
+        .account_manager
+        .list_cooldowns()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn get_all_account_statuses(
+    state: State<'_, AppState>,
+) -> Result<Vec<AccountStatus>, String> {
+    let cli_names = vec!["claude-code", "claude", "codex", "gemini"];
+    let mut statuses = Vec::new();
+    
+    for cli_name in cli_names {
+        match state.account_manager.get_account_status(cli_name) {
+            Ok(status) => {
+                if !status.available_profiles.is_empty() {
+                    statuses.push(status);
+                }
+            }
+            Err(_) => {}
+        }
+    }
+    
+    Ok(statuses)
 }

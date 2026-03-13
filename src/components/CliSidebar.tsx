@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import type { CliDefinition, SessionInfo } from '../types';
+import { useState, useEffect } from 'react';
+import type { CliDefinition, SessionInfo, AccountStatus } from '../types';
+import { getAllAccountStatuses, saveAccount, activateAccount, deleteAccount, switchToNextAccount } from '../lib/tauri';
 
 function PlayIcon() {
   return (
@@ -21,6 +22,22 @@ function TrashIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M8 6V4h8v2m-1 0v14H9V6" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+    </svg>
+  );
+}
+
+function SwitchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
     </svg>
   );
 }
@@ -52,6 +69,60 @@ export function CliSidebar({
 }: CliSidebarProps) {
   const [showCliList, setShowCliList] = useState(true);
   const [showSessions, setShowSessions] = useState(true);
+  const [showAccounts, setShowAccounts] = useState(true);
+  const [accountStatuses, setAccountStatuses] = useState<AccountStatus[]>([]);
+
+  useEffect(() => {
+    loadAccountStatuses();
+  }, [activeCli]);
+
+  const loadAccountStatuses = async () => {
+    try {
+      const statuses = await getAllAccountStatuses();
+      setAccountStatuses(statuses);
+    } catch (e) {
+      console.error('Failed to load account statuses:', e);
+    }
+  };
+
+  const handleSaveAccount = async (cliName: string) => {
+    const profileName = prompt('Enter profile name (e.g., email or alias):');
+    if (!profileName) return;
+    try {
+      await saveAccount(cliName, profileName);
+      await loadAccountStatuses();
+    } catch (e) {
+      console.error('Failed to save account:', e);
+    }
+  };
+
+  const handleActivateAccount = async (cliName: string, profileName: string) => {
+    try {
+      await activateAccount(cliName, profileName);
+      await loadAccountStatuses();
+    } catch (e) {
+      console.error('Failed to activate account:', e);
+    }
+  };
+
+  const handleDeleteAccount = async (cliName: string, profileName: string) => {
+    if (!confirm(`Delete account "${profileName}"?`)) return;
+    try {
+      await deleteAccount(cliName, profileName);
+      await loadAccountStatuses();
+    } catch (e) {
+      console.error('Failed to delete account:', e);
+    }
+  };
+
+  const handleSwitchNext = async (cliName: string) => {
+    try {
+      await switchToNextAccount(cliName);
+      await loadAccountStatuses();
+    } catch (e) {
+      console.error('Failed to switch to next account:', e);
+    }
+  };
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-cyber-line bg-cyber-panel/75 backdrop-blur">
@@ -165,6 +236,84 @@ export function CliSidebar({
                   <p className="mt-1 truncate font-mono text-xs text-slate-500">{session.id}</p>
                 </button>
               ))
+            )}
+          </div>
+        ) : null}
+
+        <div className="mb-2 mt-7 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setShowAccounts((value) => !value)}
+            className="font-display text-xs uppercase tracking-[0.2em] text-slate-400"
+          >
+            Accounts {showAccounts ? '[-]' : '[+]'}
+          </button>
+        </div>
+
+        {showAccounts ? (
+          <div className="space-y-2">
+            {accountStatuses.length === 0 ? (
+              <p className="rounded border border-dashed border-cyber-line p-3 text-sm text-slate-400">No saved accounts.</p>
+            ) : (
+              accountStatuses.map((status) => (
+                <div key={status.cliName} className="rounded border border-cyber-line bg-cyber-base/60 p-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-slate-100">{status.cliName}</span>
+                    {status.activeProfile && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyber-neon/20 text-cyber-neon">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {status.availableProfiles.map((profile) => (
+                      <div key={profile} className="flex items-center justify-between text-xs">
+                        <span className={`truncate ${status.activeProfile === profile ? 'text-cyber-neon' : 'text-slate-400'}`}>
+                          {profile}
+                        </span>
+                        <div className="flex gap-1">
+                          {status.activeProfile !== profile && (
+                            <button
+                              type="button"
+                              onClick={() => handleActivateAccount(status.cliName, profile)}
+                              title="Switch to this account"
+                              className="flex h-5 w-5 items-center justify-center rounded border border-cyber-neon/60 text-cyber-neon transition hover:bg-cyber-neon/10"
+                            >
+                              <SwitchIcon />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAccount(status.cliName, profile)}
+                            title="Delete account"
+                            className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+            {activeCli && (
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveAccount(activeCli)}
+                  className="flex-1 rounded border border-cyber-neon/60 px-2 py-1.5 text-xs text-cyber-neon transition hover:bg-cyber-neon/10"
+                >
+                  Save Current
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchNext(activeCli)}
+                  className="flex-1 rounded border border-cyber-electric/60 px-2 py-1.5 text-xs text-cyber-electric transition hover:bg-cyber-electric/10"
+                >
+                  Next Account
+                </button>
+              </div>
             )}
           </div>
         ) : null}

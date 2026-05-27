@@ -508,38 +508,24 @@ fn normalize_query_term(raw: &str) -> String {
 
 fn default_sources(home: &Path) -> Vec<CassSourceDefinition> {
     vec![
+        // CassSourceDefinition {
+        //     name: "codex",
+        //     cli_name: "codex",
+        //     root: home.join(".codex").join("sessions"),
+        //     recursive: true,
+        //     extensions: &["jsonl", "json", "md", "txt", "log"],
+        // },
+        // CassSourceDefinition {
+        //     name: "gemini",
+        //     cli_name: "gemini",
+        //     root: home.join(".gemini").join("tmp"),
+        //     recursive: true,
+        //     extensions: &["jsonl", "json", "md", "txt", "log"],
+        // },
         CassSourceDefinition {
-            name: "claude",
-            cli_name: "claude-code",
-            root: home.join(".claude").join("projects"),
-            recursive: true,
-            extensions: &["jsonl", "json", "md", "txt", "log"],
-        },
-        CassSourceDefinition {
-            name: "claude",
-            cli_name: "claude-code",
-            root: home.join(".claude").join("sessions"),
-            recursive: true,
-            extensions: &["jsonl", "json", "md", "txt", "log"],
-        },
-        CassSourceDefinition {
-            name: "claude",
-            cli_name: "claude-code",
-            root: home.join(".claude"),
-            recursive: false,
-            extensions: &["jsonl", "json", "md", "txt", "log"],
-        },
-        CassSourceDefinition {
-            name: "codex",
-            cli_name: "codex",
-            root: home.join(".codex").join("sessions"),
-            recursive: true,
-            extensions: &["jsonl", "json", "md", "txt", "log"],
-        },
-        CassSourceDefinition {
-            name: "gemini",
-            cli_name: "gemini",
-            root: home.join(".gemini"),
+            name: "qwen",
+            cli_name: "qwen",
+            root: home.join(".qwen").join("tmp"),
             recursive: true,
             extensions: &["jsonl", "json", "md", "txt", "log"],
         },

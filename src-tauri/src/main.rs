@@ -15,7 +15,7 @@ use commands::{
         list_account_cooldowns, list_accounts, list_clis, list_project_tags, list_sessions,
         open_backend_logs_folder, pick_folder, save_account, save_cli_tag, save_project_tag,
         send_cli_input, set_account_cooldown, stop_cli, switch_to_next_account, upsert_cli,
-        resize_cli,
+        resize_cli, list_directory_files,
     },
 };
 
@@ -57,6 +57,7 @@ fn main() {
             clear_account_cooldown,
             list_account_cooldowns,
             get_all_account_statuses,
+            list_directory_files,
             cass_index_logs,
             cass_stats,
             cass_search,

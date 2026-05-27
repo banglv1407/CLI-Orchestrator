@@ -1,15 +1,50 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import type { CliDefinition, CliSavedDirectory } from '../types';
+import type { CliDefinition } from '../types';
 
 interface CliStartModalProps {
     isOpen: boolean;
     cli: CliDefinition | null;
+    accountProfiles: string[];
+    activeProfile?: string | null;
+    isLoadingAccounts: boolean;
     onClose: () => void;
-    onConfirm: (cliName: string, directory: string, tag: string) => void;
+    onConfirm: (cliName: string, directory: string, tag: string, profileName: string | null) => void;
 }
 
-export function CliStartModal({ isOpen, cli, onClose, onConfirm }: CliStartModalProps) {
+export function CliStartModal({
+    isOpen,
+    cli,
+    accountProfiles,
+    activeProfile,
+    isLoadingAccounts,
+    onClose,
+    onConfirm,
+}: CliStartModalProps) {
+    const [selectedProfile, setSelectedProfile] = useState<string>('__active__');
+
+    useEffect(() => {
+        if (!isOpen || !cli) return;
+        setSelectedProfile('__active__');
+    }, [cli, isOpen, activeProfile]);
+
+    const profileOptions = useMemo(() => {
+        const options: { value: string; label: string }[] = [];
+        if (activeProfile) {
+            options.push({ value: '__active__', label: `Keep current (${activeProfile})` });
+        } else {
+            options.push({ value: '__active__', label: 'No active account' });
+        }
+        accountProfiles.forEach((profile) => {
+            options.push({ value: profile, label: profile });
+        });
+        return options;
+    }, [accountProfiles, activeProfile]);
+
+    const resolvedProfile = selectedProfile === '__active__' || !selectedProfile
+        ? null
+        : selectedProfile;
+
     const handlePickNewFolder = useCallback(async () => {
         if (!cli) return;
         try {
@@ -20,12 +55,12 @@ export function CliStartModal({ isOpen, cli, onClose, onConfirm }: CliStartModal
             });
 
             if (typeof picked === 'string') {
-                onConfirm(cli.name, picked, '');
+                onConfirm(cli.name, picked, '', resolvedProfile);
             }
         } catch (error) {
             console.error('Failed to pick folder:', error);
         }
-    }, [cli, onConfirm]);
+    }, [cli, onConfirm, resolvedProfile]);
 
     if (!isOpen || !cli) return null;
 
@@ -47,6 +82,27 @@ export function CliStartModal({ isOpen, cli, onClose, onConfirm }: CliStartModal
                 </div>
 
                 <div className="space-y-3">
+                    <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest text-slate-500">
+                            Account Profile
+                        </label>
+                        <select
+                            value={selectedProfile || '__active__'}
+                            onChange={(event) => setSelectedProfile(event.target.value)}
+                            disabled={isLoadingAccounts}
+                            className="w-full rounded border border-cyber-line/60 bg-cyber-base/40 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-cyber-neon disabled:cursor-not-allowed disabled:text-slate-500"
+                        >
+                            {profileOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                        {!isLoadingAccounts && accountProfiles.length === 0 ? (
+                            <p className="text-[11px] text-slate-500">No saved accounts for this CLI.</p>
+                        ) : null}
+                    </div>
+
                     {savedDirs.length > 0 && (
                         <div className="space-y-2">
                             <label className="text-[10px] uppercase tracking-widest text-slate-500">
@@ -56,7 +112,7 @@ export function CliStartModal({ isOpen, cli, onClose, onConfirm }: CliStartModal
                                 {savedDirs.map((dir) => (
                                     <button
                                         key={`${dir.tag}-${dir.path}`}
-                                        onClick={() => onConfirm(cli.name, dir.path, dir.tag)}
+                                        onClick={() => onConfirm(cli.name, dir.path, dir.tag, resolvedProfile)}
                                         className="group w-full rounded border border-cyber-line bg-cyber-base/50 p-3 text-left transition hover:border-cyber-electric/50 hover:bg-cyber-electric/5"
                                     >
                                         <div className="flex items-center justify-between">

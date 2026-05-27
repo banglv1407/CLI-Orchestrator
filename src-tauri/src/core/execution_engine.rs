@@ -23,10 +23,16 @@ impl ExecutionEngine {
         prompt: &str,
         working_dir: Option<String>,
     ) -> ResolvedCommand {
+        let mut parts = cli.command.split_whitespace();
+        let base_command = parts.next().unwrap_or("").to_string();
+        let extra_args: Vec<String> = parts.map(|s| s.to_string()).collect();
+
         let mut used_placeholder = false;
         let prompt_value = prompt.trim();
 
-        let mut args = Vec::with_capacity(cli.args.len());
+        let mut args = Vec::with_capacity(cli.args.len() + extra_args.len());
+        args.extend(extra_args);
+
         for arg in &cli.args {
             if arg.contains("{prompt}") {
                 used_placeholder = true;
@@ -44,7 +50,7 @@ impl ExecutionEngine {
             args.push(prompt_value.to_string());
         }
 
-        let (command, args) = platform_prepare_command(cli.mode.clone(), cli.command.clone(), args);
+        let (command, args) = platform_prepare_command(cli.mode.clone(), base_command, args);
 
         ResolvedCommand {
             command,
@@ -257,5 +263,31 @@ endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\node_
         assert_eq!(parsed, script_target);
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn resolve_command_splits_multi_word_command() {
+        let cli = CliDefinition {
+            name: "aider".to_string(),
+            command: "npx aider --model gemini/gemini-1.5-pro".to_string(),
+            args: vec!["--git".to_string()],
+            mode: CliMode::Interactive,
+            env: HashMap::new(),
+            default_working_dir: None,
+            saved_directories: Vec::new(),
+        };
+        let resolved = ExecutionEngine::resolve_command(&cli, "write tests", None);
+        
+        let actual_args = if resolved.command == "cmd.exe" {
+            &resolved.args[3..]
+        } else {
+            &resolved.args[..]
+        };
+
+        assert_eq!(actual_args[0], "aider".to_string());
+        assert_eq!(actual_args[1], "--model".to_string());
+        assert_eq!(actual_args[2], "gemini/gemini-1.5-pro".to_string());
+        assert_eq!(actual_args[3], "--git".to_string());
+        assert_eq!(actual_args[4], "write tests".to_string());
     }
 }

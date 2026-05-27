@@ -142,3 +142,12 @@ export interface CassSearchRequest {
   limit?: number;
   refresh?: boolean;
 }
+
+export type AppTheme = 'cyberpunk' | 'kawaii';
+
+export interface FileEntry {
+  name: string;
+  path: string;
+  isDir: boolean;
+}
+

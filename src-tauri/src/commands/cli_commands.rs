@@ -476,3 +476,53 @@ pub async fn get_all_account_statuses(
     
     Ok(statuses)
 }
+
+#[derive(serde::Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+}
+
+#[tauri::command]
+pub async fn list_directory_files(path: String) -> Result<Vec<FileEntry>, String> {
+    use std::fs;
+    let mut entries = Vec::new();
+    let dir_entries = fs::read_dir(&path).map_err(|e| format!("Failed to read directory '{}': {}", path, e))?;
+    
+    for entry in dir_entries {
+        if let Ok(entry) = entry {
+            let path_buf = entry.path();
+            let name = path_buf
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            
+            // Filter out hidden files / folders to keep explorer UI clean
+            if name.starts_with('.') {
+                continue;
+            }
+            
+            let is_dir = path_buf.is_dir();
+            entries.push(FileEntry {
+                name,
+                path: path_buf.to_string_lossy().to_string(),
+                is_dir,
+            });
+        }
+    }
+    
+    // Sort: directories first, then files alphabetically
+    entries.sort_by(|a, b| {
+        if a.is_dir != b.is_dir {
+            b.is_dir.cmp(&a.is_dir)
+        } else {
+            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        }
+    });
+    
+    Ok(entries)
+}
+

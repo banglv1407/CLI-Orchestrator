@@ -105,11 +105,15 @@ export function TerminalPanel({
   }, [visibleSessionId, sessions, onSaveTag]);
 
   const fitTerminal = useCallback((sessionId: string) => {
+    if (sessionId !== visibleSessionId) {
+      return;
+    }
     const handle = terminalRefs.current[sessionId];
     if (handle) {
       handle.fit.fit();
+      handle.term.refresh(0, handle.term.rows - 1);
     }
-  }, []);
+  }, [visibleSessionId]);
 
   const ensureTerminal = useCallback(
     (session: SessionInfo) => {
@@ -175,14 +179,12 @@ export function TerminalPanel({
         if (scrollTimeout) {
           window.clearTimeout(scrollTimeout);
         }
-        handle.fit.fit();
         scrollTimeout = window.setTimeout(() => {
-          handle.fit.fit();
           if (viewport) {
             const atBottom = Math.abs(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight) < 50;
             handle.isAtBottom = atBottom;
           }
-        }, 150);
+        }, 100);
       };
       const viewport = mountNode?.querySelector('.xterm-viewport');
       if (viewport) {
@@ -327,16 +329,23 @@ export function TerminalPanel({
       return;
     }
 
-    handle.fit.fit();
+    const refreshTerm = () => {
+      handle.fit.fit();
+      handle.term.refresh(0, handle.term.rows - 1);
+    };
+
+    refreshTerm();
     
-    const timer1 = window.setTimeout(() => handle.fit.fit(), 0);
-    const timer2 = window.setTimeout(() => handle.fit.fit(), MOUNT_DELAY_MS);
-    const timer3 = window.setTimeout(() => handle.fit.fit(), 100);
+    const timer1 = window.setTimeout(refreshTerm, 0);
+    const timer2 = window.setTimeout(refreshTerm, MOUNT_DELAY_MS);
+    const timer3 = window.setTimeout(refreshTerm, 100);
+    const timer4 = window.setTimeout(refreshTerm, 250);
 
     return () => {
       window.clearTimeout(timer1);
       window.clearTimeout(timer2);
       window.clearTimeout(timer3);
+      window.clearTimeout(timer4);
     };
   }, [visibleSessionId]);
 

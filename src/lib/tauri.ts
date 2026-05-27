@@ -13,6 +13,7 @@ import type {
   CassIndexSummary,
   CassSearchRequest,
   CassSearchResult,
+  FileEntry,
 } from '../types';
 
 export function listClis(): Promise<CliDefinition[]> {
@@ -118,3 +119,8 @@ export function cassStats(): Promise<CassIndexStats> {
 export function cassSearch(request: CassSearchRequest): Promise<CassSearchResult[]> {
   return invoke('cass_search', { request });
 }
+
+export function listDirectoryFiles(path: string): Promise<FileEntry[]> {
+  return invoke('list_directory_files', { path });
+}
+

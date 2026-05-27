@@ -5,10 +5,15 @@
   "type": "module",
   "scripts": {
     "predev": "node -e \"try { require('child_process').execSync('netstat -ano | findstr :1407') && require('child_process').execSync('taskkill /F /IM vite.exe /T') } catch (e) {}\"",
-    "dev": "vite",
+    "dev": "vite --configLoader native",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "validate:quick": "cargo fmt --check --manifest-path src-tauri/Cargo.toml && cargo clippy --workspace --manifest-path src-tauri/Cargo.toml -- -D warnings && tsc --noEmit && cargo test --manifest-path src-tauri/Cargo.toml && node scripts/audit-harness-integrity.cjs",
+    "test:integration": "cargo test --manifest-path src-tauri/Cargo.toml --test '*'",
+    "test:e2e": "echo \"No E2E tests configured in Harness v0\"",
+    "test:platform": "node scripts/platform-smoke-check.cjs",
+    "test:release": "npm run validate:quick && npm run test:integration && npm run test:platform"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.0",

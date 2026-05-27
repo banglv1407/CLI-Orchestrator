@@ -1,7 +1,7 @@
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::File,
     io::{Read, Write},
-    path::{Path, PathBuf},
+    path::Path,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -237,31 +237,8 @@ pub fn start_interactive_session(
 }
 
 fn open_session_log(cli_name: &str, session_id: &str) -> Option<File> {
-    let logs_dir = default_logs_dir()?;
-    if fs::create_dir_all(&logs_dir).is_err() {
-        return None;
-    }
-
-    let safe_cli_name = cli_name
-        .chars()
-        .map(|value| {
-            if value.is_ascii_alphanumeric() || value == '-' || value == '_' {
-                value
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>();
-    let file_name = format!("{}-{}.md", safe_cli_name, session_id);
-    OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(logs_dir.join(file_name))
-        .ok()
-}
-
-fn default_logs_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| home.join(".ai-cli-manager").join("logs"))
+    let _ = (cli_name, session_id);
+    None
 }
 
 fn write_log_line(log_file: &mut Option<File>, line: &str) {

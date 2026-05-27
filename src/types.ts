@@ -151,3 +151,18 @@ export interface FileEntry {
   isDir: boolean;
 }
 
+export interface LlmConfig {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  headers: Record<string, string>;
+  systemPrompt: string;
+  stream: boolean;
+}
+
+export interface LlmChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+

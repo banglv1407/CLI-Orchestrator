@@ -160,6 +160,29 @@ export function TerminalPanel({
         },
       });
 
+      term.attachCustomKeyEventHandler((event) => {
+        // Ctrl+C: Copy text if selection exists, otherwise let it pass (SIGINT to PTY)
+        if (event.ctrlKey && event.key === 'c') {
+          if (term.hasSelection()) {
+            const selected = term.getSelection();
+            void navigator.clipboard.writeText(selected);
+            return false;
+          }
+        }
+        // Ctrl+V: Paste text from clipboard to PTY session
+        if (event.ctrlKey && event.key === 'v') {
+          if (event.type === 'keydown') {
+            void navigator.clipboard.readText().then((text) => {
+              if (text) {
+                onSendInput(session.id, text);
+              }
+            });
+          }
+          return false;
+        }
+        return true;
+      });
+
       const fit = new FitAddon();
       term.loadAddon(fit);
       term.open(mountNode);
@@ -403,43 +426,6 @@ export function TerminalPanel({
 
   return (
     <section className="flex h-full min-h-0 flex-col rounded-xl border border-cyber-line bg-cyber-panel/70">
-      <header className="flex items-center justify-between border-b border-cyber-line p-3">
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {sessions.map((session) => (
-            <button
-              key={session.id}
-              type="button"
-              onClick={() => onSelectSession(session.id)}
-              className={`rounded border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${visibleSessionId === session.id
-                ? 'border-cyber-neon bg-cyber-neon/15 text-cyber-neon'
-                : 'border-cyber-line bg-cyber-base text-slate-300'
-                }`}
-            >
-              {session.cliName}
-            </button>
-          ))}
-        </div>
-
-        {visibleSessionId ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveTag}
-              className="rounded border border-cyber-neon/70 px-3 py-1 text-xs uppercase tracking-wider text-cyber-neon transition hover:bg-cyber-neon/10"
-            >
-              Save Tag
-            </button>
-            <button
-              type="button"
-              onClick={() => onStopSession(visibleSessionId)}
-              className="rounded border border-cyber-warn/70 px-3 py-1 text-xs uppercase tracking-wider text-cyber-warn transition hover:bg-cyber-warn/10"
-            >
-              Stop
-            </button>
-          </div>
-        ) : null}
-      </header>
-
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {sessions.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-slate-400">
@@ -465,6 +451,47 @@ export function TerminalPanel({
           ))
         )}
       </div>
+
+      <footer className="flex items-center justify-between border-t border-cyber-line p-3 shrink-0">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {sessions.map((session) => {
+            const lastDirPart = session.workingDir ? (session.workingDir.split(/[/\\]/).pop() || session.workingDir) : '';
+            const displayName = lastDirPart ? `${session.cliName} - ${lastDirPart}` : session.cliName;
+            return (
+              <button
+                key={session.id}
+                type="button"
+                onClick={() => onSelectSession(session.id)}
+                className={`rounded border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${visibleSessionId === session.id
+                  ? 'border-cyber-neon bg-cyber-neon/15 text-cyber-neon'
+                  : 'border-cyber-line bg-cyber-base text-slate-300'
+                  }`}
+              >
+                {displayName}
+              </button>
+            );
+          })}
+        </div>
+
+        {visibleSessionId ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveTag}
+              className="rounded border border-cyber-neon/70 px-3 py-1 text-xs uppercase tracking-wider text-cyber-neon transition hover:bg-cyber-neon/10"
+            >
+              Save Tag
+            </button>
+            <button
+              type="button"
+              onClick={() => onStopSession(visibleSessionId)}
+              className="rounded border border-cyber-warn/70 px-3 py-1 text-xs uppercase tracking-wider text-cyber-warn transition hover:bg-cyber-warn/10"
+            >
+              Stop
+            </button>
+          </div>
+        ) : null}
+      </footer>
     </section>
   );
 }

@@ -1,18 +1,23 @@
 # CLI Orchestrator
 
-A powerful, high-performance desktop application for managing and orchestrating multiple AI CLI tools. Unlike simple wrappers, CLI Orchestrator provides a full pseudo-terminal (PTY) environment, allowing you to interact with tools like `aider`, `claude-code`, and `gemini-cli` in a unified, multi-tabbed interface.
+A powerful, high-performance desktop application for managing and orchestrating multiple AI CLI tools. Unlike simple wrappers, CLI Orchestrator provides a full pseudo-terminal (PTY) environment, allowing you to interact with tools like `aider`, `claude-code`, and `gemini-cli` in a unified, multi-tabbed interface with a built-in custom AI Chat Companion.
 
 ![Dashboard Screen](Screen1.png)
 
 ## 🚀 Key Features
 
 - **Multi-Session Interactive Terminal**: Run multiple interactive CLI sessions simultaneously using a robust XTerm.js-powered UI and a Rust-based PTY backend.
+- **Smart Ctrl+C / Ctrl+V Support**: Seamlessly copy selected terminal text or paste text from the system clipboard directly into PTY sessions.
+- **Built-in AI Companion**: 
+  - Chat with a custom LLM right from the sidebar!
+  - Fully customizable: support OpenAI-compatible custom endpoints, custom models, custom API keys, custom headers (e.g. customized `User-Agent`), custom System Prompt, and toggleable **Stream Mode**.
+  - History is preserved locally across app restarts.
+- **Cyberpunk Resizable Sidebar**: Resize the VSCode-style sidebar by clicking and dragging with the mouse. Width is automatically persisted.
+- **Auto-focused Explorer Workspace**: Switching between active PTY sessions automatically focuses the File Explorer tab, loads the corresponding session's working directory, and updates the workspace view seamlessly.
+- **Interactive File Actions**: Click files in the Explorer tree to instantly send their paths to the active PTY session (or copy to clipboard silently if no active session is selected) with reactive Anime Assistant status feedback (no annoying system confirm/alert popups).
+- **Tab Layout Optimization**: Reorganized control panel with session tabs, "Save Tag", and "Stop" actions housed in a clean sticky bottom Footer, maximizing terminal output area.
 - **Dynamic CLI Registration**: Add any CLI tool by simply defining a JSON configuration.
 - **Smart Directory Management**: Save and quickly select working directories for your projects. Tags are automatically associated with paths for seamless context switching.
-- **Execution Modes**:
-  - **Interactive**: Full REPL support with terminal emulation.
-  - **Streaming**: Real-time output streaming for non-interactive long-running tasks.
-  - **One-shot**: Quick command execution with result capture.
 - **Premium Aesthetics**: Choose between **Cyberpunk** and **Kawaii** themes, featuring a reactive **Anime Assistant** that reflects the current system state.
 
 ## 🛠 Tech Stack
@@ -82,4 +87,3 @@ Example configuration:
 
 ## 📄 License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-

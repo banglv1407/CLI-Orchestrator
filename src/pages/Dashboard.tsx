@@ -408,6 +408,8 @@ export function Dashboard() {
         setTheme={setTheme}
         assistantState={assistantState}
         assistantText={assistantText}
+        setAssistantState={setAssistantState}
+        setAssistantText={setAssistantText}
       />
 
       <section className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">

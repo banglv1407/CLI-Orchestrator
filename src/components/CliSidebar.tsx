@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
-import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState } from '../types';
+import { useState, useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage } from '../types';
 import { AnimeAssistant } from './AnimeAssistant';
+import { LlmConfigModal } from './LlmConfigModal';
 import { 
   listDirectoryFiles, 
   pickFolder,
@@ -113,6 +115,8 @@ interface CliSidebarProps {
   setTheme: (theme: AppTheme) => void;
   assistantState: AssistantState;
   assistantText: string;
+  setAssistantState?: (state: AssistantState) => void;
+  setAssistantText?: (text: string) => void;
 }
 
 type SidebarTab = 'explorer' | 'cli-manager' | 'settings';
@@ -132,8 +136,213 @@ export function CliSidebar({
   setTheme,
   assistantState,
   assistantText,
+  setAssistantState,
+  setAssistantText,
 }: CliSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('explorer');
+
+  // --- Sidebar Resizer Code ---
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('ai-cli-sidebar-width');
+    return saved ? parseInt(saved, 10) : 320;
+  });
+
+  const isResizingRef = useRef(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const newWidth = Math.max(220, Math.min(e.clientX, 800));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        localStorage.setItem('ai-cli-sidebar-width', String(sidebarWidth));
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [sidebarWidth]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  // Auto-switch to Explorer tab when an active session changes and has a workingDir
+  useEffect(() => {
+    if (activeSessionId) {
+      const activeSess = sessions.find((s) => s.id === activeSessionId);
+      if (activeSess?.workingDir) {
+        setActiveTab('explorer');
+      }
+    }
+  }, [activeSessionId, sessions]);
+
+  // --- LLM Chat States & Handlers ---
+  const DEFAULT_LLM_CONFIG: LlmConfig = {
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
+    apiKey: '',
+    headers: {
+      'User-Agent': 'AI-CLI-Orchestrator'
+    },
+    systemPrompt: 'You are an intelligent terminal companion helping developers with their terminal commands and daily programming tasks. Keep your answers concise, practical and optimized.',
+    stream: false
+  };
+
+  const [showLlmChat, setShowLlmChat] = useState(() => {
+    return localStorage.getItem('ai-cli-show-llm-chat') !== 'false';
+  });
+
+  const [llmConfig, setLlmConfig] = useState<LlmConfig>(() => {
+    const saved = localStorage.getItem('ai-cli-llm-config');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
+    }
+    return DEFAULT_LLM_CONFIG;
+  });
+
+  const [chatHistory, setChatHistory] = useState<LlmChatMessage[]>(() => {
+    const saved = localStorage.getItem('ai-cli-llm-history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  });
+
+  const [chatInput, setChatInput] = useState('');
+  const [isLoadingLlm, setIsLoadingLlm] = useState(false);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Persist showLlmChat state
+  useEffect(() => {
+    localStorage.setItem('ai-cli-show-llm-chat', String(showLlmChat));
+  }, [showLlmChat]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory, isLoadingLlm]);
+
+  const handleSaveLlmConfig = (newConfig: LlmConfig) => {
+    setLlmConfig(newConfig);
+    localStorage.setItem('ai-cli-llm-config', JSON.stringify(newConfig));
+    if (setAssistantState && setAssistantText) {
+      setAssistantState('Done');
+      setAssistantText('LLM configuration saved successfully!');
+    }
+  };
+
+  const handleClearChat = () => {
+    setChatHistory([]);
+    localStorage.removeItem('ai-cli-llm-history');
+    if (setAssistantState && setAssistantText) {
+      setAssistantState('Done');
+      setAssistantText('Chat history cleared.');
+    }
+  };
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isLoadingLlm) return;
+
+    const userMessageContent = chatInput.trim();
+    setChatInput('');
+
+    const userMsg: LlmChatMessage = {
+      role: 'user',
+      content: userMessageContent,
+      timestamp: new Date().toLocaleTimeString(),
+    };
+
+    const newHistory = [...chatHistory, userMsg];
+    setChatHistory(newHistory);
+    localStorage.setItem('ai-cli-llm-history', JSON.stringify(newHistory));
+
+    setIsLoadingLlm(true);
+    if (setAssistantState && setAssistantText) {
+      setAssistantState('Thinking');
+      setAssistantText('AI Companion is processing your request...');
+    }
+
+    try {
+      const contextMessages = newHistory.slice(-10).map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      const reply = await invoke<string>('send_llm_chat', {
+        request: {
+          baseUrl: llmConfig.baseUrl,
+          model: llmConfig.model,
+          apiKey: llmConfig.apiKey,
+          headers: llmConfig.headers,
+          systemPrompt: llmConfig.systemPrompt,
+          messages: contextMessages,
+          stream: llmConfig.stream ?? false,
+        },
+      });
+
+      const assistantMsg: LlmChatMessage = {
+        role: 'assistant',
+        content: reply,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+
+      const updatedHistory = [...newHistory, assistantMsg];
+      setChatHistory(updatedHistory);
+      localStorage.setItem('ai-cli-llm-history', JSON.stringify(updatedHistory));
+
+      setIsLoadingLlm(false);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText(reply.length > 50 ? `${reply.slice(0, 50)}...` : reply);
+        setTimeout(() => {
+          setAssistantState('Idle');
+        }, 4000);
+      }
+    } catch (error) {
+      console.error('LLM request failed:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      
+      const assistantMsg: LlmChatMessage = {
+        role: 'assistant',
+        content: `Error: ${errorMsg}\n\nPlease check your LLM configuration, custom API endpoint URL, network connections, or headers (User-Agent).`,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+
+      const updatedHistory = [...newHistory, assistantMsg];
+      setChatHistory(updatedHistory);
+      localStorage.setItem('ai-cli-llm-history', JSON.stringify(updatedHistory));
+      
+      setIsLoadingLlm(false);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Error');
+        setAssistantText(`LLM Error: ${errorMsg}`);
+      }
+    }
+  };
 
   // CLI Manager States
   const [showCliList, setShowCliList] = useState(true);
@@ -156,6 +365,11 @@ export function CliSidebar({
         })
         .catch((e) => console.error('Failed to load root files:', e));
     }
+  }, [rootPath]);
+
+  // Clear expanded subfolders when root workspace changes
+  useEffect(() => {
+    setExpandedPaths({});
   }, [rootPath]);
 
   // Folder selection helper
@@ -192,16 +406,22 @@ export function CliSidebar({
   // Click file inside tree
   const handleFileClick = (entry: FileEntry) => {
     if (activeSessionId) {
-      // Send smart paste command to active terminal session
-      const message = confirm(`Send file path to terminal?\n\n"${entry.path}"`);
-      if (message) {
-        void sendCliInput(activeSessionId, ` "${entry.path}" `);
+      // Send smart paste command to active terminal session directly without any confirm dialog
+      void sendCliInput(activeSessionId, ` "${entry.path}" `);
+      if (setAssistantText) {
+        setAssistantText(`Sent file path to terminal: ${entry.path.split(/[/\\]/).pop()}`);
       }
     } else {
-      // Otherwise fallback to copying path
+      // Otherwise fallback to copying path silently without any alert dialog
       navigator.clipboard.writeText(entry.path)
-        .then(() => alert(`Copied file path to clipboard:\n${entry.path}`))
-        .catch(() => alert('Failed to copy file path.'));
+        .then(() => {
+          if (setAssistantText) {
+            setAssistantText(`Copied file path to clipboard: ${entry.path.split(/[/\\]/).pop()}`);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to copy file path:', err);
+        });
     }
   };
 
@@ -258,7 +478,15 @@ export function CliSidebar({
   };
 
   return (
-    <div className="flex h-full w-80 shrink-0 border-r border-cyber-line bg-cyber-panel/75 backdrop-blur">
+    <div
+      className="relative flex h-full shrink-0 border-r border-cyber-line bg-cyber-panel/75 backdrop-blur"
+      style={{ width: `${sidebarWidth}px` }}
+    >
+      {/* Resizable drag handle bar */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-cyber-neon/40 active:bg-cyber-neon transition-colors z-50"
+      />
       {/* 1. Left-most Activity Bar (VSCode Style) */}
       <nav className="flex h-full w-14 flex-col items-center justify-between border-r border-cyber-line/50 bg-cyber-base/70 py-4">
         <div className="flex flex-col gap-5">
@@ -378,6 +606,88 @@ export function CliSidebar({
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-5">
+              {/* LLM COMPANION SECTION */}
+              <div className="pb-4 border-b border-cyber-line/30">
+                <div className="mb-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setShowLlmChat((value) => !value)}
+                    className="font-display text-xs uppercase tracking-[0.2em] text-slate-400 hover:text-slate-200"
+                  >
+                    AI Companion {showLlmChat ? '[-]' : '[+]'}
+                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setConfigModalOpen(true)}
+                      className="rounded border border-cyber-electric/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10"
+                    >
+                      Config
+                    </button>
+                    {chatHistory.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearChat}
+                        className="rounded border border-cyber-warn/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-warn transition hover:border-cyber-warn hover:bg-cyber-warn/10"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {showLlmChat && (
+                  <div className="flex flex-col rounded-lg border border-cyber-line bg-cyber-base/20 p-2 text-xs">
+                    {/* Chat Messages Log */}
+                    <div className="h-96 overflow-y-auto space-y-2 mb-2 pr-1 scrollbar-thin">
+                      {chatHistory.length === 0 ? (
+                        <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-6 italic text-[11px]">
+                          No messages yet. Ask me anything about commands, coding or settings!
+                        </div>
+                      ) : (
+                        chatHistory.map((msg, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`flex flex-col max-w-[90%] rounded-lg px-2.5 py-1.5 leading-normal ${
+                              msg.role === 'user'
+                                ? 'bg-cyber-neon/10 border border-cyber-neon/30 text-slate-100 self-end ml-auto'
+                                : 'bg-cyber-electric/15 border border-cyber-electric/30 text-slate-200 self-start mr-auto'
+                            }`}
+                          >
+                            <span className={`text-[8px] font-bold uppercase tracking-wider mb-0.5 ${
+                              msg.role === 'user' ? 'text-cyber-neon' : 'text-cyber-electric'
+                            }`}>
+                              {msg.role === 'user' ? 'You' : 'AI Companion'}
+                            </span>
+                            <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed">{msg.content}</p>
+                          </div>
+                        ))
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Chat Input form */}
+                    <form onSubmit={handleSendChatMessage} className="flex gap-1.5 items-center">
+                      <input
+                        type="text"
+                        placeholder="Type a message..."
+                        value={chatInput}
+                        disabled={isLoadingLlm}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        className="flex-1 min-w-0 rounded border border-cyber-line bg-cyber-base px-2 py-1 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[11px] disabled:opacity-50"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isLoadingLlm || !chatInput.trim()}
+                        className="shrink-0 rounded border border-cyber-neon bg-cyber-neon/15 px-3 py-1 font-bold uppercase text-[10px] text-cyber-neon hover:bg-cyber-neon/25 transition disabled:opacity-30 disabled:hover:bg-transparent"
+                      >
+                        Send
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+
               {/* CLIs SECTION */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
@@ -497,6 +807,14 @@ export function CliSidebar({
           </div>
         )}
       </aside>
+
+      {/* LLM Configuration Modal */}
+      <LlmConfigModal
+        isOpen={configModalOpen}
+        onClose={() => setConfigModalOpen(false)}
+        config={llmConfig}
+        onSave={handleSaveLlmConfig}
+      />
     </div>
   );
 }

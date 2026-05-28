@@ -5,6 +5,7 @@ import { CliEditorModal } from '../components/CliEditorModal';
 import { CliStartModal } from '../components/CliStartModal';
 import { CliSidebar } from '../components/CliSidebar';
 import { TerminalPanel } from '../components/TerminalPanel';
+import { SshConnectionModal } from '../components/SshConnectionModal';
 import {
   createTerminalSession,
   deleteCli,
@@ -17,6 +18,10 @@ import {
   stopCli,
   upsertCli,
   activateAccount,
+  loadSshConnections,
+  saveSshConnections,
+  createSshSession,
+  createRdpSession,
 } from '../lib/tauri';
 import type {
   AssistantState,
@@ -24,6 +29,7 @@ import type {
   CliSavedDirectory,
   CliStatusEvent,
   SessionInfo,
+  SshConnection,
 } from '../types';
 
 const DEFAULT_ASSISTANT_TEXT = 'Select a CLI and start an interactive session.';
@@ -52,6 +58,30 @@ export function Dashboard() {
     return stored === 'kawaii' ? 'kawaii' : 'cyberpunk';
   });
   const [globalProjectTags, setGlobalProjectTags] = useState<{ tag: string; path: string }[]>([]);
+  
+  const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
+  const [sshModalOpen, setSshModalOpen] = useState(false);
+  const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
+
+  const [recentFolders, setRecentFolders] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('ai-cli-folder-history');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const addFolderToHistory = useCallback((path: string) => {
+    if (!path) return;
+    setRecentFolders((current) => {
+      const cleaned = path.trim();
+      const filtered = current.filter((p) => p !== cleaned);
+      const next = [cleaned, ...filtered].slice(0, 10);
+      localStorage.setItem('ai-cli-folder-history', JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const displaySessions = useMemo(
     () => [...pendingSessions, ...sessions],
@@ -175,11 +205,22 @@ export function Dashboard() {
     void loadTags();
   }, []);
 
-  const handleSaveProjectTag = useCallback(
-    async (tag: string, path: string) => {
-      if (!activeCli) return;
+  useEffect(() => {
+    const loadSsh = async () => {
       try {
-        await saveCliTag(activeCli, tag, path);
+        const conns = await loadSshConnections();
+        setSshConnections(conns);
+      } catch (e) {
+        console.error('Failed to load SSH connections:', e);
+      }
+    };
+    void loadSsh();
+  }, []);
+
+  const handleSaveProjectTag = useCallback(
+    async (cliName: string, tag: string, path: string) => {
+      try {
+        await saveCliTag(cliName, tag, path);
         const tags = await listProjectTags();
         setGlobalProjectTags(tags);
         setProjectTag(tag);
@@ -193,7 +234,7 @@ export function Dashboard() {
         setAssistantText(`Save tag failed: ${message}`);
       }
     },
-    [activeCli, refreshSidebarData],
+    [refreshSidebarData],
   );
 
   const mergeCliIntoState = useCallback(
@@ -233,6 +274,10 @@ export function Dashboard() {
           projectTag: config.projectTag,
         });
 
+        if (session.workingDir) {
+          addFolderToHistory(session.workingDir);
+        }
+
         setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
         mergeCliIntoState(session);
         void refreshSidebarData();
@@ -247,7 +292,7 @@ export function Dashboard() {
         setAssistantText(`Interactive start failed: ${message}`);
       }
     },
-    [mergeCliIntoState, refreshSidebarData],
+    [mergeCliIntoState, refreshSidebarData, addFolderToHistory],
   );
 
   const handleConfirmStart = useCallback(
@@ -349,6 +394,111 @@ export function Dashboard() {
     [refreshSidebarData],
   );
 
+  const handleConnectSsh = useCallback(
+    async (connection: SshConnection) => {
+      const pendingId = `pending-${Date.now()}`;
+      const fakeSession: SessionInfo = {
+        id: pendingId,
+        cliName: `SSH: ${connection.name}`,
+        status: 'loading',
+      };
+
+      setPendingSessions((current) => [...current, fakeSession]);
+      setActiveSessionId(pendingId);
+
+      try {
+        const session = await createSshSession(connection);
+        setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
+        mergeCliIntoState(session);
+        void refreshSidebarData();
+        setAssistantState('Done');
+        setAssistantText(`SSH Session started for ${connection.name}`);
+      } catch (error) {
+        setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
+        setActiveSessionId(null);
+        await refreshSidebarData();
+        const message = error instanceof Error ? error.message : String(error);
+        setAssistantState('Error');
+        setAssistantText(`SSH Connection failed: ${message}`);
+      }
+    },
+    [mergeCliIntoState, refreshSidebarData],
+  );
+
+  const handleConnectRdp = useCallback(
+    async (connection: SshConnection) => {
+      try {
+        setAssistantState('Thinking');
+        setAssistantText(`Launching RDP Connection to ${connection.name}...`);
+        await createRdpSession(connection);
+        setAssistantState('Done');
+        setAssistantText(`RDP session launched for ${connection.name}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setAssistantState('Error');
+        setAssistantText(`RDP Connection failed: ${message}`);
+      }
+    },
+    [],
+  );
+
+  const handleSaveSshConnection = useCallback(
+    async (connection: SshConnection) => {
+      try {
+        let nextList = [...sshConnections];
+        const idx = nextList.findIndex((c) => c.id === connection.id);
+        if (idx >= 0) {
+          nextList[idx] = connection;
+        } else {
+          nextList.push(connection);
+        }
+
+        await saveSshConnections(nextList);
+        setSshConnections(nextList);
+        setAssistantState('Done');
+        setAssistantText(`SSH Connection "${connection.name}" saved.`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setAssistantState('Error');
+        setAssistantText(`Failed to save connection: ${message}`);
+      }
+    },
+    [sshConnections],
+  );
+
+  const handleDeleteSshConnection = useCallback(
+    async (connection: SshConnection) => {
+      try {
+        const ok = await confirm(`Are you sure you want to delete the VM connection "${connection.name}"?`, {
+          title: 'Delete Connection',
+          kind: 'warning',
+        });
+        if (!ok) return;
+
+        const nextList = sshConnections.filter((c) => c.id !== connection.id);
+        await saveSshConnections(nextList);
+        setSshConnections(nextList);
+        setAssistantState('Done');
+        setAssistantText(`Connection "${connection.name}" deleted.`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setAssistantState('Error');
+        setAssistantText(`Delete failed: ${message}`);
+      }
+    },
+    [sshConnections],
+  );
+
+  const handleAddSsh = useCallback(() => {
+    setEditingSsh(null);
+    setSshModalOpen(true);
+  }, []);
+
+  const handleEditSsh = useCallback((connection: SshConnection) => {
+    setEditingSsh(connection);
+    setSshModalOpen(true);
+  }, []);
+
   const handleSelectCli = useCallback(
     (cliName: string) => {
       setActiveCli(cliName);
@@ -376,17 +526,6 @@ export function Dashboard() {
     async (cli: CliDefinition) => {
       setCliToStart(cli);
       setCliStartModalOpen(true);
-      setStartAccountsLoading(true);
-      try {
-        const status = await getAccountStatus(cli.name);
-        setStartAccountProfiles(status.availableProfiles ?? []);
-        setStartAccountActive(status.activeProfile ?? null);
-      } catch {
-        setStartAccountProfiles([]);
-        setStartAccountActive(null);
-      } finally {
-        setStartAccountsLoading(false);
-      }
     },
     [],
   );
@@ -410,6 +549,13 @@ export function Dashboard() {
         assistantText={assistantText}
         setAssistantState={setAssistantState}
         setAssistantText={setAssistantText}
+        
+        sshConnections={sshConnections}
+        onConnectSsh={handleConnectSsh}
+        onConnectRdp={handleConnectRdp}
+        onAddSsh={handleAddSsh}
+        onEditSsh={handleEditSsh}
+        onDeleteSsh={handleDeleteSshConnection}
       />
 
       <section className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
@@ -421,6 +567,7 @@ export function Dashboard() {
             onSendInput={handleSendTerminalInput}
             onStopSession={handleStopSession}
             onSaveTag={handleSaveProjectTag}
+            sshConnections={sshConnections}
           />
         </div>
       </section>
@@ -438,8 +585,17 @@ export function Dashboard() {
         accountProfiles={startAccountProfiles}
         activeProfile={startAccountActive}
         isLoadingAccounts={startAccountsLoading}
+        recentFolders={recentFolders}
         onClose={() => setCliStartModalOpen(false)}
         onConfirm={handleConfirmStart}
+      />
+
+      <SshConnectionModal
+        isOpen={sshModalOpen}
+        connection={editingSsh}
+        existingGroups={Array.from(new Set(sshConnections.map((c) => c.group || 'Default')))}
+        onClose={() => setSshModalOpen(false)}
+        onSave={handleSaveSshConnection}
       />
     </main>
   );

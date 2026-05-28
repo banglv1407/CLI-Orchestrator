@@ -6,6 +6,7 @@ mod core;
 mod runners;
 mod terminal;
 
+use tauri::Manager;
 use app_state::AppState;
 use commands::{
     cass_commands::{cass_index_logs, cass_search, cass_stats},
@@ -16,6 +17,8 @@ use commands::{
         open_backend_logs_folder, pick_folder, save_account, save_cli_tag, save_project_tag,
         send_cli_input, set_account_cooldown, stop_cli, switch_to_next_account, upsert_cli,
         resize_cli, list_directory_files, send_llm_chat,
+        read_file_content, write_file_content, get_git_status, get_git_diff,
+        pick_file, load_ssh_connections, save_ssh_connections, create_ssh_session, create_rdp_session, open_workspace_folder,
     },
 };
 
@@ -58,11 +61,79 @@ fn main() {
             list_account_cooldowns,
             get_all_account_statuses,
             list_directory_files,
+            read_file_content,
+            write_file_content,
+            get_git_status,
+            get_git_diff,
             send_llm_chat,
             cass_index_logs,
             cass_stats,
             cass_search,
+            pick_file,
+            load_ssh_connections,
+            save_ssh_connections,
+            create_ssh_session,
+            create_rdp_session,
+            open_workspace_folder,
         ])
+        .setup(|app| {
+            let show = tauri::menu::MenuItem::with_id(app, "show", "Hiện ứng dụng", true, None::<&str>)?;
+            let hide = tauri::menu::MenuItem::with_id(app, "hide", "Ẩn xuống khay hệ thống", true, None::<&str>)?;
+            let quit = tauri::menu::MenuItem::with_id(app, "quit", "Thoát hoàn toàn", true, None::<&str>)?;
+            
+            let tray_menu = tauri::menu::Menu::with_items(app, &[&show, &hide, &quit])?;
+            
+            let _tray = tauri::tray::TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&tray_menu)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                         "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "hide" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.hide();
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let is_visible = window.is_visible().unwrap_or(false);
+                            let is_focused = window.is_focused().unwrap_or(false);
+                            let is_minimized = window.is_minimized().unwrap_or(false);
+                            
+                            if is_visible && is_focused && !is_minimized {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    }
+                })
+                .build(app)?;
+            
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running AI CLI Manager");
 }

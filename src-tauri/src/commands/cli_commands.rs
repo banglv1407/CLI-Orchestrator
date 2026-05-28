@@ -526,6 +526,117 @@ pub async fn list_directory_files(path: String) -> Result<Vec<FileEntry>, String
     Ok(entries)
 }
 
+#[tauri::command]
+pub async fn read_file_content(path: String) -> Result<String, String> {
+    use std::fs;
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read file '{}': {}", path, e))
+}
+
+#[tauri::command]
+pub async fn write_file_content(path: String, content: String) -> Result<(), String> {
+    use std::fs;
+    fs::write(&path, content).map_err(|e| format!("Failed to write file '{}': {}", path, e))
+}
+
+fn create_silent_command(program: &str) -> std::process::Command {
+    let mut cmd = std::process::Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    cmd
+}
+
+#[derive(serde::Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStatusEntry {
+    pub path: String,
+    pub status: String,
+}
+
+#[tauri::command]
+pub async fn get_git_status(repo_path: String) -> Result<Vec<GitStatusEntry>, String> {
+    let output = create_silent_command("git")
+        .arg("rev-parse")
+        .arg("--is-inside-work-tree")
+        .current_dir(&repo_path)
+        .output();
+        
+    match output {
+        Ok(out) if out.status.success() => {
+            let status_out = create_silent_command("git")
+                .arg("status")
+                .arg("--porcelain")
+                .current_dir(&repo_path)
+                .output()
+                .map_err(|e| format!("Failed to run git status: {}", e))?;
+                
+            let stdout_str = String::from_utf8_lossy(&status_out.stdout);
+            let mut entries = Vec::new();
+            
+            for line in stdout_str.lines() {
+                if line.len() > 3 {
+                    let git_status = line[..2].trim().to_string();
+                    let file_path = line[3..].trim().to_string();
+                    
+                    let status_str = match git_status.as_str() {
+                        "M" => "modified",
+                        "A" => "added",
+                        "D" => "deleted",
+                        "??" | "?" => "untracked",
+                        _ => "modified",
+                    };
+                    
+                    entries.push(GitStatusEntry {
+                        path: file_path,
+                        status: status_str.to_string(),
+                    });
+                }
+            }
+            Ok(entries)
+        }
+        _ => {
+            Ok(Vec::new())
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_git_diff(repo_path: String, file_path: String, is_untracked: bool) -> Result<String, String> {
+    use std::fs;
+    use std::path::Path;
+    
+    if is_untracked {
+        let full_path = Path::new(&repo_path).join(&file_path);
+        let content = fs::read_to_string(&full_path)
+            .map_err(|e| format!("Failed to read untracked file: {}", e))?;
+            
+        let mut diff = format!("--- /dev/null\n+++ b/{}\n@@ -0,0 +1,{} @@\n", file_path, content.lines().count());
+        for line in content.lines() {
+            diff.push_str(&format!("+{}\n", line));
+        }
+        return Ok(diff);
+    }
+    
+    let output = create_silent_command("git")
+        .arg("diff")
+        .arg("HEAD")
+        .arg("--")
+        .arg(&file_path)
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {}", e))?;
+        
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+    
+    let diff_str = String::from_utf8_lossy(&output.stdout).to_string();
+    Ok(diff_str)
+}
+
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LlmChatRequest {
@@ -667,4 +778,153 @@ pub async fn send_llm_chat(request: LlmChatRequest) -> Result<String, String> {
         
     Ok(content.to_string())
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshConnection {
+    pub id: String,
+    pub name: String,
+    #[serde(default = "default_protocol")]
+    pub protocol: String, // "ssh" or "rdp"
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub auth_mode: Option<String>,
+    pub key_path: Option<String>,
+    pub password: Option<String>,
+    pub group: String,
+    pub rdp_resolution: Option<String>,
+    pub rdp_share_clipboard: Option<bool>,
+    pub rdp_share_drives: Option<bool>,
+}
+
+fn default_protocol() -> String {
+    "ssh".to_string()
+}
+
+#[tauri::command]
+pub fn pick_file() -> Result<Option<String>, String> {
+    Ok(rfd::FileDialog::new()
+        .pick_file()
+        .map(|path| path.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
+pub async fn load_ssh_connections(state: State<'_, AppState>) -> Result<Vec<SshConnection>, String> {
+    let root_dir = state.registry.data_dirs().root_dir;
+    let path = root_dir.join("ssh_connections.json");
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let data = std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let connections: Vec<SshConnection> = serde_json::from_str(&data).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    Ok(connections)
+}
+
+#[tauri::command]
+pub async fn save_ssh_connections(
+    state: State<'_, AppState>,
+    connections: Vec<SshConnection>,
+) -> Result<(), String> {
+    let root_dir = state.registry.data_dirs().root_dir;
+    std::fs::create_dir_all(&root_dir).map_err(|e| format!("Failed to create directory: {}", e))?;
+    let path = root_dir.join("ssh_connections.json");
+    let data = serde_json::to_string_pretty(&connections).map_err(|e| format!("Failed to serialize JSON: {}", e))?;
+    std::fs::write(&path, data).map_err(|e| format!("Failed to write file: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn create_ssh_session(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    connection: SshConnection,
+) -> Result<SessionInfo, String> {
+    let mut args = vec![
+        "-p".to_string(),
+        connection.port.to_string(),
+    ];
+    if connection.auth_mode.as_deref() == Some("key") {
+        if let Some(ref path) = connection.key_path {
+            args.push("-i".to_string());
+            args.push(path.clone());
+        }
+    }
+    args.push(format!("{}@{}", connection.user, connection.host));
+
+    let command = crate::core::execution_engine::ResolvedCommand {
+        command: "ssh".to_string(),
+        args,
+        env: std::collections::HashMap::new(),
+        cwd: None,
+    };
+
+    let display_name = format!("SSH: {}", connection.name);
+    state
+        .session_manager
+        .create_session(app, display_name, None, None, command)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn create_rdp_session(
+    state: State<'_, AppState>,
+    connection: SshConnection,
+) -> Result<(), String> {
+    let root_dir = state.registry.data_dirs().root_dir;
+    let rdp_dir = root_dir.join("rdp_profiles");
+    std::fs::create_dir_all(&rdp_dir).map_err(|e| format!("Failed to create RDP directory: {}", e))?;
+    
+    let file_path = rdp_dir.join(format!("{}.rdp", connection.id));
+    
+    // Resolution parameters
+    let (screen_mode, width, height) = match connection.rdp_resolution.as_deref() {
+        Some("fullscreen") => (2, 1920, 1080),
+        Some("1080p") => (1, 1920, 1080),
+        Some("720p") => (1, 1280, 720),
+        _ => (1, 1440, 900),
+    };
+    
+    let share_clipboard = if connection.rdp_share_clipboard.unwrap_or(true) { 1 } else { 0 };
+    let share_drives = if connection.rdp_share_drives.unwrap_or(false) { 1 } else { 0 };
+    
+    let rdp_content = format!(
+        "screen mode id:i:{}\r\n\
+         desktopwidth:i:{}\r\n\
+         desktopheight:i:{}\r\n\
+         session bpp:i:32\r\n\
+         full address:s:{}:{}\r\n\
+         username:s:{}\r\n\
+         redirectclip:i:{}\r\n\
+         redirectdrives:i:{}\r\n\
+         prompt for credentials:i:1\r\n",
+        screen_mode, width, height, connection.host, connection.port, connection.user, share_clipboard, share_drives
+    );
+    
+    std::fs::write(&file_path, rdp_content).map_err(|e| format!("Failed to write RDP file: {}", e))?;
+    
+    #[cfg(target_os = "windows")]
+    {
+        let path_str = file_path.to_string_lossy().to_string();
+        std::process::Command::new("mstsc.exe")
+            .arg(path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to launch mstsc.exe: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_workspace_folder(path: String) -> Result<(), String> {
+    let p = PathBuf::from(path);
+    if !p.exists() {
+        return Err("Directory does not exist".to_string());
+    }
+    open_folder(&p)
+}
+
+
+
 

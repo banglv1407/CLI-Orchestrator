@@ -8,6 +8,7 @@ interface CliStartModalProps {
     accountProfiles: string[];
     activeProfile?: string | null;
     isLoadingAccounts: boolean;
+    recentFolders: string[];
     onClose: () => void;
     onConfirm: (cliName: string, directory: string, tag: string, profileName: string | null) => void;
 }
@@ -15,35 +16,10 @@ interface CliStartModalProps {
 export function CliStartModal({
     isOpen,
     cli,
-    accountProfiles,
-    activeProfile,
-    isLoadingAccounts,
+    recentFolders,
     onClose,
     onConfirm,
 }: CliStartModalProps) {
-    const [selectedProfile, setSelectedProfile] = useState<string>('__active__');
-
-    useEffect(() => {
-        if (!isOpen || !cli) return;
-        setSelectedProfile('__active__');
-    }, [cli, isOpen, activeProfile]);
-
-    const profileOptions = useMemo(() => {
-        const options: { value: string; label: string }[] = [];
-        if (activeProfile) {
-            options.push({ value: '__active__', label: `Keep current (${activeProfile})` });
-        } else {
-            options.push({ value: '__active__', label: 'No active account' });
-        }
-        accountProfiles.forEach((profile) => {
-            options.push({ value: profile, label: profile });
-        });
-        return options;
-    }, [accountProfiles, activeProfile]);
-
-    const resolvedProfile = selectedProfile === '__active__' || !selectedProfile
-        ? null
-        : selectedProfile;
 
     const handlePickNewFolder = useCallback(async () => {
         if (!cli) return;
@@ -55,16 +31,14 @@ export function CliStartModal({
             });
 
             if (typeof picked === 'string') {
-                onConfirm(cli.name, picked, '', resolvedProfile);
+                onConfirm(cli.name, picked, '', null);
             }
         } catch (error) {
             console.error('Failed to pick folder:', error);
         }
-    }, [cli, onConfirm, resolvedProfile]);
+    }, [cli, onConfirm]);
 
     if (!isOpen || !cli) return null;
-
-    const savedDirs = cli.savedDirectories ?? [];
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -73,56 +47,38 @@ export function CliStartModal({
                 onClick={onClose}
             />
 
-            <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-cyber-neon/30 bg-cyber-panel p-6 shadow-2xl shadow-cyber-neon/10">
+            <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-cyber-neon/30 bg-cyber-panel p-6 shadow-2xl shadow-cyber-neon/10 select-none">
                 <div className="mb-4">
                     <h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">
                         Start {cli.name}
                     </h2>
-                    <p className="text-sm text-slate-400">Select a working directory to begin.</p>
+                    <p className="text-xs text-slate-400">Select a working directory to begin.</p>
                 </div>
 
                 <div className="space-y-3">
-                    <div className="space-y-2">
-                        <label className="text-[10px] uppercase tracking-widest text-slate-500">
-                            Account Profile
-                        </label>
-                        <select
-                            value={selectedProfile || '__active__'}
-                            onChange={(event) => setSelectedProfile(event.target.value)}
-                            disabled={isLoadingAccounts}
-                            className="w-full rounded border border-cyber-line/60 bg-cyber-base/40 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-cyber-neon disabled:cursor-not-allowed disabled:text-slate-500"
-                        >
-                            {profileOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                        {!isLoadingAccounts && accountProfiles.length === 0 ? (
-                            <p className="text-[11px] text-slate-500">No saved accounts for this CLI.</p>
-                        ) : null}
-                    </div>
-
-                    {savedDirs.length > 0 && (
+                    {recentFolders.length > 0 && (
                         <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest text-slate-500">
-                                Saved Directories
+                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold font-display">
+                                🕒 Recent Thư Mục Làm Việc
                             </label>
-                            <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
-                                {savedDirs.map((dir) => (
-                                    <button
-                                        key={`${dir.tag}-${dir.path}`}
-                                        onClick={() => onConfirm(cli.name, dir.path, dir.tag, resolvedProfile)}
-                                        className="group w-full rounded border border-cyber-line bg-cyber-base/50 p-3 text-left transition hover:border-cyber-electric/50 hover:bg-cyber-electric/5"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-semibold text-slate-200 group-hover:text-cyber-electric">
-                                                #{dir.tag}
-                                            </span>
-                                        </div>
-                                        <p className="mt-1 truncate text-xs text-slate-500">{dir.path}</p>
-                                    </button>
-                                ))}
+                            <div className="max-h-60 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
+                                {recentFolders.map((dirPath) => {
+                                    const folderName = dirPath.split(/[/\\]/).pop() || dirPath;
+                                    return (
+                                        <button
+                                            key={dirPath}
+                                            onClick={() => onConfirm(cli.name, dirPath, '', null)}
+                                            className="group w-full rounded border border-cyber-line bg-[#0a0f1f]/60 p-3 text-left transition hover:border-cyber-electric/60 hover:bg-cyber-electric/5"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-semibold text-slate-200 group-hover:text-cyber-electric font-mono text-xs">
+                                                    📁 {folderName}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 truncate text-[10px] text-slate-500 font-mono" title={dirPath}>{dirPath}</p>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

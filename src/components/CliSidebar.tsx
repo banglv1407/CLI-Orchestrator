@@ -12,6 +12,9 @@ import {
   openWorkspaceFolder,
   getGitStatus,
   getGitDiff,
+  listSshDirectoryFiles,
+  listAllFilesRecursive,
+  listSshFilesRecursive,
 } from '../lib/tauri';
 
 // --- SVG Icons ---
@@ -137,6 +140,12 @@ interface CliSidebarProps {
   onAddSsh: () => void;
   onEditSsh: (connection: SshConnection) => void;
   onDeleteSsh: (connection: SshConnection) => void;
+
+  selectedFilePath: string | null;
+  gitStatusList: { path: string; status: 'modified' | 'added' | 'deleted' | 'untracked' }[];
+  refreshGitStatus: (repo: string) => Promise<void>;
+  onFileClick: (entry: FileEntry, rootPath: string | null) => Promise<void>;
+  onCloseFile: () => void;
 }
 
 type SidebarTab = 'explorer' | 'cli-manager' | 'settings' | 'ai-chat' | 'operator';
@@ -165,8 +174,14 @@ export function CliSidebar({
   onAddSsh,
   onEditSsh,
   onDeleteSsh,
+
+  selectedFilePath,
+  gitStatusList,
+  refreshGitStatus,
+  onFileClick,
+  onCloseFile,
 }: CliSidebarProps) {
-  const [activeTab, setActiveTab] = useState<SidebarTab>('explorer');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
 
   // --- Sidebar Resizer Code ---
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -285,12 +300,8 @@ export function CliSidebar({
     }
   };
 
-  const handleSendChatMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || isLoadingLlm) return;
-
-    const userMessageContent = chatInput.trim();
-    setChatInput('');
+  const sendLlmMessage = async (userMessageContent: string) => {
+    if (isLoadingLlm) return;
 
     const userMsg: LlmChatMessage = {
       role: 'user',
@@ -366,36 +377,192 @@ export function CliSidebar({
     }
   };
 
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isLoadingLlm) return;
+
+    const userMessageContent = chatInput.trim();
+    setChatInput('');
+    await sendLlmMessage(userMessageContent);
+  };
+
+  useEffect(() => {
+    const handleExplainEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const textToExplain = customEvent.detail;
+      if (textToExplain) {
+        setActiveTab('ai-chat');
+        const promptText = `Hãy giải thích chi tiết đoạn mã hoặc văn bản sau đây:\n\n\`\`\`\n${textToExplain}\n\`\`\``;
+        void sendLlmMessage(promptText);
+      }
+    };
+
+    window.addEventListener('explain-text', handleExplainEvent);
+    return () => window.removeEventListener('explain-text', handleExplainEvent);
+  }, [chatHistory, llmConfig, isLoadingLlm]);
+
   // CLI Manager States
   const [showCliList, setShowCliList] = useState(true);
 
   // Explorer States
   const [customFolder, setCustomFolder] = useState<string | null>(null);
+
+  // Active workspace calculation
+  const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const isSshSession = !!activeSession?.cliName.startsWith('SSH: ');
+  const sshConnectionName = isSshSession ? activeSession?.cliName.slice(5) : null;
+  const sshConnection = sshConnections.find((c) => c.name === sshConnectionName);
+
+  const rootPath = isSshSession 
+    ? (activeSession?.workingDir || sshConnection?.workingDir || '.') 
+    : (activeSession?.workingDir || customFolder);
+
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({});
   const [cachedFiles, setCachedFiles] = useState<Record<string, FileEntry[]>>({});
 
-  // File Editor States
-  const [openedFile, setOpenedFile] = useState<{ path: string; name: string } | null>(null);
-  const [fileContent, setFileContent] = useState<string>('');
-  const [fileOriginalContent, setFileOriginalContent] = useState<string>('');
-  const [isSavingFile, setIsSavingFile] = useState(false);
-  const [fileLoadError, setFileLoadError] = useState<string | null>(null);
-  const [isFileLoading, setIsFileLoading] = useState(false);
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  // Ctrl+P search states
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [allFiles, setAllFiles] = useState<FileEntry[]>([]);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Git & Diff States
-  const [gitStatusList, setGitStatusList] = useState<{ path: string; status: 'modified' | 'added' | 'deleted' | 'untracked' }[]>([]);
-  const [viewMode, setViewMode] = useState<'edit' | 'diff'>('edit');
-  const [gitDiffContent, setGitDiffContent] = useState<string>('');
-  const [isDiffLoading, setIsDiffLoading] = useState(false);
+  // Ctrl+P global keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeTab === 'explorer' && e.ctrlKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setIsSearchModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab]);
+
+  // Load recursive files when search opens
+  useEffect(() => {
+    if (!isSearchModalOpen || !rootPath) {
+      setAllFiles([]);
+      setSearchQuery('');
+      setSelectedIndex(0);
+      return;
+    }
+
+    setIsSearchLoading(true);
+    if (isSshSession && sshConnection) {
+      listSshFilesRecursive(sshConnection, rootPath)
+        .then((files) => {
+          setAllFiles(files);
+        })
+        .catch((err) => {
+          console.error('Failed to load recursive SSH files:', err);
+        })
+        .finally(() => {
+          setIsSearchLoading(false);
+        });
+    } else {
+      listAllFilesRecursive(rootPath)
+        .then((files) => {
+          setAllFiles(files);
+        })
+        .catch((err) => {
+          console.error('Failed to load recursive local files:', err);
+        })
+        .finally(() => {
+          setIsSearchLoading(false);
+        });
+    }
+  }, [isSearchModalOpen, rootPath, isSshSession, sshConnection]);
+
+  // Filtered files list
+  const filteredFiles = useMemo(() => {
+    if (!searchQuery) {
+      return allFiles.slice(0, 50);
+    }
+    const q = searchQuery.toLowerCase();
+    return allFiles
+      .filter((file) => {
+        return file.name.toLowerCase().includes(q) || file.path.toLowerCase().includes(q);
+      })
+      .slice(0, 50);
+  }, [allFiles, searchQuery]);
+
+  // Reset selection index when search query changes
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [searchQuery]);
+
+  // Keep ref of cachedFiles to check if directories are pre-loaded without triggering effect
+  const cachedFilesRef = useRef(cachedFiles);
+  useEffect(() => {
+    cachedFilesRef.current = cachedFiles;
+  }, [cachedFiles]);
+
+  // Expand parent directories when a file is selected (e.g. from Ctrl+P search)
+  useEffect(() => {
+    if (!selectedFilePath || !rootPath) return;
+
+    const getParentPaths = (filePath: string, root: string) => {
+      const paths: string[] = [];
+      let current = filePath;
+      while (true) {
+        const lastSlash = Math.max(current.lastIndexOf('/'), current.lastIndexOf('\\'));
+        if (lastSlash === -1 || lastSlash <= root.length) {
+          break;
+        }
+        current = current.substring(0, lastSlash);
+        if (current.length >= root.length) {
+          paths.push(current);
+        } else {
+          break;
+        }
+      }
+      return paths.reverse();
+    };
+
+    const parents = getParentPaths(selectedFilePath, rootPath);
+    if (parents.length === 0) return;
+
+    const loadParents = async () => {
+      let changedCached = false;
+      const cachedUpdates: Record<string, FileEntry[]> = {};
+
+      for (const parent of parents) {
+        const isAlreadyCached = cachedFilesRef.current[parent] || cachedUpdates[parent];
+        if (!isAlreadyCached) {
+          try {
+            const files = isSshSession && sshConnection
+              ? await listSshDirectoryFiles(sshConnection, parent)
+              : await listDirectoryFiles(parent);
+            cachedUpdates[parent] = files;
+            changedCached = true;
+          } catch (e) {
+            console.error(`Failed to preload parent dir ${parent}:`, e);
+          }
+        }
+      }
+
+      setExpandedPaths((prev) => {
+        const next = { ...prev };
+        parents.forEach((p) => {
+          next[p] = true;
+        });
+        return next;
+      });
+
+      if (changedCached) {
+        setCachedFiles((prev) => ({ ...prev, ...cachedUpdates }));
+      }
+    };
+
+    void loadParents();
+  }, [selectedFilePath, rootPath, isSshSession, sshConnection]);
 
   // Accordion Panel States
   const [workspaceFilesExpanded, setWorkspaceFilesExpanded] = useState(true);
   const [gitDiffExpanded, setGitDiffExpanded] = useState(false);
 
-  // Active workspace calculation
-  const activeSession = sessions.find((s) => s.id === activeSessionId);
-  const rootPath = activeSession?.workingDir || customFolder;
+
 
   // Path helper
   const getRelativePath = (fullPath: string, root: string) => {
@@ -404,37 +571,53 @@ export function CliSidebar({
     return rel.replace(/\\/g, '/');
   };
 
-  // Fetch Git Status
-  const refreshGitStatus = async (repo: string) => {
-    try {
-      const status = await getGitStatus(repo);
-      setGitStatusList(status);
-    } catch (e) {
-      console.error('Failed to get git status:', e);
-    }
-  };
-
   // Sync loading root files
   useEffect(() => {
     if (rootPath) {
-      listDirectoryFiles(rootPath)
-        .then((files) => {
-          setCachedFiles((prev) => ({ ...prev, [rootPath]: files }));
-        })
-        .catch((e) => console.error('Failed to load root files:', e));
+      if (isSshSession && sshConnection) {
+        listSshDirectoryFiles(sshConnection, rootPath)
+          .then((files) => {
+            setCachedFiles((prev) => ({ ...prev, [rootPath]: files }));
+          })
+          .catch((e) => console.error('Failed to load remote SSH root files:', e));
+      } else {
+        listDirectoryFiles(rootPath)
+          .then((files) => {
+            setCachedFiles((prev) => ({ ...prev, [rootPath]: files }));
+          })
+          .catch((e) => console.error('Failed to load root files:', e));
+      }
       
-      if (gitDiffExpanded) {
+      if (gitDiffExpanded && !isSshSession) {
         void refreshGitStatus(rootPath);
       }
-    } else {
-      setGitStatusList([]);
     }
-  }, [rootPath, gitDiffExpanded]);
+  }, [rootPath, gitDiffExpanded, refreshGitStatus, isSshSession, sshConnection]);
 
   // Clear expanded subfolders when root workspace changes
   useEffect(() => {
     setExpandedPaths({});
   }, [rootPath]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredFiles.length));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + filteredFiles.length) % Math.max(1, filteredFiles.length));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const selected = filteredFiles[selectedIndex];
+      if (selected) {
+        onFileClick(selected, rootPath);
+        setIsSearchModalOpen(false);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsSearchModalOpen(false);
+    }
+  };
 
   // Folder selection helper
   const handleSelectFolder = async () => {
@@ -454,8 +637,13 @@ export function CliSidebar({
     
     if (!isExpanded && !cachedFiles[path]) {
       try {
-        const files = await listDirectoryFiles(path);
-        setCachedFiles((prev) => ({ ...prev, [path]: files }));
+        if (isSshSession && sshConnection) {
+          const files = await listSshDirectoryFiles(sshConnection, path);
+          setCachedFiles((prev) => ({ ...prev, [path]: files }));
+        } else {
+          const files = await listDirectoryFiles(path);
+          setCachedFiles((prev) => ({ ...prev, [path]: files }));
+        }
       } catch (e) {
         console.error('Failed to load subfolder:', e);
       }
@@ -467,93 +655,7 @@ export function CliSidebar({
     }));
   };
 
-  // Click file inside tree – open in built-in editor panel
-  const handleFileClick = async (entry: FileEntry) => {
-    setSelectedFilePath(entry.path);
-    setOpenedFile({ path: entry.path, name: entry.name });
-    setFileLoadError(null);
-    setIsFileLoading(true);
-    setFileContent('');
-    setFileOriginalContent('');
-    setGitDiffContent('');
-    
-    const relPath = rootPath ? getRelativePath(entry.path, rootPath) : '';
-    const gitItem = gitStatusList.find((g) => g.path === relPath);
-    const hasGitChanges = !!gitItem;
 
-    if (hasGitChanges) {
-      setViewMode('diff');
-    } else {
-      setViewMode('edit');
-    }
-
-    try {
-      const content = await readFileContent(entry.path);
-      setFileContent(content);
-      setFileOriginalContent(content);
-      if (setAssistantText) {
-        setAssistantText(`Opened: ${entry.name}`);
-      }
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : String(e);
-      setFileLoadError(errMsg);
-      if (setAssistantText) {
-        setAssistantText(`Cannot read file: ${entry.name}`);
-      }
-    } finally {
-      setIsFileLoading(false);
-    }
-
-    if (hasGitChanges && rootPath) {
-      setIsDiffLoading(true);
-      try {
-        const diff = await getGitDiff(rootPath, relPath, gitItem.status === 'untracked');
-        setGitDiffContent(diff || 'No changes or empty file.');
-      } catch (e) {
-        console.error('Failed to load git diff:', e);
-        setGitDiffContent('Error loading diff.');
-      } finally {
-        setIsDiffLoading(false);
-      }
-    }
-  };
-
-  const handleCloseFile = () => {
-    setOpenedFile(null);
-    setFileContent('');
-    setFileOriginalContent('');
-    setFileLoadError(null);
-    setSelectedFilePath(null);
-  };
-
-  const handleSaveFile = async () => {
-    if (!openedFile || isSavingFile) return;
-    setIsSavingFile(true);
-    try {
-      await writeFileContent(openedFile.path, fileContent);
-      setFileOriginalContent(fileContent);
-      
-      if (rootPath && gitDiffExpanded) {
-        void refreshGitStatus(rootPath);
-      }
-
-      if (setAssistantState && setAssistantText) {
-        setAssistantState('Done');
-        setAssistantText(`Saved: ${openedFile.name}`);
-        setTimeout(() => setAssistantState?.('Idle'), 2500);
-      }
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : String(e);
-      if (setAssistantState && setAssistantText) {
-        setAssistantState('Error');
-        setAssistantText(`Save failed: ${errMsg}`);
-      }
-    } finally {
-      setIsSavingFile(false);
-    }
-  };
-
-  const fileDirty = openedFile !== null && fileContent !== fileOriginalContent;
 
   // Recursive Tree Node Renderer
   const renderFileNode = (entry: FileEntry, depth: number) => {
@@ -587,7 +689,7 @@ export function CliSidebar({
       <div key={entry.path} className="select-none text-[13px]">
         <button
           type="button"
-          onClick={() => (entry.isDir ? handleToggleExpand(entry.path) : void handleFileClick(entry))}
+          onClick={() => (entry.isDir ? handleToggleExpand(entry.path) : void onFileClick(entry, rootPath))}
           style={{ paddingLeft: `${depth * 14 + 10}px` }}
           className={`flex w-full items-center gap-2 py-1 pr-3 text-left transition hover:bg-cyber-neon/5 ${
             !entry.isDir
@@ -675,22 +777,6 @@ export function CliSidebar({
         <div className="flex flex-col gap-5">
           <button
             type="button"
-            onClick={() => setActiveTab('explorer')}
-            title="File Explorer"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'explorer'
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {activeTab === 'explorer' && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-            )}
-            <ExplorerIcon />
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('cli-manager')}
             title="CLI Orchestrator"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
@@ -703,6 +789,22 @@ export function CliSidebar({
               <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
             )}
             <TerminalIcon />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('explorer')}
+            title="File Explorer"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'explorer'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {activeTab === 'explorer' && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+            )}
+            <ExplorerIcon />
           </button>
 
           <button
@@ -779,6 +881,16 @@ export function CliSidebar({
                     Reveal
                   </button>
                 )}
+                {rootPath && (
+                  <button
+                    type="button"
+                    onClick={() => setIsSearchModalOpen(true)}
+                    title="Search files (Ctrl+P)"
+                    className="rounded border border-cyber-neon/60 bg-cyber-neon/10 px-2 py-0.5 text-[10px] uppercase font-semibold text-cyber-neon transition hover:border-cyber-neon hover:bg-cyber-neon/20 shadow-neon-sm"
+                  >
+                    🔍 Find File (Ctrl+P)
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleSelectFolder}
@@ -792,9 +904,7 @@ export function CliSidebar({
 
             {/* Accordion Panels Container */}
             <div
-              className={`flex flex-col overflow-hidden shrink-0 border-b border-cyber-line/20 ${
-                openedFile ? 'h-[360px]' : 'flex-1'
-              }`}
+              className="flex flex-col overflow-hidden shrink-0 border-b border-cyber-line/20 flex-1"
             >
               {rootPath ? (
                 <div className="flex flex-col h-full overflow-hidden">
@@ -879,7 +989,7 @@ export function CliSidebar({
                                 <button
                                   key={gitItem.path}
                                   type="button"
-                                  onClick={() => void handleFileClick(entry)}
+                                  onClick={() => void onFileClick(entry, rootPath)}
                                   className={`flex w-full items-center justify-between px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 ${
                                     isActive 
                                       ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' 
@@ -925,163 +1035,7 @@ export function CliSidebar({
               )}
             </div>
 
-            {/* File Editor Panel */}
-            {openedFile && (() => {
-              const relPath = rootPath ? getRelativePath(openedFile.path, rootPath) : '';
-              const fileHasChanges = gitStatusList.some((g) => g.path === relPath);
 
-              return (
-                <div className="flex flex-1 flex-col overflow-hidden">
-                  {/* Editor toolbar */}
-                  <div className="flex shrink-0 items-center justify-between gap-1 border-b border-cyber-line bg-cyber-base/50 px-3 py-1.5">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <FileIcon />
-                      <span
-                        className="truncate font-mono text-[11px] text-slate-200 max-w-[100px]"
-                        title={openedFile.path}
-                      >
-                        {openedFile.name}
-                      </span>
-                      {fileDirty && (
-                        <span className="ml-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyber-warn" title="Unsaved changes" />
-                      )}
-
-                      {/* Diff / Edit Mode Toggle */}
-                      {fileHasChanges && (
-                        <div className="flex bg-cyber-base/80 border border-cyber-line p-0.5 rounded ml-2 select-none">
-                          <button
-                            type="button"
-                            onClick={() => setViewMode('diff')}
-                            className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded transition-colors ${
-                              viewMode === 'diff'
-                                ? 'bg-cyber-neon/15 text-cyber-neon shadow-neon-sm'
-                                : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            Diff
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setViewMode('edit')}
-                            className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded transition-colors ${
-                              viewMode === 'edit'
-                                ? 'bg-cyber-electric/15 text-cyber-electric shadow-neon-blue-sm'
-                                : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      {viewMode === 'edit' && fileDirty && (
-                        <button
-                          type="button"
-                          onClick={() => setFileContent(fileOriginalContent)}
-                          title="Revert changes"
-                          className="rounded border border-cyber-warn/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-cyber-warn transition hover:bg-cyber-warn/10"
-                        >
-                          Revert
-                        </button>
-                      )}
-                      {viewMode === 'edit' && (
-                        <button
-                          type="button"
-                          onClick={handleSaveFile}
-                          disabled={!fileDirty || isSavingFile}
-                          title="Save file (Ctrl+S)"
-                          className="rounded border border-cyber-neon/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-cyber-neon transition hover:bg-cyber-neon/10 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          {isSavingFile ? 'Saving…' : 'Save'}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleCloseFile}
-                        title="Close file"
-                        className="flex h-4 w-4 items-center justify-center rounded text-slate-400 hover:text-white transition text-[14px] leading-none"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Editor body */}
-                  <div className="flex-1 overflow-hidden relative">
-                    {isFileLoading ? (
-                      <div className="flex h-full items-center justify-center text-[11px] text-slate-500 italic">
-                        Loading…
-                      </div>
-                    ) : fileLoadError ? (
-                      <div className="p-4 text-[11px] text-cyber-warn leading-relaxed">
-                        <p className="font-semibold mb-1">Cannot display this file</p>
-                        <p className="text-slate-400 break-words">{fileLoadError}</p>
-                      </div>
-                    ) : viewMode === 'diff' ? (
-                      isDiffLoading ? (
-                        <div className="flex h-full items-center justify-center text-[11px] text-slate-500 italic">
-                          Loading diff…
-                        </div>
-                      ) : (
-                        <div className="h-full w-full overflow-y-auto bg-cyber-base/80 p-3 font-mono text-[11px] leading-relaxed select-text scrollbar-thin text-slate-300">
-                          {gitDiffContent ? (
-                            gitDiffContent.split('\n').map((line, idx) => {
-                              let lineClass = 'text-slate-400 pl-2';
-                              if (line.startsWith('+') && !line.startsWith('+++')) {
-                                lineClass = 'bg-emerald-950/20 text-emerald-400 border-l-2 border-emerald-500 pl-2 font-semibold py-0.5';
-                              } else if (line.startsWith('-') && !line.startsWith('---')) {
-                                lineClass = 'bg-rose-950/20 text-rose-400 border-l-2 border-rose-500 pl-2 font-semibold py-0.5';
-                              } else if (line.startsWith('@@')) {
-                                lineClass = 'bg-indigo-950/20 text-indigo-400 italic pl-2 py-0.5';
-                              } else if (line.startsWith('diff') || line.startsWith('index') || line.startsWith('---') || line.startsWith('+++')) {
-                                lineClass = 'text-slate-500 font-semibold pl-2 py-0.5';
-                              }
-                              return (
-                                <div key={idx} className={`${lineClass} whitespace-pre-wrap min-h-[18px]`}>
-                                  {line}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-slate-500 italic p-2">No differences found.</div>
-                          )}
-                        </div>
-                      )
-                    ) : (
-                      <textarea
-                        value={fileContent}
-                        onChange={(e) => setFileContent(e.target.value)}
-                        onKeyDown={(e) => {
-                          // Ctrl+S to save
-                          if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                            e.preventDefault();
-                            void handleSaveFile();
-                          }
-                          // Tab insert
-                          if (e.key === 'Tab') {
-                            e.preventDefault();
-                            const { selectionStart, selectionEnd } = e.currentTarget;
-                            const newVal =
-                              fileContent.substring(0, selectionStart) +
-                              '  ' +
-                              fileContent.substring(selectionEnd);
-                            setFileContent(newVal);
-                            requestAnimationFrame(() => {
-                              e.currentTarget.selectionStart = selectionStart + 2;
-                              e.currentTarget.selectionEnd = selectionStart + 2;
-                            });
-                          }
-                        }}
-                        spellCheck={false}
-                        className="h-full w-full resize-none bg-cyber-base/80 p-3 font-mono text-[12px] leading-relaxed text-slate-200 outline-none placeholder-slate-600 scrollbar-thin selection:bg-cyber-neon/30"
-                        style={{ caretColor: 'var(--color-cyber-neon, #39ff14)' }}
-                      />
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         )}
 
@@ -1118,8 +1072,8 @@ export function CliSidebar({
             <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
               {chatHistory.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8">
-                  <p className="text-[11px] italic">No messages yet.</p>
-                  <p className="mt-1 text-[10px] text-slate-600">Ask me anything about commands or coding!</p>
+                  <p className="text-[13px] italic">No messages yet.</p>
+                  <p className="mt-1 text-[12px] text-slate-600">Ask me anything about commands or coding!</p>
                 </div>
               ) : (
                 chatHistory.map((msg, idx) => (
@@ -1131,19 +1085,19 @@ export function CliSidebar({
                         : 'bg-cyber-electric/10 border border-cyber-electric/30 text-slate-200 self-start mr-auto'
                     }`}
                   >
-                    <span className={`text-[8px] font-bold uppercase tracking-wider mb-1 ${
+                    <span className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${
                       msg.role === 'user' ? 'text-cyber-neon' : 'text-cyber-electric'
                     }`}>
                       {msg.role === 'user' ? 'You' : 'AI Companion'}
                       <span className="ml-2 font-normal opacity-50">{msg.timestamp}</span>
                     </span>
-                    <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed">{msg.content}</p>
+                    <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.content}</p>
                   </div>
                 ))
               )}
               {isLoadingLlm && (
                 <div className="flex items-center gap-2 self-start max-w-[80%] rounded-lg px-3 py-2 bg-cyber-electric/10 border border-cyber-electric/20">
-                  <span className="text-[10px] text-cyber-electric italic">AI is thinking</span>
+                  <span className="text-[13px] text-cyber-electric italic">AI is thinking</span>
                   <span className="flex gap-0.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -1171,18 +1125,18 @@ export function CliSidebar({
                       }
                     }
                   }}
-                  className="flex-1 min-w-0 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[11px] disabled:opacity-50 resize-none overflow-y-auto"
+                  className="flex-1 min-w-0 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[13px] disabled:opacity-50 resize-none overflow-y-auto"
                   style={{ maxHeight: '7rem' }}
                 />
                 <button
                   type="submit"
                   disabled={isLoadingLlm || !chatInput.trim()}
-                  className="shrink-0 rounded border border-cyber-neon bg-cyber-neon/15 px-3 py-1.5 font-bold uppercase text-[10px] text-cyber-neon hover:bg-cyber-neon/25 transition disabled:opacity-30"
+                  className="shrink-0 rounded border border-cyber-neon bg-cyber-neon/15 px-3 py-1.5 font-bold uppercase text-[11px] text-cyber-neon hover:bg-cyber-neon/25 transition disabled:opacity-30"
                 >
                   Send
                 </button>
               </div>
-              <p className="mt-1 text-[9px] text-slate-600">Enter to send · Shift+Enter for new line</p>
+              <p className="mt-1 text-[10px] text-slate-600">Enter to send · Shift+Enter for new line</p>
             </form>
           </div>
         )}
@@ -1430,6 +1384,7 @@ export function CliSidebar({
                   >
                     <option value="cyberpunk">Cyberpunk</option>
                     <option value="kawaii">Kawaii</option>
+                    <option value="light">Light</option>
                   </select>
                 </label>
               </div>
@@ -1459,6 +1414,77 @@ export function CliSidebar({
         config={llmConfig}
         onSave={handleSaveLlmConfig}
       />
+
+      {/* Ctrl+P File Finder Modal */}
+      {isSearchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl border border-cyber-line/80 bg-cyber-panel shadow-2xl overflow-hidden flex flex-col max-h-[450px]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-cyber-line/55 bg-cyber-base/40 px-4 py-3">
+              <span className="font-display text-[10px] uppercase tracking-wider text-cyber-neon font-bold">Search Files</span>
+              <button 
+                type="button" 
+                onClick={() => setIsSearchModalOpen(false)}
+                className="text-slate-400 hover:text-white transition font-mono text-xs"
+              >
+                ESC
+              </button>
+            </div>
+
+            {/* Input */}
+            <div className="p-3 border-b border-cyber-line/30">
+              <input
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Type name to find files..."
+                className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-xs font-semibold text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition"
+              />
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+              {isSearchLoading ? (
+                <div className="flex flex-col items-center justify-center py-8 text-xs text-slate-400 gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyber-neon border-t-transparent" />
+                  <span>Scanning workspace files...</span>
+                </div>
+              ) : filteredFiles.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-500">
+                  No files match your search query.
+                </div>
+              ) : (
+                <div className="space-y-0.5 font-mono">
+                  {filteredFiles.map((file, idx) => {
+                    const isSelected = idx === selectedIndex;
+                    const displayPath = rootPath ? getRelativePath(file.path, rootPath) : file.path;
+                    return (
+                      <div
+                        key={file.path}
+                        onClick={() => {
+                          onFileClick(file, rootPath);
+                          setIsSearchModalOpen(false);
+                        }}
+                        onMouseEnter={() => setSelectedIndex(idx)}
+                        className={`flex flex-col px-3 py-2 rounded-lg cursor-pointer transition ${
+                          isSelected 
+                            ? 'bg-cyber-neon/15 border border-cyber-neon/30 text-white' 
+                            : 'border border-transparent text-slate-300 hover:bg-cyber-base/40'
+                        }`}
+                      >
+                        <span className="text-xs font-semibold truncate select-none">{file.name}</span>
+                        <span className="text-[10px] text-slate-500 truncate select-none">{displayPath}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -134,6 +134,26 @@ export function writeFileContent(path: string, content: string): Promise<void> {
   return invoke('write_file_content', { path, content });
 }
 
+export function listSshDirectoryFiles(connection: SshConnection, path: string): Promise<FileEntry[]> {
+  return invoke('list_ssh_directory_files', { connection, path });
+}
+
+export function readSshFileContent(connection: SshConnection, path: string): Promise<string> {
+  return invoke('read_ssh_file_content', { connection, path });
+}
+
+export function writeSshFileContent(connection: SshConnection, path: string, content: string): Promise<void> {
+  return invoke('write_ssh_file_content', { connection, path, content });
+}
+
+export function listAllFilesRecursive(path: string): Promise<FileEntry[]> {
+  return invoke('list_all_files_recursive', { path });
+}
+
+export function listSshFilesRecursive(connection: SshConnection, path: string): Promise<FileEntry[]> {
+  return invoke('list_ssh_files_recursive', { connection, path });
+}
+
 export function pickFile(): Promise<string | null> {
   return invoke('pick_file');
 }

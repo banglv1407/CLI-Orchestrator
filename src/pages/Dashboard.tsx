@@ -22,6 +22,12 @@ import {
   saveSshConnections,
   createSshSession,
   createRdpSession,
+  getGitStatus,
+  getGitDiff,
+  readFileContent,
+  writeFileContent,
+  readSshFileContent,
+  writeSshFileContent,
 } from '../lib/tauri';
 import type {
   AssistantState,
@@ -33,7 +39,7 @@ import type {
 } from '../types';
 
 const DEFAULT_ASSISTANT_TEXT = 'Select a CLI and start an interactive session.';
-type AppTheme = 'cyberpunk' | 'kawaii';
+type AppTheme = 'cyberpunk' | 'kawaii' | 'light';
 
 export function Dashboard() {
   const [clis, setClis] = useState<CliDefinition[]>([]);
@@ -55,13 +61,14 @@ export function Dashboard() {
   const [startAccountsLoading, setStartAccountsLoading] = useState(false);
   const [theme, setTheme] = useState<AppTheme>(() => {
     const stored = localStorage.getItem('ai-cli-theme');
-    return stored === 'kawaii' ? 'kawaii' : 'cyberpunk';
+    return (stored === 'kawaii' || stored === 'light') ? stored : 'cyberpunk';
   });
   const [globalProjectTags, setGlobalProjectTags] = useState<{ tag: string; path: string }[]>([]);
   
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
+
 
   const [recentFolders, setRecentFolders] = useState<string[]>(() => {
     try {
@@ -91,7 +98,18 @@ export function Dashboard() {
   const refreshSidebarData = useCallback(async () => {
     const [loadedClis, loadedSessions] = await Promise.all([listClis(), listSessions()]);
     setClis(loadedClis);
-    setSessions(loadedSessions);
+    setSessions((current) => {
+      return loadedSessions.map((s) => {
+        const existing = current.find((es) => es.id === s.id);
+        if (existing?.panel) {
+          return { ...s, panel: existing.panel };
+        }
+        return {
+          ...s,
+          panel: 'right',
+        };
+      });
+    });
 
     if (loadedClis.length > 0) {
       const hasActiveCli = loadedClis.some((cli) => cli.name === activeCli);
@@ -241,17 +259,177 @@ export function Dashboard() {
     (session: SessionInfo) => {
       setSessions((current) => {
         const index = current.findIndex((item) => item.id === session.id);
+        const sessionWithPanel = {
+          ...session,
+          panel: session.panel || 'right',
+        };
         if (index >= 0) {
           const next = [...current];
-          next[index] = session;
+          next[index] = sessionWithPanel;
           return next;
         }
-        return [...current, session];
+        return [...current, sessionWithPanel];
       });
       setActiveSessionId(session.id);
     },
     [setSessions, setActiveSessionId],
   );
+
+  // --- File Editor States ---
+  const [openedFile, setOpenedFile] = useState<{ path: string; name: string } | null>(null);
+  const [openedFileRootPath, setOpenedFileRootPath] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<string>('');
+  const [fileOriginalContent, setFileOriginalContent] = useState<string>('');
+  const [isSavingFile, setIsSavingFile] = useState(false);
+  const [fileLoadError, setFileLoadError] = useState<string | null>(null);
+  const [isFileLoading, setIsFileLoading] = useState(false);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'edit' | 'diff'>('edit');
+  const [gitDiffContent, setGitDiffContent] = useState<string>('');
+  const [isDiffLoading, setIsDiffLoading] = useState(false);
+  const [gitStatusList, setGitStatusList] = useState<{ path: string; status: 'modified' | 'added' | 'deleted' | 'untracked' }[]>([]);
+
+  const activeSession = useMemo(() => sessions.find((s) => s.id === activeSessionId), [sessions, activeSessionId]);
+  const isSshSession = useMemo(() => !!activeSession?.cliName.startsWith('SSH: '), [activeSession]);
+  const sshConnectionName = useMemo(() => isSshSession ? activeSession?.cliName.slice(5) : null, [isSshSession, activeSession]);
+  const activeSshConnection = useMemo(() => sshConnections.find((c) => c.name === sshConnectionName), [sshConnections, sshConnectionName]);
+
+  // Path helper
+  const getRelativePath = useCallback((fullPath: string, root: string) => {
+    let rel = fullPath.replace(root, '');
+    rel = rel.replace(/^[/\\]+/, '');
+    return rel.replace(/\\/g, '/');
+  }, []);
+
+  // Fetch Git Status
+  const refreshGitStatus = useCallback(async (repo: string) => {
+    try {
+      const status = await getGitStatus(repo);
+      setGitStatusList(status);
+    } catch (e) {
+      console.error('Failed to get git status:', e);
+    }
+  }, []);
+
+  // Click file inside tree
+  const handleFileClick = useCallback(async (entry: { path: string; name: string }, rootPath: string | null) => {
+    setSelectedFilePath(entry.path);
+    setOpenedFile({ path: entry.path, name: entry.name });
+    setOpenedFileRootPath(rootPath);
+    setFileLoadError(null);
+    setIsFileLoading(true);
+    setFileContent('');
+    setFileOriginalContent('');
+    setGitDiffContent('');
+    
+    const relPath = rootPath ? getRelativePath(entry.path, rootPath) : '';
+    const gitItem = gitStatusList.find((g) => g.path === relPath);
+    const hasGitChanges = !isSshSession && !!gitItem;
+
+    if (hasGitChanges) {
+      setViewMode('diff');
+    } else {
+      setViewMode('edit');
+    }
+
+    try {
+      let content = '';
+      if (isSshSession && activeSshConnection) {
+        content = await readSshFileContent(activeSshConnection, entry.path);
+      } else {
+        content = await readFileContent(entry.path);
+      }
+      setFileContent(content);
+      setFileOriginalContent(content);
+      setAssistantText(`Opened: ${entry.name}`);
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setFileLoadError(errMsg);
+      setAssistantText(`Cannot read file: ${entry.name}`);
+    } finally {
+      setIsFileLoading(false);
+    }
+
+    if (hasGitChanges && rootPath && !isSshSession && gitItem) {
+      setIsDiffLoading(true);
+      try {
+        const diff = await getGitDiff(rootPath, relPath, gitItem.status === 'untracked');
+        setGitDiffContent(diff || 'No changes or empty file.');
+      } catch (e) {
+        console.error('Failed to load git diff:', e);
+        setGitDiffContent('Error loading diff.');
+      } finally {
+        setIsDiffLoading(false);
+      }
+    }
+  }, [gitStatusList, getRelativePath, isSshSession, activeSshConnection]);
+
+  const handleCloseFile = useCallback(() => {
+    setOpenedFile(null);
+    setOpenedFileRootPath(null);
+    setFileContent('');
+    setFileOriginalContent('');
+    setFileLoadError(null);
+    setSelectedFilePath(null);
+  }, []);
+
+  const handleSaveFile = useCallback(async () => {
+    if (!openedFile || isSavingFile) return;
+    setIsSavingFile(true);
+    try {
+      if (isSshSession && activeSshConnection) {
+        await writeSshFileContent(activeSshConnection, openedFile.path, fileContent);
+      } else {
+        await writeFileContent(openedFile.path, fileContent);
+      }
+      setFileOriginalContent(fileContent);
+      
+      if (openedFileRootPath && !isSshSession) {
+        void refreshGitStatus(openedFileRootPath);
+      }
+
+      setAssistantState('Done');
+      setAssistantText(`Saved: ${openedFile.name}`);
+      setTimeout(() => setAssistantState('Idle'), 2500);
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setAssistantState('Error');
+      setAssistantText(`Save failed: ${errMsg}`);
+    } finally {
+      setIsSavingFile(false);
+    }
+  }, [openedFile, isSavingFile, fileContent, openedFileRootPath, refreshGitStatus, isSshSession, activeSshConnection]);
+
+  // Drag-and-drop session reordering handlers
+  const handleReorderSessions = useCallback((draggedId: string, targetId: string) => {
+    setSessions((current) => {
+      const draggedIdx = current.findIndex((s) => s.id === draggedId);
+      const targetIdx = current.findIndex((s) => s.id === targetId);
+      if (draggedIdx === -1 || targetIdx === -1) {
+        return current;
+      }
+      const next = [...current];
+      const targetPanel = next[targetIdx].panel || 'right';
+      next[draggedIdx] = { ...next[draggedIdx], panel: targetPanel };
+      
+      const [draggedItem] = next.splice(draggedIdx, 1);
+      const newTargetIdx = next.findIndex((s) => s.id === targetId);
+      next.splice(newTargetIdx, 0, draggedItem);
+      return next;
+    });
+  }, []);
+
+  const handleMoveSessionToPanel = useCallback((sessionId: string, panel: 'bottom' | 'right') => {
+    setSessions((current) => {
+      const idx = current.findIndex((s) => s.id === sessionId);
+      if (idx === -1) return current;
+      const next = [...current];
+      next[idx] = { ...next[idx], panel };
+      const [item] = next.splice(idx, 1);
+      next.push(item);
+      return next;
+    });
+  }, []);
 
   const createSessionForCli = useCallback(
     async (cliName: string, config: { projectTag?: string; workingDir?: string }) => {
@@ -346,8 +524,51 @@ export function Dashboard() {
         setAssistantText(`Stop failed: ${message}`);
       }
     },
-    [activeSessionId, refreshSidebarData],
+    [activeSessionId, refreshSidebarData]
   );
+
+  const handleQuickSession = useCallback(async (panel: 'bottom' | 'right' = 'right') => {
+    let workingDir: string | undefined;
+    if (activeSessionId) {
+      const activeSess = sessions.find((s) => s.id === activeSessionId);
+      if (activeSess && activeSess.workingDir) {
+        workingDir = activeSess.workingDir;
+      }
+    }
+
+    const cliName = 'Quick - shell';
+    const pendingId = `pending-quick-${Date.now()}`;
+    const fakeSession: SessionInfo = {
+      id: pendingId,
+      cliName,
+      workingDir: workingDir || undefined,
+      projectTag: undefined,
+      status: 'loading',
+      panel,
+    };
+
+    setPendingSessions((current) => [...current, fakeSession]);
+    setActiveSessionId(pendingId);
+
+    try {
+      const session = await createTerminalSession({
+        cliName,
+        workingDir,
+      });
+
+      setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
+      mergeCliIntoState({ ...session, panel });
+      void refreshSidebarData();
+      setAssistantState('Done');
+      setAssistantText('Quick CLI session started.');
+    } catch (error) {
+      setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
+      setActiveSessionId(null);
+      const message = error instanceof Error ? error.message : String(error);
+      setAssistantState('Error');
+      setAssistantText(`Failed to start Quick CLI: ${message}`);
+    }
+  }, [activeSessionId, sessions, refreshSidebarData, mergeCliIntoState]);
 
   const handleAddCli = useCallback(() => {
     setEditingCli(null);
@@ -539,7 +760,10 @@ export function Dashboard() {
         activeSessionId={activeSessionId}
         onSelectCli={handleSelectCli}
         onOpenCliInteraction={handleOpenCliInteraction}
-        onSelectSession={setActiveSessionId}
+        onSelectSession={(sessId) => {
+          setActiveSessionId(sessId);
+          handleCloseFile();
+        }}
         onAddCli={handleAddCli}
         onEditCli={handleEditCli}
         onDeleteCli={handleDeleteCli}
@@ -556,6 +780,12 @@ export function Dashboard() {
         onAddSsh={handleAddSsh}
         onEditSsh={handleEditSsh}
         onDeleteSsh={handleDeleteSshConnection}
+
+        selectedFilePath={selectedFilePath}
+        gitStatusList={gitStatusList}
+        refreshGitStatus={refreshGitStatus}
+        onFileClick={handleFileClick}
+        onCloseFile={handleCloseFile}
       />
 
       <section className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
@@ -563,11 +793,35 @@ export function Dashboard() {
           <TerminalPanel
             sessions={sessions}
             activeSessionId={activeSessionId}
-            onSelectSession={setActiveSessionId}
+            onSelectSession={(sessId) => {
+              setActiveSessionId(sessId);
+              handleCloseFile();
+            }}
             onSendInput={handleSendTerminalInput}
             onStopSession={handleStopSession}
             onSaveTag={handleSaveProjectTag}
             sshConnections={sshConnections}
+            onQuickSession={handleQuickSession}
+
+            openedFile={openedFile}
+            openedFileRootPath={openedFileRootPath}
+            fileContent={fileContent}
+            setFileContent={setFileContent}
+            fileOriginalContent={fileOriginalContent}
+            isSavingFile={isSavingFile}
+            fileLoadError={fileLoadError}
+            isFileLoading={isFileLoading}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            gitDiffContent={gitDiffContent}
+            isDiffLoading={isDiffLoading}
+            gitStatusList={gitStatusList}
+            onSaveFile={handleSaveFile}
+            onCloseFile={handleCloseFile}
+
+            onReorderSessions={handleReorderSessions}
+            onMoveSessionToPanel={handleMoveSessionToPanel}
+            theme={theme}
           />
         </div>
       </section>

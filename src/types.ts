@@ -23,6 +23,7 @@ export interface SessionInfo {
   status: string;
   workingDir?: string;
   projectTag?: string;
+  panel?: 'bottom' | 'right';
 }
 
 export interface ProjectTag {
@@ -143,7 +144,7 @@ export interface CassSearchRequest {
   refresh?: boolean;
 }
 
-export type AppTheme = 'cyberpunk' | 'kawaii';
+export type AppTheme = 'cyberpunk' | 'kawaii' | 'light';
 
 export interface FileEntry {
   name: string;
@@ -190,6 +191,7 @@ export interface SshConnection {
   rdpResolution?: 'fullscreen' | '1080p' | '720p' | 'custom';
   rdpShareClipboard?: boolean;
   rdpShareDrives?: boolean;
+  workingDir?: string;
 }
 
 

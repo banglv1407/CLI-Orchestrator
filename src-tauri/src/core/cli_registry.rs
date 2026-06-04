@@ -149,7 +149,14 @@ impl CliRegistry {
     }
 
     pub fn detect_installed_clis(&self) -> Vec<DetectedCli> {
-        let known = vec!["qwen", "gemini", "codex", "aider", "claude-code", "opencode"];
+        let known = vec![
+            "qwen",
+            "gemini",
+            "codex",
+            "aider",
+            "claude-code",
+            "opencode",
+        ];
 
         known
             .into_iter()
@@ -226,10 +233,7 @@ impl CliRegistry {
             return Err(RegistryError::InvalidCliName);
         }
 
-        let file_path = self
-            .dirs
-            .clis_dir
-            .join(Self::file_name_for_cli(trimmed));
+        let file_path = self.dirs.clis_dir.join(Self::file_name_for_cli(trimmed));
         if !file_path.exists() {
             return Err(RegistryError::CliNotFound(trimmed.to_string()));
         }
@@ -348,10 +352,7 @@ impl CliRegistry {
         }
 
         for cli in Self::default_cli_configs() {
-            let path = self
-                .dirs
-                .clis_dir
-                .join(Self::file_name_for_cli(&cli.name));
+            let path = self.dirs.clis_dir.join(Self::file_name_for_cli(&cli.name));
             let json = serde_json::to_string_pretty(&cli)?;
             fs::write(path, json)?;
         }

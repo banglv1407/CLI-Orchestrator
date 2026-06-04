@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -23,6 +23,72 @@
   --cyber-electric: 128 220 255;
   --cyber-warn: 255 124 177;
   --cyber-glow: 255 221 145;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --cyber-base: 241 245 249;
+  --cyber-panel: 255 255 255;
+  --cyber-line: 203 213 225;
+  --cyber-neon: 124 58 237;
+  --cyber-electric: 37 99 235;
+  --cyber-warn: 220 38 38;
+  --cyber-glow: 217 119 6;
+}
+
+/* Light Theme overrides for dark utility classes */
+:root[data-theme='light'] .text-slate-100,
+:root[data-theme='light'] .text-slate-50,
+:root[data-theme='light'] .text-slate-200,
+:root[data-theme='light'] .text-white {
+  color: rgb(15 23 42) !important;
+}
+
+:root[data-theme='light'] .text-slate-300 {
+  color: rgb(51 65 85) !important;
+}
+
+:root[data-theme='light'] .text-slate-400 {
+  color: rgb(71 85 105) !important;
+}
+
+:root[data-theme='light'] .text-slate-500 {
+  color: rgb(100 116 139) !important;
+}
+
+:root[data-theme='light'] .hover\:text-white:hover {
+  color: rgb(15 23 42) !important;
+}
+
+:root[data-theme='light'] .hover\:text-slate-200:hover {
+  color: rgb(30 41 59) !important;
+}
+
+:root[data-theme='light'] .hover\:text-slate-300:hover {
+  color: rgb(51 65 85) !important;
+}
+
+:root[data-theme='light'] .bg-\[\#0a0f1f\],
+:root[data-theme='light'] .bg-\[\#070b16\],
+:root[data-theme='light'] .bg-\[\#0d1324\],
+:root[data-theme='light'] .bg-\[\#000000\],
+:root[data-theme='light'] .bg-black,
+:root[data-theme='light'] .bg-slate-900,
+:root[data-theme='light'] .bg-slate-950,
+:root[data-theme='light'] .bg-cyber-base\/40 {
+  background-color: rgb(241 245 249) !important;
+}
+
+:root[data-theme='light'] .bg-\[\#0a0f1f\%\/85\],
+:root[data-theme='light'] .bg-\[\#0a0f1f\%\/90\],
+:root[data-theme='light'] .bg-\[\#0a0f1f\%\/95\] {
+  background-color: rgba(241, 245, 249, 0.85) !important;
+}
+
+:root[data-theme='light'] .border-cyber-line\/50,
+:root[data-theme='light'] .border-cyber-line\/40,
+:root[data-theme='light'] .border-cyber-line\/20 {
+  border-color: rgb(203 213 225) !important;
 }
 
 * {
@@ -53,3 +119,29 @@ body {
 pre {
   margin: 0;
 }
+
+/* Cyberpunk scrolling marquee for long session names */
+@keyframes cyberMarquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.cyber-marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  display: flex;
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+}
+
+.cyber-marquee-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: cyberMarquee 12s linear infinite;
+  padding-right: 20px;
+}
+

@@ -56,8 +56,16 @@ pub fn start_interactive_session(
     let thread_cwd = command.cwd.clone();
     let mut log_file = open_session_log(&cli_name, &session_id);
     if let Some(ref mut file) = log_file {
-        let cwd = thread_cwd.as_deref().unwrap_or_else(|| Path::new("unknown"));
-        let _ = writeln!(file, "# Session: {} | {} | `{}`\n", cli_name, session_id, cwd.display());
+        let cwd = thread_cwd
+            .as_deref()
+            .unwrap_or_else(|| Path::new("unknown"));
+        let _ = writeln!(
+            file,
+            "# Session: {} | {} | `{}`\n",
+            cli_name,
+            session_id,
+            cwd.display()
+        );
     }
 
     thread::Builder::new()
@@ -72,9 +80,15 @@ pub fn start_interactive_session(
                 match reader.read(&mut buffer) {
                     Ok(0) => {
                         if !output_buffer.is_empty() {
-                            let line = output_buffer.trim_end_matches('\n').trim_end_matches('\r').to_string();
+                            let line = output_buffer
+                                .trim_end_matches('\n')
+                                .trim_end_matches('\r')
+                                .to_string();
                             if !line.is_empty() {
-                                write_log_line(&mut thread_log_file, &format!("**🤖 CLI:** `{}`", line));
+                                write_log_line(
+                                    &mut thread_log_file,
+                                    &format!("**🤖 CLI:** `{}`", line),
+                                );
                             }
                             output_buffer.clear();
                         }
@@ -85,7 +99,10 @@ pub fn start_interactive_session(
                                 Err(_) => {
                                     write_log_line(
                                         &mut thread_log_file,
-                                        &format!("**❌ Error:** session={} message=child lock poisoned", thread_session_id),
+                                        &format!(
+                                            "**❌ Error:** session={} message=child lock poisoned",
+                                            thread_session_id
+                                        ),
                                     );
                                     if let Ok(mut guard) = thread_status.lock() {
                                         *guard = "error".to_string();
@@ -174,11 +191,14 @@ pub fn start_interactive_session(
                         let chunk = String::from_utf8_lossy(&buffer[..size]).to_string();
                         output_buffer.push_str(&chunk);
 
-                        while let Some (newline_pos) = output_buffer.find('\n') {
+                        while let Some(newline_pos) = output_buffer.find('\n') {
                             let line = output_buffer[..newline_pos].to_string();
                             output_buffer.drain(..=newline_pos);
                             if !line.is_empty() || line.is_empty() {
-                                write_log_line(&mut thread_log_file, &format!("**🤖 CLI:** `{}`", line));
+                                write_log_line(
+                                    &mut thread_log_file,
+                                    &format!("**🤖 CLI:** `{}`", line),
+                                );
                             }
                         }
 
@@ -195,16 +215,25 @@ pub fn start_interactive_session(
                     }
                     Err(error) => {
                         if !output_buffer.is_empty() {
-                            let line = output_buffer.trim_end_matches('\n').trim_end_matches('\r').to_string();
+                            let line = output_buffer
+                                .trim_end_matches('\n')
+                                .trim_end_matches('\r')
+                                .to_string();
                             if !line.is_empty() {
-                                write_log_line(&mut thread_log_file, &format!("**🤖 CLI:** `{}`", line));
+                                write_log_line(
+                                    &mut thread_log_file,
+                                    &format!("**🤖 CLI:** `{}`", line),
+                                );
                             }
                             output_buffer.clear();
                         }
 
                         write_log_line(
                             &mut thread_log_file,
-                            &format!("**❌ Error:** session={} message={}", thread_session_id, error),
+                            &format!(
+                                "**❌ Error:** session={} message={}",
+                                thread_session_id, error
+                            ),
                         );
                         if let Ok(mut guard) = thread_status.lock() {
                             *guard = "error".to_string();

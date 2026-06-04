@@ -48,12 +48,14 @@ pub fn spawn_pty_process(command: &ResolvedCommand) -> Result<PtyProcess, PtyMan
                     let primary_message = primary_error.to_string();
                     if should_retry_with_cmd_fallback(command, &primary_message) {
                         let fallback_builder = build_windows_cmd_builder(command);
-                        pair.slave.spawn_command(fallback_builder).map_err(|fallback_error| {
-                            PtyManagerError::Spawn(with_spawn_hint(format!(
-                                "{}; fallback via cmd.exe failed: {}",
-                                primary_message, fallback_error
-                            )))
-                        })?
+                        pair.slave
+                            .spawn_command(fallback_builder)
+                            .map_err(|fallback_error| {
+                                PtyManagerError::Spawn(with_spawn_hint(format!(
+                                    "{}; fallback via cmd.exe failed: {}",
+                                    primary_message, fallback_error
+                                )))
+                            })?
                     } else {
                         return Err(PtyManagerError::Spawn(with_spawn_hint(primary_message)));
                     }

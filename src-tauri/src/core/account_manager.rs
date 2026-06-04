@@ -126,9 +126,7 @@ impl AccountManager {
                 (home.join(".claude.json"), "claude_json"),
                 (home.join(".config/claude-code/auth.json"), "auth_json"),
             ],
-            "codex" => vec![
-                (home.join(".codex/auth.json"), "auth_json"),
-            ],
+            "codex" => vec![(home.join(".codex/auth.json"), "auth_json")],
             "gemini" => vec![
                 (home.join(".gemini/settings.json"), "settings_json"),
                 (home.join(".gemini/oauth_creds.json"), "oauth_creds_json"),
@@ -137,9 +135,13 @@ impl AccountManager {
         }
     }
 
-    pub fn backup_account(&self, cli_name: &str, profile_name: &str) -> Result<AccountProfile, AccountError> {
+    pub fn backup_account(
+        &self,
+        cli_name: &str,
+        profile_name: &str,
+    ) -> Result<AccountProfile, AccountError> {
         let auth_paths = Self::get_auth_file_paths(cli_name);
-        
+
         if auth_paths.iter().filter(|(p, _)| p.exists()).count() == 0 {
             return Err(AccountError::NoAuthFiles(cli_name.to_string()));
         }
@@ -180,9 +182,12 @@ impl AccountManager {
 
     pub fn activate_account(&self, cli_name: &str, profile_name: &str) -> Result<(), AccountError> {
         let vault_dir = self.vault_dir.join(cli_name).join(profile_name);
-        
+
         if !vault_dir.exists() {
-            return Err(AccountError::ProfileNotFound(format!("{}/{}", cli_name, profile_name)));
+            return Err(AccountError::ProfileNotFound(format!(
+                "{}/{}",
+                cli_name, profile_name
+            )));
         }
 
         let auth_paths = Self::get_auth_file_paths(cli_name);
@@ -209,7 +214,7 @@ impl AccountManager {
 
     pub fn delete_account(&self, cli_name: &str, profile_name: &str) -> Result<(), AccountError> {
         let vault_dir = self.vault_dir.join(cli_name).join(profile_name);
-        
+
         if vault_dir.exists() {
             fs::remove_dir_all(&vault_dir)?;
         }
@@ -229,15 +234,18 @@ impl AccountManager {
             "SELECT id, cli_name, profile_name, created_at, last_used FROM accounts WHERE cli_name = ?1 ORDER BY last_used DESC"
         )?;
 
-        let profiles = stmt.query_map(params![cli_name], |row| {
-            Ok(AccountProfile {
-                id: row.get(0)?,
-                cli_name: row.get(1)?,
-                profile_name: row.get(2)?,
-                created_at: row.get(3)?,
-                last_used: row.get(4)?,
-            })
-        })?.filter_map(Result::ok).collect();
+        let profiles = stmt
+            .query_map(params![cli_name], |row| {
+                Ok(AccountProfile {
+                    id: row.get(0)?,
+                    cli_name: row.get(1)?,
+                    profile_name: row.get(2)?,
+                    created_at: row.get(3)?,
+                    last_used: row.get(4)?,
+                })
+            })?
+            .filter_map(Result::ok)
+            .collect();
 
         Ok(profiles)
     }
@@ -255,7 +263,7 @@ impl AccountManager {
 
     pub fn get_active_profile(&self, cli_name: &str) -> Result<Option<String>, AccountError> {
         let auth_paths = Self::get_auth_file_paths(cli_name);
-        
+
         let mut current_hash: Option<String> = None;
         for (path, _) in &auth_paths {
             if path.exists() {
@@ -287,11 +295,11 @@ impl AccountManager {
                 if vault_file.exists() && source_path.exists() {
                     let vault_content = fs::read(&vault_file)?;
                     let current_content = fs::read(source_path)?;
-                    
+
                     let mut vault_hasher = Sha256::new();
                     vault_hasher.update(&vault_content);
                     let vault_hash = hex::encode(vault_hasher.finalize());
-                    
+
                     let mut current_hasher = Sha256::new();
                     current_hasher.update(&current_content);
                     let current_hash_val = hex::encode(current_hasher.finalize());
@@ -306,9 +314,14 @@ impl AccountManager {
         Ok(None)
     }
 
-    pub fn set_cooldown(&self, cli_name: &str, profile_name: &str, minutes: i64) -> Result<(), AccountError> {
+    pub fn set_cooldown(
+        &self,
+        cli_name: &str,
+        profile_name: &str,
+        minutes: i64,
+    ) -> Result<(), AccountError> {
         let until = Utc::now() + chrono::Duration::minutes(minutes);
-        
+
         let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
         db.execute(
             "INSERT OR REPLACE INTO cooldown (cli_name, profile_name, until) VALUES (?1, ?2, ?3)",
@@ -318,7 +331,11 @@ impl AccountManager {
         Ok(())
     }
 
-    pub fn get_cooldown(&self, cli_name: &str, profile_name: &str) -> Result<Option<CooldownEntry>, AccountError> {
+    pub fn get_cooldown(
+        &self,
+        cli_name: &str,
+        profile_name: &str,
+    ) -> Result<Option<CooldownEntry>, AccountError> {
         let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
         let mut stmt = db.prepare(
             "SELECT cli_name, profile_name, until FROM cooldown WHERE cli_name = ?1 AND profile_name = ?2"
@@ -358,30 +375,32 @@ impl AccountManager {
 
     pub fn list_cooldowns(&self) -> Result<Vec<CooldownEntry>, AccountError> {
         let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
-        let mut stmt = db.prepare(
-            "SELECT cli_name, profile_name, until FROM cooldown"
-        )?;
+        let mut stmt = db.prepare("SELECT cli_name, profile_name, until FROM cooldown")?;
 
-        let entries: Vec<CooldownEntry> = stmt.query_map([], |row| {
-            Ok(CooldownEntry {
-                cli_name: row.get(0)?,
-                profile_name: row.get(1)?,
-                until: row.get(2)?,
+        let entries: Vec<CooldownEntry> = stmt
+            .query_map([], |row| {
+                Ok(CooldownEntry {
+                    cli_name: row.get(0)?,
+                    profile_name: row.get(1)?,
+                    until: row.get(2)?,
+                })
+            })?
+            .filter_map(Result::ok)
+            .filter(|e| {
+                if let Ok(until) = DateTime::parse_from_rfc3339(&e.until) {
+                    until.with_timezone(&Utc) > Utc::now()
+                } else {
+                    false
+                }
             })
-        })?.filter_map(Result::ok).filter(|e| {
-            if let Ok(until) = DateTime::parse_from_rfc3339(&e.until) {
-                until.with_timezone(&Utc) > Utc::now()
-            } else {
-                false
-            }
-        }).collect();
+            .collect();
 
         Ok(entries)
     }
 
     pub fn select_next_profile(&self, cli_name: &str) -> Result<Option<String>, AccountError> {
         let profiles = self.list_accounts(cli_name)?;
-        
+
         if profiles.is_empty() {
             return Ok(None);
         }
@@ -399,7 +418,8 @@ impl AccountManager {
     pub fn get_all_cli_names(&self) -> Result<Vec<String>, AccountError> {
         let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
         let mut stmt = db.prepare("SELECT DISTINCT cli_name FROM accounts")?;
-        let names: Vec<String> = stmt.query_map([], |row| row.get(0))?
+        let names: Vec<String> = stmt
+            .query_map([], |row| row.get(0))?
             .filter_map(Result::ok)
             .collect();
         Ok(names)

@@ -152,10 +152,10 @@ impl CassIndex {
     pub fn stats(&self) -> Result<CassIndexStats, CassIndexError> {
         let (sessions_total, tokens_total, last_indexed_at) = {
             let db = self.db.lock().map_err(|_| CassIndexError::DbLockPoisoned)?;
-            let sessions_total: usize = db
-                .query_row("SELECT COUNT(*) FROM cass_sessions", [], |row| row.get(0))?;
-            let tokens_total: usize = db
-                .query_row("SELECT COUNT(*) FROM cass_tokens", [], |row| row.get(0))?;
+            let sessions_total: usize =
+                db.query_row("SELECT COUNT(*) FROM cass_sessions", [], |row| row.get(0))?;
+            let tokens_total: usize =
+                db.query_row("SELECT COUNT(*) FROM cass_tokens", [], |row| row.get(0))?;
             let last_indexed_at: Option<String> = db
                 .query_row(
                     "SELECT value FROM cass_meta WHERE key = 'last_indexed_at'",
@@ -323,8 +323,7 @@ impl CassIndex {
 
         let mut to_remove = Vec::new();
         {
-            let mut stmt = db
-                .prepare("SELECT session_id, path FROM cass_sessions")?;
+            let mut stmt = db.prepare("SELECT session_id, path FROM cass_sessions")?;
             let rows = stmt.query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
             })?;
@@ -350,10 +349,10 @@ impl CassIndex {
             params![last_indexed_at],
         )?;
 
-        let sessions_total: usize = db
-            .query_row("SELECT COUNT(*) FROM cass_sessions", [], |row| row.get(0))?;
-        let tokens_total: usize = db
-            .query_row("SELECT COUNT(*) FROM cass_tokens", [], |row| row.get(0))?;
+        let sessions_total: usize =
+            db.query_row("SELECT COUNT(*) FROM cass_sessions", [], |row| row.get(0))?;
+        let tokens_total: usize =
+            db.query_row("SELECT COUNT(*) FROM cass_tokens", [], |row| row.get(0))?;
 
         Ok(CassIndexSummary {
             indexed,
@@ -368,7 +367,11 @@ impl CassIndex {
         })
     }
 
-    pub fn search(&self, query: &str, limit: usize) -> Result<Vec<CassSearchResult>, CassIndexError> {
+    pub fn search(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<CassSearchResult>, CassIndexError> {
         let db = self.db.lock().map_err(|_| CassIndexError::DbLockPoisoned)?;
         let query = query.trim();
         if query.is_empty() {
@@ -381,10 +384,10 @@ impl CassIndex {
         }
 
         let mut scores: HashMap<String, i64> = HashMap::new();
-        let mut stmt_exact = db
-            .prepare("SELECT session_id, weight FROM cass_tokens WHERE token = ?1")?;
-        let mut stmt_like = db
-            .prepare("SELECT session_id, weight FROM cass_tokens WHERE token LIKE ?1")?;
+        let mut stmt_exact =
+            db.prepare("SELECT session_id, weight FROM cass_tokens WHERE token = ?1")?;
+        let mut stmt_like =
+            db.prepare("SELECT session_id, weight FROM cass_tokens WHERE token LIKE ?1")?;
 
         for token in &query_tokens {
             let (pattern, boost) = match token.mode {
@@ -420,7 +423,10 @@ impl CassIndex {
             "SELECT session_id, cli_name, path, updated_at, cwd FROM cass_sessions WHERE session_id = ?1",
         )?;
 
-        let terms: Vec<String> = query_tokens.iter().map(|token| token.value.clone()).collect();
+        let terms: Vec<String> = query_tokens
+            .iter()
+            .map(|token| token.value.clone())
+            .collect();
 
         for (session_id, score) in scored {
             let row = stmt
@@ -475,15 +481,16 @@ fn parse_query_tokens(query: &str) -> Vec<QueryToken> {
             continue;
         }
 
-        let (mode, inner) = if trimmed.starts_with('*') && trimmed.ends_with('*') && trimmed.len() > 2 {
-            (QueryMode::Contains, trimmed.trim_matches('*'))
-        } else if trimmed.ends_with('*') && trimmed.len() > 1 {
-            (QueryMode::Prefix, trimmed.trim_end_matches('*'))
-        } else if trimmed.starts_with('*') && trimmed.len() > 1 {
-            (QueryMode::Contains, trimmed.trim_start_matches('*'))
-        } else {
-            (QueryMode::Exact, trimmed)
-        };
+        let (mode, inner) =
+            if trimmed.starts_with('*') && trimmed.ends_with('*') && trimmed.len() > 2 {
+                (QueryMode::Contains, trimmed.trim_matches('*'))
+            } else if trimmed.ends_with('*') && trimmed.len() > 1 {
+                (QueryMode::Prefix, trimmed.trim_end_matches('*'))
+            } else if trimmed.starts_with('*') && trimmed.len() > 1 {
+                (QueryMode::Contains, trimmed.trim_start_matches('*'))
+            } else {
+                (QueryMode::Exact, trimmed)
+            };
 
         let normalized = normalize_query_term(inner);
         if normalized.len() < 2 {

@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     core::{
-        account_manager::AccountManager,
-        cass_index::CassIndex,
-        cli_registry::CliRegistry,
+        account_manager::AccountManager, cass_index::CassIndex, cli_registry::CliRegistry,
         project_store::ProjectStore,
     },
     terminal::session_manager::SessionManager,

@@ -285,12 +285,8 @@ export function CliSidebar({
     }
   };
 
-  const handleSendChatMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || isLoadingLlm) return;
-
-    const userMessageContent = chatInput.trim();
-    setChatInput('');
+  const sendLlmMessage = async (userMessageContent: string) => {
+    if (isLoadingLlm) return;
 
     const userMsg: LlmChatMessage = {
       role: 'user',
@@ -365,6 +361,30 @@ export function CliSidebar({
       }
     }
   };
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isLoadingLlm) return;
+
+    const userMessageContent = chatInput.trim();
+    setChatInput('');
+    await sendLlmMessage(userMessageContent);
+  };
+
+  useEffect(() => {
+    const handleExplainEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const textToExplain = customEvent.detail;
+      if (textToExplain) {
+        setActiveTab('ai-chat');
+        const promptText = `Hãy giải thích chi tiết đoạn mã hoặc văn bản sau đây:\n\n\`\`\`\n${textToExplain}\n\`\`\``;
+        void sendLlmMessage(promptText);
+      }
+    };
+
+    window.addEventListener('explain-text', handleExplainEvent);
+    return () => window.removeEventListener('explain-text', handleExplainEvent);
+  }, [chatHistory, llmConfig, isLoadingLlm]);
 
   // CLI Manager States
   const [showCliList, setShowCliList] = useState(true);
@@ -1118,8 +1138,8 @@ export function CliSidebar({
             <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
               {chatHistory.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8">
-                  <p className="text-[11px] italic">No messages yet.</p>
-                  <p className="mt-1 text-[10px] text-slate-600">Ask me anything about commands or coding!</p>
+                  <p className="text-[13px] italic">No messages yet.</p>
+                  <p className="mt-1 text-[12px] text-slate-600">Ask me anything about commands or coding!</p>
                 </div>
               ) : (
                 chatHistory.map((msg, idx) => (
@@ -1131,19 +1151,19 @@ export function CliSidebar({
                         : 'bg-cyber-electric/10 border border-cyber-electric/30 text-slate-200 self-start mr-auto'
                     }`}
                   >
-                    <span className={`text-[8px] font-bold uppercase tracking-wider mb-1 ${
+                    <span className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${
                       msg.role === 'user' ? 'text-cyber-neon' : 'text-cyber-electric'
                     }`}>
                       {msg.role === 'user' ? 'You' : 'AI Companion'}
                       <span className="ml-2 font-normal opacity-50">{msg.timestamp}</span>
                     </span>
-                    <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed">{msg.content}</p>
+                    <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.content}</p>
                   </div>
                 ))
               )}
               {isLoadingLlm && (
                 <div className="flex items-center gap-2 self-start max-w-[80%] rounded-lg px-3 py-2 bg-cyber-electric/10 border border-cyber-electric/20">
-                  <span className="text-[10px] text-cyber-electric italic">AI is thinking</span>
+                  <span className="text-[13px] text-cyber-electric italic">AI is thinking</span>
                   <span className="flex gap-0.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -1171,18 +1191,18 @@ export function CliSidebar({
                       }
                     }
                   }}
-                  className="flex-1 min-w-0 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[11px] disabled:opacity-50 resize-none overflow-y-auto"
+                  className="flex-1 min-w-0 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[13px] disabled:opacity-50 resize-none overflow-y-auto"
                   style={{ maxHeight: '7rem' }}
                 />
                 <button
                   type="submit"
                   disabled={isLoadingLlm || !chatInput.trim()}
-                  className="shrink-0 rounded border border-cyber-neon bg-cyber-neon/15 px-3 py-1.5 font-bold uppercase text-[10px] text-cyber-neon hover:bg-cyber-neon/25 transition disabled:opacity-30"
+                  className="shrink-0 rounded border border-cyber-neon bg-cyber-neon/15 px-3 py-1.5 font-bold uppercase text-[11px] text-cyber-neon hover:bg-cyber-neon/25 transition disabled:opacity-30"
                 >
                   Send
                 </button>
               </div>
-              <p className="mt-1 text-[9px] text-slate-600">Enter to send · Shift+Enter for new line</p>
+              <p className="mt-1 text-[10px] text-slate-600">Enter to send · Shift+Enter for new line</p>
             </form>
           </div>
         )}

@@ -190,6 +190,7 @@ export interface SshConnection {
   rdpResolution?: 'fullscreen' | '1080p' | '720p' | 'custom';
   rdpShareClipboard?: boolean;
   rdpShareDrives?: boolean;
+  workingDir?: string;
 }
 
 

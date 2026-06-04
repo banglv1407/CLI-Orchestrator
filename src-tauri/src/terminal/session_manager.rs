@@ -76,8 +76,7 @@ impl SessionManager {
         command: ResolvedCommand,
     ) -> Result<SessionInfo, SessionError> {
         let session_id = format!("{}-{}", cli_name, Uuid::new_v4().as_simple());
-        let (spawn_command, startup_input) =
-            prepare_interactive_spawn_command(&cli_name, command);
+        let (spawn_command, startup_input) = prepare_interactive_spawn_command(&cli_name, command);
 
         let log_cwd = spawn_command.cwd.clone();
         let handle = interactive_runner::start_interactive_session(
@@ -91,11 +90,20 @@ impl SessionManager {
         let mut log_file = open_session_log(&cli_name, &session_id);
         if let Some(ref mut file) = log_file {
             let cwd = log_cwd.as_deref().unwrap_or_else(|| Path::new("unknown"));
-            let _ = writeln!(file, "# Session: {} | {} | `{}`\n", cli_name, session_id, cwd.display());
+            let _ = writeln!(
+                file,
+                "# Session: {} | {} | `{}`\n",
+                cli_name,
+                session_id,
+                cwd.display()
+            );
         }
 
         if let Some(input) = startup_input {
-            let mut writer = handle.writer.lock().map_err(|_| SessionError::LockPoisoned)?;
+            let mut writer = handle
+                .writer
+                .lock()
+                .map_err(|_| SessionError::LockPoisoned)?;
             writer.write_all(input.as_bytes())?;
             writer.flush()?;
         }
@@ -159,11 +167,18 @@ impl SessionManager {
 
         if let Ok(mut log_guard) = session.log_file.lock() {
             if let Some(ref mut file) = *log_guard {
-                let _ = writeln!(file, "**🧑 User:** `{}`", input.trim_end_matches('\n').trim_end_matches('\r'));
+                let _ = writeln!(
+                    file,
+                    "**🧑 User:** `{}`",
+                    input.trim_end_matches('\n').trim_end_matches('\r')
+                );
             }
         }
 
-        let mut writer = session.writer.lock().map_err(|_| SessionError::LockPoisoned)?;
+        let mut writer = session
+            .writer
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
         if let Err(error) = writer.write_all(input.as_bytes()) {
             if let Ok(mut status_guard) = session.status.lock() {
                 *status_guard = "error".to_string();
@@ -180,25 +195,44 @@ impl SessionManager {
         Ok(())
     }
 
-    pub async fn resize_session(&self, session_id: &str, rows: u16, cols: u16) -> Result<(), SessionError> {
+    pub async fn resize_session(
+        &self,
+        session_id: &str,
+        rows: u16,
+        cols: u16,
+    ) -> Result<(), SessionError> {
         let session = {
             let guard = self.sessions.read().await;
             guard.get(session_id).cloned()
         }
         .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
 
-        let master = session._master.lock().map_err(|_| SessionError::LockPoisoned)?;
-        master.resize(portable_pty::PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        }).map_err(|error| SessionError::Io(std::io::Error::new(std::io::ErrorKind::Other, error.to_string())))?;
+        let master = session
+            ._master
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        master
+            .resize(portable_pty::PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|error| {
+                SessionError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    error.to_string(),
+                ))
+            })?;
 
         Ok(())
     }
 
-    pub async fn stop_session(&self, app: &AppHandle, session_id: &str) -> Result<(), SessionError> {
+    pub async fn stop_session(
+        &self,
+        app: &AppHandle,
+        session_id: &str,
+    ) -> Result<(), SessionError> {
         let session = {
             let mut guard = self.sessions.write().await;
             guard.remove(session_id)
@@ -206,12 +240,18 @@ impl SessionManager {
         .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
 
         {
-            let mut status = session.status.lock().map_err(|_| SessionError::LockPoisoned)?;
+            let mut status = session
+                .status
+                .lock()
+                .map_err(|_| SessionError::LockPoisoned)?;
             *status = "stopped".to_string();
         }
 
         {
-            let mut child = session.child.lock().map_err(|_| SessionError::LockPoisoned)?;
+            let mut child = session
+                .child
+                .lock()
+                .map_err(|_| SessionError::LockPoisoned)?;
             let _ = child.kill();
         }
 
@@ -301,8 +341,7 @@ fn build_windows_shell_bootstrap(command: ResolvedCommand) -> (ResolvedCommand, 
 fn quote_windows_cmd_arg(value: &str) -> String {
     let needs_quotes = value.is_empty()
         || value.chars().any(|ch| {
-            ch.is_whitespace()
-                || matches!(ch, '"' | '^' | '&' | '|' | '<' | '>' | '(' | ')' | '%')
+            ch.is_whitespace() || matches!(ch, '"' | '^' | '&' | '|' | '<' | '>' | '(' | ')' | '%')
         });
 
     if !needs_quotes {

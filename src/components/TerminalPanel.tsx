@@ -540,36 +540,20 @@ export function TerminalPanel({
     };
   }, []);
 
+  const cliSessions = useMemo(() => sessions.filter(s => !s.cliName.startsWith('SSH: ')), [sessions]);
+  const sshSessions = useMemo(() => sessions.filter(s => s.cliName.startsWith('SSH: ')), [sessions]);
+
   const activeSession = sessions.find((s) => s.id === visibleSessionId);
-  const matchedSsh = useMemo(() => {
-    if (!activeSession) return null;
-    return sshConnections.find((c) => `SSH: ${c.name}` === activeSession.cliName);
-  }, [activeSession, sshConnections]);
 
   // Dynamic height and scale calculation to ensure up to 10 sessions fit on a single screen without scrolling!
   const thumbSizes = useMemo(() => {
-    const N = sessions.length;
-    if (N <= 1) return { cardHeight: 144, cardWidth: 230, scale: 0.18, containerWidth: 260 };
-    
-    // We assume available vertical height of around 640px
-    const availableHeight = 640;
-    const totalGaps = (N - 1) * 8; // 8px gaps
-    let height = Math.floor((availableHeight - totalGaps) / N);
-    
-    // Limit bounds
-    height = Math.max(54, Math.min(144, height));
-    
-    const width = Math.floor(height * 1.6);
-    const scale = height / 800; // virtual height is 800px
-    const containerWidth = width + 28; // Card width + padding
-    
     return {
-      cardHeight: height,
-      cardWidth: width,
-      scale,
-      containerWidth: Math.max(120, Math.min(260, containerWidth))
+      cardHeight: 110,
+      cardWidth: 176,
+      scale: 0.1375,
+      containerWidth: 204
     };
-  }, [sessions.length]);
+  }, []);
 
   return (
     <section className="flex h-full w-full rounded-xl border border-cyber-line bg-cyber-panel/70 overflow-hidden relative">
@@ -581,77 +565,149 @@ export function TerminalPanel({
         <div className="flex h-full w-full overflow-hidden select-none">
           {/* Main active terminal center panel */}
           <div 
-            className="relative flex-1 h-full min-w-0 bg-[#0a0f1f] flex flex-col justify-between"
-            onContextMenu={(e) => visibleSessionId && handleContextMenu(e, visibleSessionId)}
+            className="flex-1 h-full min-w-0 flex flex-col"
           >
-            {/* Active Session Info Header */}
-            {activeSession && (
-              <div className="absolute top-3 left-4 z-20 flex items-center gap-2 select-none">
-                <div className="px-3 py-1 rounded bg-[#0a0f1f]/85 border border-cyber-line/50 text-[10px] font-mono font-bold text-cyber-electric shadow-neon-blue-sm">
-                  🟢 {activeSession.cliName} {activeSession.workingDir ? `| ${activeSession.workingDir.split(/[/\\]/).pop() || activeSession.workingDir}` : ''}
+            {/* Top: Active terminal canvas viewport */}
+            <div 
+              className="relative flex-1 min-h-0 bg-[#0a0f1f] flex flex-col justify-between"
+              onContextMenu={(e) => visibleSessionId && handleContextMenu(e, visibleSessionId)}
+            >
+              {/* Active Session Info Header */}
+              {activeSession && (
+                <div className="absolute top-3 left-4 z-20 flex items-center gap-2 select-none">
+                  <div className="px-3 py-1 rounded bg-[#0a0f1f]/85 border border-cyber-line/50 text-[10px] font-mono font-bold text-cyber-electric shadow-neon-blue-sm">
+                    🟢 {activeSession.cliName} {activeSession.workingDir ? `| ${activeSession.workingDir.split(/[/\\]/).pop() || activeSession.workingDir}` : ''}
+                  </div>
+                </div>
+              )}
+
+              {/* Stop Session (Close) Button on top right */}
+              {visibleSessionId && (
+                <button
+                  type="button"
+                  onClick={() => onStopSession(visibleSessionId)}
+                  className="absolute top-3 right-4 z-20 flex h-6 w-6 items-center justify-center rounded-lg border border-cyber-warn/60 bg-[#0a0f1f]/90 text-cyber-warn hover:bg-cyber-warn hover:text-white transition cursor-pointer select-none font-bold text-xs shadow-neon-sm"
+                  title="Stop / Close Session"
+                >
+                  ✕
+                </button>
+              )}
+
+              {/* Active terminal canvas viewport */}
+              <div className="flex-1 w-full h-full min-h-0 relative">
+                {sessions.map((session) => (
+                  <div
+                    key={`main-${session.id}`}
+                    className={`h-full w-full ${visibleSessionId === session.id ? 'block' : 'hidden'}`}
+                  >
+                    <div
+                      ref={(node) => {
+                        if (visibleSessionId !== session.id) {
+                          return; // Active is mounted in main
+                        }
+                        containerRefs.current[session.id] = node;
+                        if (node) {
+                          containerToSessionRef.current.set(node, session.id);
+                          ensureTerminal(session, node);
+                        }
+                      }}
+                      className="h-full w-full"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom: SSH Consoles Tray */}
+            {sshSessions.length > 0 && (
+              <div className="h-[170px] shrink-0 border-t border-cyber-line/50 bg-[#070b16] p-3 flex flex-col gap-2 overflow-hidden select-none">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-[9px] uppercase tracking-[0.15em] text-cyber-electric font-bold">
+                    ⚡ SSH Consoles ({sshSessions.length})
+                  </h3>
                 </div>
                 
-                {matchedSsh && matchedSsh.authMode === 'password' && matchedSsh.password && (
-                  <button
-                    type="button"
-                    onClick={() => onSendInput(visibleSessionId!, `${matchedSsh.password}\n`)}
-                    className="rounded bg-cyber-electric/25 border border-cyber-electric/80 px-2 py-0.5 font-bold uppercase tracking-wider text-cyber-electric transition hover:bg-cyber-electric/40 shadow-neon-blue-sm font-mono text-[9px] select-none cursor-pointer"
-                  >
-                    🔑 Autofill Password
-                  </button>
-                )}
+                <div className="flex-1 flex gap-3 overflow-x-auto overflow-y-hidden justify-start items-center scrollbar-thin pb-1">
+                  {sshSessions.map((session) => {
+                    const isActive = visibleSessionId === session.id;
+                    return (
+                      <div
+                        key={`ssh-thumb-${session.id}`}
+                        onClick={() => onSelectSession(session.id)}
+                        onContextMenu={(e) => handleContextMenu(e, session.id)}
+                        style={{ 
+                          width: '176px', 
+                          height: '110px' 
+                        }}
+                        className={`relative rounded-lg border-2 overflow-hidden transition-all duration-200 shrink-0 cursor-pointer ${
+                          isActive 
+                            ? 'border-cyber-electric shadow-neon-blue-sm bg-cyber-electric/5' 
+                            : 'border-cyber-line/50 hover:border-cyber-electric/80 bg-[#0a0f1f] hover:shadow-neon-blue-sm'
+                        }`}
+                      >
+                        {/* Live scaled view */}
+                        <div 
+                          style={{ 
+                            transform: 'scale(0.1375)', 
+                            width: '1280px', 
+                            height: '800px' 
+                          }}
+                          className="absolute inset-0 origin-top-left pointer-events-none"
+                        >
+                          <div
+                            ref={(node) => {
+                              miniContainerRefs.current[session.id] = node;
+                              if (node) {
+                                containerToSessionRef.current.set(node, session.id);
+                                ensureMiniTerminal(session, node);
+                              }
+                            }}
+                            className="h-full w-full"
+                          />
+                        </div>
+
+                        {/* Overlay connection name / label */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-[#0a0f1f]/85 border-t border-cyber-line/20 px-2 py-0.5 flex items-center justify-between pointer-events-none text-[8px]">
+                          <span className="truncate max-w-[70%] font-mono font-semibold text-cyber-electric">
+                            {session.cliName}
+                          </span>
+                          <span className="font-mono text-[7px] px-1 rounded bg-[#0a0f1f]/80 border border-cyber-line text-slate-400 select-none scale-90">
+                            {session.id.substring(0, 4)}
+                          </span>
+                        </div>
+
+                        {/* Quick Close button on SSH thumbnail */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStopSession(session.id);
+                          }}
+                          className="absolute top-1 right-1 z-30 flex h-4.5 w-4.5 items-center justify-center rounded bg-rose-500/80 hover:bg-rose-600 text-white transition font-bold text-[8px] opacity-75 hover:opacity-100 shadow-sm"
+                          title="Stop / Close Session"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
-
-            {/* Stop Session (Close) Button on top right */}
-            {visibleSessionId && (
-              <button
-                type="button"
-                onClick={() => onStopSession(visibleSessionId)}
-                className="absolute top-3 right-4 z-20 flex h-6 w-6 items-center justify-center rounded-lg border border-cyber-warn/60 bg-[#0a0f1f]/90 text-cyber-warn hover:bg-cyber-warn hover:text-white transition cursor-pointer select-none font-bold text-xs shadow-neon-sm"
-                title="Stop / Close Session"
-              >
-                ✕
-              </button>
-            )}
-
-            {/* Active terminal canvas viewport */}
-            <div className="flex-1 w-full h-full min-h-0 relative">
-              {sessions.map((session) => (
-                <div
-                  key={`main-${session.id}`}
-                  className={`h-full w-full ${visibleSessionId === session.id ? 'block' : 'hidden'}`}
-                >
-                  <div
-                    ref={(node) => {
-                      if (visibleSessionId !== session.id) {
-                        return; // Active is mounted in main
-                      }
-                      containerRefs.current[session.id] = node;
-                      if (node) {
-                        containerToSessionRef.current.set(node, session.id);
-                        ensureTerminal(session, node);
-                      }
-                    }}
-                    className="h-full w-full"
-                  />
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Right live scaled session thumbnails panel */}
-          {sessions.length > 1 && (
+          {cliSessions.length >= 1 && (
             <div 
               style={{ width: `${thumbSizes.containerWidth}px` }}
               className="h-full border-l border-cyber-line bg-cyber-base/40 p-3.5 flex flex-col gap-2 shrink-0 select-none overflow-hidden"
             >
               <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold mb-1 text-center truncate">
-                Meetings ({sessions.length})
+                Meetings ({cliSessions.length})
               </h3>
               
-              <div className="flex-1 flex flex-col gap-2 overflow-y-hidden justify-start items-center">
-                {sessions.map((session) => {
+              <div className="flex-1 flex flex-col gap-2 overflow-y-auto scrollbar-thin justify-start items-center w-full">
+                {cliSessions.map((session) => {
                   const isActive = visibleSessionId === session.id;
                   return (
                     <div
@@ -695,7 +751,7 @@ export function TerminalPanel({
                           <span className="truncate max-w-[70%] font-mono font-semibold text-slate-300">
                             {session.cliName}
                           </span>
-                          <span className="font-mono text-[7px] px-1 rounded bg-cyber-base border border-cyber-line text-slate-400 select-none scale-90">
+                          <span className="font-mono text-[7px] px-1 rounded bg-[#0a0f1f]/80 border border-cyber-line text-slate-400 select-none scale-90">
                             {session.id.substring(0, 4)}
                           </span>
                         </div>
@@ -733,6 +789,32 @@ export function TerminalPanel({
           style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
           className="fixed z-[100] w-48 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
         >
+          {(() => {
+            const sessionTerminal = terminalRefs.current[contextMenu.sessionId]?.term;
+            const terminalSelection = sessionTerminal?.hasSelection() ? sessionTerminal.getSelection() : '';
+            const pageSelection = window.getSelection()?.toString() || '';
+            const selectedText = (terminalSelection || pageSelection).trim();
+            if (selectedText) {
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const event = new CustomEvent('explain-text', { detail: selectedText });
+                      window.dispatchEvent(event);
+                      setContextMenu(null);
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition"
+                  >
+                    💡 Giải thích
+                  </button>
+                  <div className="my-1 border-t border-cyber-line/50" />
+                </>
+              );
+            }
+            return null;
+          })()}
+
           <button
             type="button"
             onClick={() => {
@@ -745,23 +827,7 @@ export function TerminalPanel({
           >
             📁 Reveal in Explorer
           </button>
-          
-          {(() => {
-            const session = sessions.find((s) => s.id === contextMenu.sessionId);
-            const matched = session ? sshConnections.find((c) => `SSH: ${c.name}` === session.cliName) : null;
-            if (matched && matched.authMode === 'password' && matched.password) {
-              return (
-                <button
-                  type="button"
-                  onClick={() => onSendInput(contextMenu.sessionId, `${matched.password}\n`)}
-                  className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon transition"
-                >
-                  🔑 Autofill Password
-                </button>
-              );
-            }
-            return null;
-          })()}
+
 
           <button
             type="button"

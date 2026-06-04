@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { SshConnection } from '../types';
-import { pickFile } from '../lib/tauri';
+import { pickFile, pickFolder } from '../lib/tauri';
 
 interface SshConnectionModalProps {
   isOpen: boolean;
@@ -29,6 +29,7 @@ export function SshConnectionModal({
   const [newGroupInput, setNewGroupInput] = useState('');
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [workingDir, setWorkingDir] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // RDP specific states
@@ -56,6 +57,7 @@ export function SshConnectionModal({
         setRdpResolution(connection.rdpResolution || '1080p');
         setRdpShareClipboard(connection.rdpShareClipboard !== false);
         setRdpShareDrives(!!connection.rdpShareDrives);
+        setWorkingDir(connection.workingDir || '');
         setShowNewGroupInput(false);
         setNewGroupInput('');
       } else {
@@ -71,6 +73,7 @@ export function SshConnectionModal({
         setRdpResolution('1080p');
         setRdpShareClipboard(true);
         setRdpShareDrives(false);
+        setWorkingDir('');
         setShowNewGroupInput(false);
         setNewGroupInput('');
       }
@@ -96,6 +99,17 @@ export function SshConnectionModal({
       }
     } catch (e) {
       console.error('Failed to pick private key file:', e);
+    }
+  };
+
+  const handleBrowseFolder = async () => {
+    try {
+      const path = await pickFolder();
+      if (path) {
+        setWorkingDir(path);
+      }
+    } catch (e) {
+      console.error('Failed to pick workspace folder:', e);
     }
   };
 
@@ -137,6 +151,7 @@ export function SshConnectionModal({
       rdpResolution: protocol === 'rdp' ? rdpResolution : undefined,
       rdpShareClipboard: protocol === 'rdp' ? rdpShareClipboard : undefined,
       rdpShareDrives: protocol === 'rdp' ? rdpShareDrives : undefined,
+      workingDir: workingDir.trim() || undefined,
     });
     onClose();
   };
@@ -385,6 +400,29 @@ export function SshConnectionModal({
                   </div>
                 </div>
               )}
+
+              {/* Workspace Directory mapping */}
+              <div className="mt-3">
+                <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 text-[10px]">
+                  Local Workspace Folder (Optional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. C:\Projects\MyProject (mapped local directory)"
+                    value={workingDir}
+                    onChange={(e) => setWorkingDir(e.target.value)}
+                    className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-xs font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleBrowseFolder}
+                    className="rounded border border-cyber-electric bg-cyber-electric/15 px-3 py-1.5 font-bold uppercase tracking-wider text-cyber-electric transition hover:bg-cyber-electric/25 text-[10px]"
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
             </>
           )}
 

@@ -1,15 +1,28 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage } from '../types';
+import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection } from '../types';
 import { AnimeAssistant } from './AnimeAssistant';
 import { LlmConfigModal } from './LlmConfigModal';
 import { 
   listDirectoryFiles, 
   pickFolder,
-  sendCliInput 
+  sendCliInput,
+  readFileContent,
+  writeFileContent,
+  openWorkspaceFolder,
+  getGitStatus,
+  getGitDiff,
 } from '../lib/tauri';
 
 // --- SVG Icons ---
+
+function CloudIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" />
+    </svg>
+  );
+}
 
 function ExplorerIcon() {
   return (
@@ -117,9 +130,16 @@ interface CliSidebarProps {
   assistantText: string;
   setAssistantState?: (state: AssistantState) => void;
   setAssistantText?: (text: string) => void;
+
+  sshConnections: SshConnection[];
+  onConnectSsh: (connection: SshConnection) => void;
+  onConnectRdp: (connection: SshConnection) => void;
+  onAddSsh: () => void;
+  onEditSsh: (connection: SshConnection) => void;
+  onDeleteSsh: (connection: SshConnection) => void;
 }
 
-type SidebarTab = 'explorer' | 'cli-manager' | 'settings';
+type SidebarTab = 'explorer' | 'cli-manager' | 'settings' | 'ai-chat' | 'operator';
 
 export function CliSidebar({
   clis,
@@ -138,6 +158,13 @@ export function CliSidebar({
   assistantText,
   setAssistantState,
   setAssistantText,
+
+  sshConnections,
+  onConnectSsh,
+  onConnectRdp,
+  onAddSsh,
+  onEditSsh,
+  onDeleteSsh,
 }: CliSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('explorer');
 
@@ -180,6 +207,10 @@ export function CliSidebar({
     document.body.style.userSelect = 'none';
   };
 
+  // --- SSH VM Manager States ---
+  const [sshSearchQuery, setSshSearchQuery] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
   // Auto-switch to Explorer tab when an active session changes and has a workingDir
   useEffect(() => {
     if (activeSessionId) {
@@ -201,10 +232,6 @@ export function CliSidebar({
     systemPrompt: 'You are an intelligent terminal companion helping developers with their terminal commands and daily programming tasks. Keep your answers concise, practical and optimized.',
     stream: false
   };
-
-  const [showLlmChat, setShowLlmChat] = useState(() => {
-    return localStorage.getItem('ai-cli-show-llm-chat') !== 'false';
-  });
 
   const [llmConfig, setLlmConfig] = useState<LlmConfig>(() => {
     const saved = localStorage.getItem('ai-cli-llm-config');
@@ -235,11 +262,6 @@ export function CliSidebar({
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Persist showLlmChat state
-  useEffect(() => {
-    localStorage.setItem('ai-cli-show-llm-chat', String(showLlmChat));
-  }, [showLlmChat]);
-
   // Scroll to bottom on new messages
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -263,12 +285,8 @@ export function CliSidebar({
     }
   };
 
-  const handleSendChatMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || isLoadingLlm) return;
-
-    const userMessageContent = chatInput.trim();
-    setChatInput('');
+  const sendLlmMessage = async (userMessageContent: string) => {
+    if (isLoadingLlm) return;
 
     const userMsg: LlmChatMessage = {
       role: 'user',
@@ -344,6 +362,30 @@ export function CliSidebar({
     }
   };
 
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isLoadingLlm) return;
+
+    const userMessageContent = chatInput.trim();
+    setChatInput('');
+    await sendLlmMessage(userMessageContent);
+  };
+
+  useEffect(() => {
+    const handleExplainEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const textToExplain = customEvent.detail;
+      if (textToExplain) {
+        setActiveTab('ai-chat');
+        const promptText = `Hãy giải thích chi tiết đoạn mã hoặc văn bản sau đây:\n\n\`\`\`\n${textToExplain}\n\`\`\``;
+        void sendLlmMessage(promptText);
+      }
+    };
+
+    window.addEventListener('explain-text', handleExplainEvent);
+    return () => window.removeEventListener('explain-text', handleExplainEvent);
+  }, [chatHistory, llmConfig, isLoadingLlm]);
+
   // CLI Manager States
   const [showCliList, setShowCliList] = useState(true);
 
@@ -352,9 +394,45 @@ export function CliSidebar({
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({});
   const [cachedFiles, setCachedFiles] = useState<Record<string, FileEntry[]>>({});
 
+  // File Editor States
+  const [openedFile, setOpenedFile] = useState<{ path: string; name: string } | null>(null);
+  const [fileContent, setFileContent] = useState<string>('');
+  const [fileOriginalContent, setFileOriginalContent] = useState<string>('');
+  const [isSavingFile, setIsSavingFile] = useState(false);
+  const [fileLoadError, setFileLoadError] = useState<string | null>(null);
+  const [isFileLoading, setIsFileLoading] = useState(false);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+
+  // Git & Diff States
+  const [gitStatusList, setGitStatusList] = useState<{ path: string; status: 'modified' | 'added' | 'deleted' | 'untracked' }[]>([]);
+  const [viewMode, setViewMode] = useState<'edit' | 'diff'>('edit');
+  const [gitDiffContent, setGitDiffContent] = useState<string>('');
+  const [isDiffLoading, setIsDiffLoading] = useState(false);
+
+  // Accordion Panel States
+  const [workspaceFilesExpanded, setWorkspaceFilesExpanded] = useState(true);
+  const [gitDiffExpanded, setGitDiffExpanded] = useState(false);
+
   // Active workspace calculation
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const rootPath = activeSession?.workingDir || customFolder;
+
+  // Path helper
+  const getRelativePath = (fullPath: string, root: string) => {
+    let rel = fullPath.replace(root, '');
+    rel = rel.replace(/^[/\\]+/, '');
+    return rel.replace(/\\/g, '/');
+  };
+
+  // Fetch Git Status
+  const refreshGitStatus = async (repo: string) => {
+    try {
+      const status = await getGitStatus(repo);
+      setGitStatusList(status);
+    } catch (e) {
+      console.error('Failed to get git status:', e);
+    }
+  };
 
   // Sync loading root files
   useEffect(() => {
@@ -364,8 +442,14 @@ export function CliSidebar({
           setCachedFiles((prev) => ({ ...prev, [rootPath]: files }));
         })
         .catch((e) => console.error('Failed to load root files:', e));
+      
+      if (gitDiffExpanded) {
+        void refreshGitStatus(rootPath);
+      }
+    } else {
+      setGitStatusList([]);
     }
-  }, [rootPath]);
+  }, [rootPath, gitDiffExpanded]);
 
   // Clear expanded subfolders when root workspace changes
   useEffect(() => {
@@ -403,41 +487,134 @@ export function CliSidebar({
     }));
   };
 
-  // Click file inside tree
-  const handleFileClick = (entry: FileEntry) => {
-    if (activeSessionId) {
-      // Send smart paste command to active terminal session directly without any confirm dialog
-      void sendCliInput(activeSessionId, ` "${entry.path}" `);
-      if (setAssistantText) {
-        setAssistantText(`Sent file path to terminal: ${entry.path.split(/[/\\]/).pop()}`);
-      }
+  // Click file inside tree – open in built-in editor panel
+  const handleFileClick = async (entry: FileEntry) => {
+    setSelectedFilePath(entry.path);
+    setOpenedFile({ path: entry.path, name: entry.name });
+    setFileLoadError(null);
+    setIsFileLoading(true);
+    setFileContent('');
+    setFileOriginalContent('');
+    setGitDiffContent('');
+    
+    const relPath = rootPath ? getRelativePath(entry.path, rootPath) : '';
+    const gitItem = gitStatusList.find((g) => g.path === relPath);
+    const hasGitChanges = !!gitItem;
+
+    if (hasGitChanges) {
+      setViewMode('diff');
     } else {
-      // Otherwise fallback to copying path silently without any alert dialog
-      navigator.clipboard.writeText(entry.path)
-        .then(() => {
-          if (setAssistantText) {
-            setAssistantText(`Copied file path to clipboard: ${entry.path.split(/[/\\]/).pop()}`);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to copy file path:', err);
-        });
+      setViewMode('edit');
+    }
+
+    try {
+      const content = await readFileContent(entry.path);
+      setFileContent(content);
+      setFileOriginalContent(content);
+      if (setAssistantText) {
+        setAssistantText(`Opened: ${entry.name}`);
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setFileLoadError(errMsg);
+      if (setAssistantText) {
+        setAssistantText(`Cannot read file: ${entry.name}`);
+      }
+    } finally {
+      setIsFileLoading(false);
+    }
+
+    if (hasGitChanges && rootPath) {
+      setIsDiffLoading(true);
+      try {
+        const diff = await getGitDiff(rootPath, relPath, gitItem.status === 'untracked');
+        setGitDiffContent(diff || 'No changes or empty file.');
+      } catch (e) {
+        console.error('Failed to load git diff:', e);
+        setGitDiffContent('Error loading diff.');
+      } finally {
+        setIsDiffLoading(false);
+      }
     }
   };
+
+  const handleCloseFile = () => {
+    setOpenedFile(null);
+    setFileContent('');
+    setFileOriginalContent('');
+    setFileLoadError(null);
+    setSelectedFilePath(null);
+  };
+
+  const handleSaveFile = async () => {
+    if (!openedFile || isSavingFile) return;
+    setIsSavingFile(true);
+    try {
+      await writeFileContent(openedFile.path, fileContent);
+      setFileOriginalContent(fileContent);
+      
+      if (rootPath && gitDiffExpanded) {
+        void refreshGitStatus(rootPath);
+      }
+
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText(`Saved: ${openedFile.name}`);
+        setTimeout(() => setAssistantState?.('Idle'), 2500);
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Error');
+        setAssistantText(`Save failed: ${errMsg}`);
+      }
+    } finally {
+      setIsSavingFile(false);
+    }
+  };
+
+  const fileDirty = openedFile !== null && fileContent !== fileOriginalContent;
 
   // Recursive Tree Node Renderer
   const renderFileNode = (entry: FileEntry, depth: number) => {
     const isExpanded = !!expandedPaths[entry.path];
     const children = cachedFiles[entry.path] ?? [];
 
+    const relPath = rootPath ? getRelativePath(entry.path, rootPath) : '';
+    const gitItem = gitStatusList.find((g) => g.path === relPath);
+    
+    // Style and badge depending on Git status
+    let gitBadge = null;
+    let gitTextClass = 'text-slate-300 hover:text-white';
+    
+    if (gitItem && !entry.isDir) {
+      if (gitItem.status === 'modified') {
+        gitBadge = <span className="ml-auto text-[10px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20 font-mono scale-90 select-none">M</span>;
+        gitTextClass = 'text-amber-300 hover:text-amber-200';
+      } else if (gitItem.status === 'added') {
+        gitBadge = <span className="ml-auto text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-400/20 font-mono scale-90 select-none">A</span>;
+        gitTextClass = 'text-emerald-300 hover:text-emerald-200';
+      } else if (gitItem.status === 'untracked') {
+        gitBadge = <span className="ml-auto text-[10px] font-bold text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded border border-cyan-400/20 font-mono scale-90 select-none">U</span>;
+        gitTextClass = 'text-cyan-300 hover:text-cyan-200';
+      } else if (gitItem.status === 'deleted') {
+        gitBadge = <span className="ml-auto text-[10px] font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 line-through font-mono scale-90 select-none">D</span>;
+        gitTextClass = 'text-rose-400/90 hover:text-rose-300 line-through';
+      }
+    }
+
     return (
       <div key={entry.path} className="select-none text-[13px]">
         <button
           type="button"
-          onClick={() => (entry.isDir ? handleToggleExpand(entry.path) : handleFileClick(entry))}
+          onClick={() => (entry.isDir ? handleToggleExpand(entry.path) : void handleFileClick(entry))}
           style={{ paddingLeft: `${depth * 14 + 10}px` }}
-          className={`flex w-full items-center gap-2 py-1 text-left transition hover:bg-cyber-neon/5 ${
-            !entry.isDir ? 'text-slate-300 hover:text-white' : 'text-slate-100 font-semibold'
+          className={`flex w-full items-center gap-2 py-1 pr-3 text-left transition hover:bg-cyber-neon/5 ${
+            !entry.isDir
+              ? selectedFilePath === entry.path
+                ? 'text-cyber-neon bg-cyber-neon/10 font-medium'
+                : `${gitTextClass}`
+              : 'text-slate-100 font-semibold'
           }`}
         >
           {entry.isDir ? (
@@ -452,6 +629,7 @@ export function CliSidebar({
             </>
           )}
           <span className="truncate">{entry.name}</span>
+          {gitBadge}
         </button>
 
         {entry.isDir && isExpanded && (
@@ -476,6 +654,31 @@ export function CliSidebar({
       </div>
     );
   };
+
+  // --- SSH VM Grouping and Filtering ---
+  const groupedConnections = useMemo(() => {
+    const query = sshSearchQuery.toLowerCase().trim();
+    const filtered = sshConnections.filter((conn) => {
+      if (!query) return true;
+      return (
+        conn.name.toLowerCase().includes(query) ||
+        conn.host.toLowerCase().includes(query) ||
+        conn.user.toLowerCase().includes(query) ||
+        conn.group.toLowerCase().includes(query) ||
+        (conn.protocol || 'ssh').toLowerCase().includes(query)
+      );
+    });
+
+    const groups: Record<string, SshConnection[]> = {};
+    filtered.forEach((conn) => {
+      const g = conn.group || 'Default';
+      if (!groups[g]) {
+        groups[g] = [];
+      }
+      groups[g].push(conn);
+    });
+    return groups;
+  }, [sshConnections, sshSearchQuery]);
 
   return (
     <div
@@ -521,6 +724,22 @@ export function CliSidebar({
             )}
             <TerminalIcon />
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('operator')}
+            title="Operator (SSH VM Manager)"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'operator'
+                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {activeTab === 'operator' && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
+            )}
+            <CloudIcon />
+          </button>
         </div>
 
         <button
@@ -542,37 +761,170 @@ export function CliSidebar({
 
       {/* 2. Primary Sidebar Panel Content */}
       <aside className="flex flex-1 flex-col overflow-hidden">
-        {/* Anime Assistant at the top of the sidebar */}
-        <div className="p-3 border-b border-cyber-line bg-cyber-base/30 shrink-0">
-          <AnimeAssistant state={assistantState} text={assistantText} />
+        {/* Anime Assistant — click to toggle AI Chat panel */}
+        <div
+          className="p-3 border-b border-cyber-line bg-cyber-base/30 shrink-0 cursor-pointer transition-colors hover:bg-cyber-neon/5 select-none"
+          onClick={() => setActiveTab((prev) => prev === 'ai-chat' ? 'explorer' : 'ai-chat')}
+          role="button"
+          title={activeTab === 'ai-chat' ? 'Close AI Companion Chat' : 'Open AI Companion Chat'}
+          aria-label="Toggle AI Companion Chat"
+        >
+          <div className={`relative transition-all ${activeTab === 'ai-chat' ? 'ring-1 ring-cyber-neon/60 rounded-xl' : ''}`}>
+            <AnimeAssistant state={assistantState} text={assistantText} />
+            {activeTab !== 'ai-chat' && chatHistory.length > 0 && (
+              <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-cyber-neon animate-pulse shadow-neon-sm" title="New messages" />
+            )}
+            <div className={`absolute bottom-1.5 right-2 text-[8px] font-bold uppercase tracking-widest transition ${
+              activeTab === 'ai-chat' ? 'text-cyber-neon' : 'text-slate-500'
+            }`}>
+              {activeTab === 'ai-chat' ? '▲ close chat' : '▼ open chat'}
+            </div>
+          </div>
         </div>
 
         {/* Active Tab: Explorer */}
         {activeTab === 'explorer' && (
           <div className="flex h-full flex-col overflow-hidden">
+            {/* Explorer header */}
             <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
               <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">Explorer</h2>
-              <button
-                type="button"
-                onClick={handleSelectFolder}
-                title="Open Local Folder"
-                className="rounded border border-cyber-neon/40 px-2 py-0.5 text-[10px] uppercase font-semibold text-cyber-neon transition hover:border-cyber-neon hover:bg-cyber-neon/10"
-              >
-                Open Folder
-              </button>
+              <div className="flex gap-1.5">
+                {rootPath && (
+                  <button
+                    type="button"
+                    onClick={() => void openWorkspaceFolder(rootPath)}
+                    title="Open directory in Windows Explorer"
+                    className="rounded border border-cyber-electric/40 px-2 py-0.5 text-[10px] uppercase font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10"
+                  >
+                    Reveal
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSelectFolder}
+                  title="Open Local Folder"
+                  className="rounded border border-cyber-neon/40 px-2 py-0.5 text-[10px] uppercase font-semibold text-cyber-neon transition hover:border-cyber-neon hover:bg-cyber-neon/10"
+                >
+                  Open Folder
+                </button>
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-2">
+            {/* Accordion Panels Container */}
+            <div
+              className={`flex flex-col overflow-hidden shrink-0 border-b border-cyber-line/20 ${
+                openedFile ? 'h-[360px]' : 'flex-1'
+              }`}
+            >
               {rootPath ? (
-                <div>
-                  <div className="px-4 pb-2 pt-1">
-                    <span className="font-display text-[10px] uppercase tracking-wider text-slate-400">Open Folder</span>
-                    <h3 className="truncate font-mono text-[11px] font-semibold text-cyber-electric" title={rootPath}>
-                      {rootPath.split(/[/\\]/).pop() || rootPath}
-                    </h3>
+                <div className="flex flex-col h-full overflow-hidden">
+                  {/* Panel 1: Workspace Files */}
+                  <div className={`flex flex-col overflow-hidden ${workspaceFilesExpanded ? 'flex-1 min-h-[100px]' : 'shrink-0'}`}>
+                    <button
+                      type="button"
+                      onClick={() => setWorkspaceFilesExpanded(!workspaceFilesExpanded)}
+                      className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 hover:bg-cyber-base/70 transition select-none"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FolderArrowIcon isExpanded={workspaceFilesExpanded} />
+                        <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">Workspace Files</span>
+                      </div>
+                      <span className="truncate max-w-[120px] font-mono text-[9px] font-semibold text-cyber-electric/80" title={rootPath}>
+                        {rootPath.split(/[/\\]/).pop() || rootPath}
+                      </span>
+                    </button>
+                    
+                    {workspaceFilesExpanded && (
+                      <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
+                        {(cachedFiles[rootPath] ?? []).map((entry) => renderFileNode(entry, 0))}
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-2">
-                    {(cachedFiles[rootPath] ?? []).map((entry) => renderFileNode(entry, 0))}
+
+                  {/* Panel 2: Git Diff (Changes) */}
+                  <div className={`flex flex-col overflow-hidden border-t border-cyber-line/30 ${gitDiffExpanded ? 'flex-1 min-h-[120px]' : 'shrink-0'}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextVal = !gitDiffExpanded;
+                        setGitDiffExpanded(nextVal);
+                        if (nextVal && rootPath) {
+                          void refreshGitStatus(rootPath);
+                        }
+                      }}
+                      className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 hover:bg-cyber-base/70 transition select-none"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FolderArrowIcon isExpanded={gitDiffExpanded} />
+                        <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">Git Diff (Changes)</span>
+                      </div>
+                      {gitStatusList.length > 0 && (
+                        <span className="rounded bg-cyber-neon/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-neon border border-cyber-neon/30 font-mono">
+                          {gitStatusList.length}
+                        </span>
+                      )}
+                    </button>
+
+                    {gitDiffExpanded && (
+                      <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
+                        {gitStatusList.length === 0 ? (
+                          <p className="px-4 py-3 text-xs italic text-slate-500 font-mono">No changed files in workspace.</p>
+                        ) : (
+                          <div className="space-y-0.5">
+                            {gitStatusList.map((gitItem) => {
+                              const entry: FileEntry = {
+                                name: gitItem.path.split('/').pop() || gitItem.path,
+                                path: rootPath + '/' + gitItem.path,
+                                isDir: false
+                              };
+                              const isActive = selectedFilePath === entry.path;
+                              
+                              let statusBadge = '';
+                              let textClass = 'text-slate-300 hover:text-white';
+                              if (gitItem.status === 'modified') {
+                                statusBadge = 'M';
+                                textClass = 'text-amber-300 hover:text-amber-200 hover:bg-amber-400/5';
+                              } else if (gitItem.status === 'added') {
+                                statusBadge = 'A';
+                                textClass = 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-400/5';
+                              } else if (gitItem.status === 'untracked') {
+                                statusBadge = 'U';
+                                textClass = 'text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/5';
+                              } else if (gitItem.status === 'deleted') {
+                                statusBadge = 'D';
+                                textClass = 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 line-through';
+                              }
+
+                              return (
+                                <button
+                                  key={gitItem.path}
+                                  type="button"
+                                  onClick={() => void handleFileClick(entry)}
+                                  className={`flex w-full items-center justify-between px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 ${
+                                    isActive 
+                                      ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' 
+                                      : `${textClass}`
+                                  }`}
+                                >
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="truncate font-semibold text-slate-200">{entry.name}</span>
+                                    <span className="truncate text-[8px] text-slate-500 font-mono mt-0.5" title={gitItem.path}>{gitItem.path}</span>
+                                  </div>
+                                  <span className={`text-[9px] font-bold px-1 py-0.2 rounded border font-mono scale-90 ${
+                                    gitItem.status === 'modified' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
+                                    gitItem.status === 'added' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
+                                    gitItem.status === 'untracked' ? 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20' :
+                                    'text-rose-500 bg-rose-500/10 border-rose-500/20 line-through'
+                                  }`}>
+                                    {statusBadge}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -592,6 +944,266 @@ export function CliSidebar({
                 </div>
               )}
             </div>
+
+            {/* File Editor Panel */}
+            {openedFile && (() => {
+              const relPath = rootPath ? getRelativePath(openedFile.path, rootPath) : '';
+              const fileHasChanges = gitStatusList.some((g) => g.path === relPath);
+
+              return (
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  {/* Editor toolbar */}
+                  <div className="flex shrink-0 items-center justify-between gap-1 border-b border-cyber-line bg-cyber-base/50 px-3 py-1.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <FileIcon />
+                      <span
+                        className="truncate font-mono text-[11px] text-slate-200 max-w-[100px]"
+                        title={openedFile.path}
+                      >
+                        {openedFile.name}
+                      </span>
+                      {fileDirty && (
+                        <span className="ml-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyber-warn" title="Unsaved changes" />
+                      )}
+
+                      {/* Diff / Edit Mode Toggle */}
+                      {fileHasChanges && (
+                        <div className="flex bg-cyber-base/80 border border-cyber-line p-0.5 rounded ml-2 select-none">
+                          <button
+                            type="button"
+                            onClick={() => setViewMode('diff')}
+                            className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded transition-colors ${
+                              viewMode === 'diff'
+                                ? 'bg-cyber-neon/15 text-cyber-neon shadow-neon-sm'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            Diff
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setViewMode('edit')}
+                            className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded transition-colors ${
+                              viewMode === 'edit'
+                                ? 'bg-cyber-electric/15 text-cyber-electric shadow-neon-blue-sm'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {viewMode === 'edit' && fileDirty && (
+                        <button
+                          type="button"
+                          onClick={() => setFileContent(fileOriginalContent)}
+                          title="Revert changes"
+                          className="rounded border border-cyber-warn/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-cyber-warn transition hover:bg-cyber-warn/10"
+                        >
+                          Revert
+                        </button>
+                      )}
+                      {viewMode === 'edit' && (
+                        <button
+                          type="button"
+                          onClick={handleSaveFile}
+                          disabled={!fileDirty || isSavingFile}
+                          title="Save file (Ctrl+S)"
+                          className="rounded border border-cyber-neon/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-cyber-neon transition hover:bg-cyber-neon/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          {isSavingFile ? 'Saving…' : 'Save'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleCloseFile}
+                        title="Close file"
+                        className="flex h-4 w-4 items-center justify-center rounded text-slate-400 hover:text-white transition text-[14px] leading-none"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Editor body */}
+                  <div className="flex-1 overflow-hidden relative">
+                    {isFileLoading ? (
+                      <div className="flex h-full items-center justify-center text-[11px] text-slate-500 italic">
+                        Loading…
+                      </div>
+                    ) : fileLoadError ? (
+                      <div className="p-4 text-[11px] text-cyber-warn leading-relaxed">
+                        <p className="font-semibold mb-1">Cannot display this file</p>
+                        <p className="text-slate-400 break-words">{fileLoadError}</p>
+                      </div>
+                    ) : viewMode === 'diff' ? (
+                      isDiffLoading ? (
+                        <div className="flex h-full items-center justify-center text-[11px] text-slate-500 italic">
+                          Loading diff…
+                        </div>
+                      ) : (
+                        <div className="h-full w-full overflow-y-auto bg-cyber-base/80 p-3 font-mono text-[11px] leading-relaxed select-text scrollbar-thin text-slate-300">
+                          {gitDiffContent ? (
+                            gitDiffContent.split('\n').map((line, idx) => {
+                              let lineClass = 'text-slate-400 pl-2';
+                              if (line.startsWith('+') && !line.startsWith('+++')) {
+                                lineClass = 'bg-emerald-950/20 text-emerald-400 border-l-2 border-emerald-500 pl-2 font-semibold py-0.5';
+                              } else if (line.startsWith('-') && !line.startsWith('---')) {
+                                lineClass = 'bg-rose-950/20 text-rose-400 border-l-2 border-rose-500 pl-2 font-semibold py-0.5';
+                              } else if (line.startsWith('@@')) {
+                                lineClass = 'bg-indigo-950/20 text-indigo-400 italic pl-2 py-0.5';
+                              } else if (line.startsWith('diff') || line.startsWith('index') || line.startsWith('---') || line.startsWith('+++')) {
+                                lineClass = 'text-slate-500 font-semibold pl-2 py-0.5';
+                              }
+                              return (
+                                <div key={idx} className={`${lineClass} whitespace-pre-wrap min-h-[18px]`}>
+                                  {line}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-slate-500 italic p-2">No differences found.</div>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                      <textarea
+                        value={fileContent}
+                        onChange={(e) => setFileContent(e.target.value)}
+                        onKeyDown={(e) => {
+                          // Ctrl+S to save
+                          if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                            e.preventDefault();
+                            void handleSaveFile();
+                          }
+                          // Tab insert
+                          if (e.key === 'Tab') {
+                            e.preventDefault();
+                            const { selectionStart, selectionEnd } = e.currentTarget;
+                            const newVal =
+                              fileContent.substring(0, selectionStart) +
+                              '  ' +
+                              fileContent.substring(selectionEnd);
+                            setFileContent(newVal);
+                            requestAnimationFrame(() => {
+                              e.currentTarget.selectionStart = selectionStart + 2;
+                              e.currentTarget.selectionEnd = selectionStart + 2;
+                            });
+                          }
+                        }}
+                        spellCheck={false}
+                        className="h-full w-full resize-none bg-cyber-base/80 p-3 font-mono text-[12px] leading-relaxed text-slate-200 outline-none placeholder-slate-600 scrollbar-thin selection:bg-cyber-neon/30"
+                        style={{ caretColor: 'var(--color-cyber-neon, #39ff14)' }}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Active Tab: AI Chat */}
+        {activeTab === 'ai-chat' && (
+          <div className="flex h-full flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4 bg-cyber-base/20">
+              <div>
+                <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-neon font-bold">AI Companion</h2>
+                <p className="text-[10px] text-slate-400 mt-0.5">Intelligent Terminal Assistant</p>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setConfigModalOpen(true)}
+                  className="rounded border border-cyber-electric/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10"
+                >
+                  Config
+                </button>
+                {chatHistory.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearChat}
+                    className="rounded border border-cyber-warn/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-warn transition hover:border-cyber-warn hover:bg-cyber-warn/10"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Chat messages — full height scrollable */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
+              {chatHistory.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8">
+                  <p className="text-[13px] italic">No messages yet.</p>
+                  <p className="mt-1 text-[12px] text-slate-600">Ask me anything about commands or coding!</p>
+                </div>
+              ) : (
+                chatHistory.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex flex-col max-w-[95%] rounded-lg px-3 py-2 leading-normal ${
+                      msg.role === 'user'
+                        ? 'bg-cyber-neon/10 border border-cyber-neon/30 text-slate-100 self-end ml-auto'
+                        : 'bg-cyber-electric/10 border border-cyber-electric/30 text-slate-200 self-start mr-auto'
+                    }`}
+                  >
+                    <span className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${
+                      msg.role === 'user' ? 'text-cyber-neon' : 'text-cyber-electric'
+                    }`}>
+                      {msg.role === 'user' ? 'You' : 'AI Companion'}
+                      <span className="ml-2 font-normal opacity-50">{msg.timestamp}</span>
+                    </span>
+                    <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.content}</p>
+                  </div>
+                ))
+              )}
+              {isLoadingLlm && (
+                <div className="flex items-center gap-2 self-start max-w-[80%] rounded-lg px-3 py-2 bg-cyber-electric/10 border border-cyber-electric/20">
+                  <span className="text-[13px] text-cyber-electric italic">AI is thinking</span>
+                  <span className="flex gap-0.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat input — Shift+Enter = newline, Enter = send */}
+            <form onSubmit={handleSendChatMessage} className="shrink-0 border-t border-cyber-line p-3">
+              <div className="flex gap-2 items-end">
+                <textarea
+                  placeholder="Type a message..."
+                  value={chatInput}
+                  disabled={isLoadingLlm}
+                  rows={1}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!isLoadingLlm && chatInput.trim()) {
+                        void handleSendChatMessage(e as unknown as React.FormEvent);
+                      }
+                    }
+                  }}
+                  className="flex-1 min-w-0 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[13px] disabled:opacity-50 resize-none overflow-y-auto"
+                  style={{ maxHeight: '7rem' }}
+                />
+                <button
+                  type="submit"
+                  disabled={isLoadingLlm || !chatInput.trim()}
+                  className="shrink-0 rounded border border-cyber-neon bg-cyber-neon/15 px-3 py-1.5 font-bold uppercase text-[11px] text-cyber-neon hover:bg-cyber-neon/25 transition disabled:opacity-30"
+                >
+                  Send
+                </button>
+              </div>
+              <p className="mt-1 text-[10px] text-slate-600">Enter to send · Shift+Enter for new line</p>
+            </form>
           </div>
         )}
 
@@ -606,87 +1218,6 @@ export function CliSidebar({
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-5">
-              {/* LLM COMPANION SECTION */}
-              <div className="pb-4 border-b border-cyber-line/30">
-                <div className="mb-2 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setShowLlmChat((value) => !value)}
-                    className="font-display text-xs uppercase tracking-[0.2em] text-slate-400 hover:text-slate-200"
-                  >
-                    AI Companion {showLlmChat ? '[-]' : '[+]'}
-                  </button>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setConfigModalOpen(true)}
-                      className="rounded border border-cyber-electric/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10"
-                    >
-                      Config
-                    </button>
-                    {chatHistory.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleClearChat}
-                        className="rounded border border-cyber-warn/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-warn transition hover:border-cyber-warn hover:bg-cyber-warn/10"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {showLlmChat && (
-                  <div className="flex flex-col rounded-lg border border-cyber-line bg-cyber-base/20 p-2 text-xs">
-                    {/* Chat Messages Log */}
-                    <div className="h-96 overflow-y-auto space-y-2 mb-2 pr-1 scrollbar-thin">
-                      {chatHistory.length === 0 ? (
-                        <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-6 italic text-[11px]">
-                          No messages yet. Ask me anything about commands, coding or settings!
-                        </div>
-                      ) : (
-                        chatHistory.map((msg, idx) => (
-                          <div 
-                            key={idx} 
-                            className={`flex flex-col max-w-[90%] rounded-lg px-2.5 py-1.5 leading-normal ${
-                              msg.role === 'user'
-                                ? 'bg-cyber-neon/10 border border-cyber-neon/30 text-slate-100 self-end ml-auto'
-                                : 'bg-cyber-electric/15 border border-cyber-electric/30 text-slate-200 self-start mr-auto'
-                            }`}
-                          >
-                            <span className={`text-[8px] font-bold uppercase tracking-wider mb-0.5 ${
-                              msg.role === 'user' ? 'text-cyber-neon' : 'text-cyber-electric'
-                            }`}>
-                              {msg.role === 'user' ? 'You' : 'AI Companion'}
-                            </span>
-                            <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed">{msg.content}</p>
-                          </div>
-                        ))
-                      )}
-                      <div ref={chatEndRef} />
-                    </div>
-
-                    {/* Chat Input form */}
-                    <form onSubmit={handleSendChatMessage} className="flex gap-1.5 items-center">
-                      <input
-                        type="text"
-                        placeholder="Type a message..."
-                        value={chatInput}
-                        disabled={isLoadingLlm}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        className="flex-1 min-w-0 rounded border border-cyber-line bg-cyber-base px-2 py-1 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[11px] disabled:opacity-50"
-                      />
-                      <button
-                        type="submit"
-                        disabled={isLoadingLlm || !chatInput.trim()}
-                        className="shrink-0 rounded border border-cyber-neon bg-cyber-neon/15 px-3 py-1 font-bold uppercase text-[10px] text-cyber-neon hover:bg-cyber-neon/25 transition disabled:opacity-30 disabled:hover:bg-transparent"
-                      >
-                        Send
-                      </button>
-                    </form>
-                  </div>
-                )}
-              </div>
 
               {/* CLIs SECTION */}
               <div>
@@ -763,6 +1294,139 @@ export function CliSidebar({
                   </div>
                 ) : null}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active Tab: Operator (SSH VM Manager) */}
+        {activeTab === 'operator' && (
+          <div className="flex h-full flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4 bg-cyber-base/20">
+              <div>
+                <h1 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">VM Operator</h1>
+                <p className="text-[10px] text-slate-400 mt-0.5">SSH connections to your VMs</p>
+              </div>
+              <button
+                type="button"
+                onClick={onAddSsh}
+                className="rounded border border-cyber-electric/50 px-2 py-1 text-[10px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10 shadow-neon-blue-sm-faint"
+              >
+                Add VM
+              </button>
+            </div>
+
+            {/* Search Box */}
+            <div className="shrink-0 p-3 border-b border-cyber-line/50">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search VM, host, user or group..."
+                  value={sshSearchQuery}
+                  onChange={(e) => setSshSearchQuery(e.target.value)}
+                  className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
+                />
+                {sshSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSshSearchQuery('')}
+                    className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* VM Connection List grouped by Group */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-thin">
+              {Object.keys(groupedConnections).length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8 select-none">
+                  <CloudIcon />
+                  <p className="mt-4 text-xs font-semibold text-slate-300">No Connections Found</p>
+                  <p className="mt-1 text-[11px] text-slate-500 leading-normal">
+                    {sshSearchQuery ? 'Try adjusting your search query.' : 'Add your first VM connection above to start.'}
+                  </p>
+                </div>
+              ) : (
+                (Object.entries(groupedConnections) as [string, SshConnection[]][]).map(([groupName, conns]) => {
+                  const isCollapsed = !!collapsedGroups[groupName];
+                  return (
+                    <div key={groupName} className="space-y-1">
+                      {/* Group Header */}
+                      <button
+                        type="button"
+                        onClick={() => setCollapsedGroups((prev) => ({ ...prev, [groupName]: !isCollapsed }))}
+                        className="flex w-full items-center justify-between font-display text-[11px] uppercase tracking-wider text-slate-400 hover:text-slate-200 py-1"
+                      >
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <FolderArrowIcon isExpanded={!isCollapsed} />
+                          <span>{groupName}</span>
+                          <span className="text-[9px] opacity-60 font-semibold lowercase">({conns.length})</span>
+                        </div>
+                      </button>
+
+                      {/* Group Connection cards */}
+                      {!isCollapsed && (
+                        <div className="space-y-1.5 pl-2 border-l border-cyber-line/20 ml-1.5 mt-1">
+                          {conns.map((conn) => (
+                            <div
+                              key={conn.id}
+                              className="rounded border border-cyber-line bg-cyber-base/40 p-2.5 transition hover:border-cyber-electric/60 hover:bg-cyber-electric/5"
+                            >
+                              <div className="flex items-start gap-1.5">
+                                <div className="min-w-0 flex-1">
+                                  <span className="block truncate text-[12.5px] font-bold text-slate-100">{conn.name}</span>
+                                  <span className="block truncate text-[9.5px] text-slate-400 font-mono mt-0.5">
+                                    {conn.user}@{conn.host}:{conn.port}
+                                  </span>
+                                  <span className={`inline-block rounded border px-1 py-0.5 text-[8.5px] font-semibold mt-1.5 uppercase tracking-wider ${
+                                    conn.protocol === 'rdp'
+                                      ? 'bg-cyber-electric/10 border-cyber-electric/40 text-cyber-electric'
+                                      : 'bg-cyber-neon/10 border-cyber-neon/40 text-cyber-neon'
+                                  }`}>
+                                    {conn.protocol === 'rdp' ? '💻 RDP' : conn.authMode === 'key' ? '🔑 SSH Key' : '⌨ SSH Pass'}
+                                  </span>
+                                </div>
+
+                                <div className="mt-0.5 flex shrink-0 items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => conn.protocol === 'rdp' ? onConnectRdp(conn) : onConnectSsh(conn)}
+                                    aria-label={conn.protocol === 'rdp' ? `Remote Desktop to ${conn.name}` : `Connect SSH to ${conn.name}`}
+                                    title={conn.protocol === 'rdp' ? "Launch RDP Session" : "Connect SSH Session"}
+                                    className="flex h-5.5 w-5.5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
+                                  >
+                                    <PlayIcon />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onEditSsh(conn)}
+                                    aria-label={`Edit ${conn.name}`}
+                                    title="Edit Profile"
+                                    className="flex h-5.5 w-5.5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
+                                  >
+                                    <EditIcon />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteSsh(conn)}
+                                    aria-label={`Delete ${conn.name}`}
+                                    title="Delete Profile"
+                                    className="flex h-5.5 w-5.5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
+                                  >
+                                    <TrashIcon />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}

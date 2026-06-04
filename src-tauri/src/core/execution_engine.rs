@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    path::Path,
-    path::PathBuf,
-};
+use std::{collections::HashMap, fs, path::Path, path::PathBuf};
 
 use crate::core::cli_registry::CliDefinition;
 
@@ -62,7 +57,11 @@ impl ExecutionEngine {
 }
 
 #[cfg(target_os = "windows")]
-fn platform_prepare_command(mode: crate::core::cli_registry::CliMode, command: String, args: Vec<String>) -> (String, Vec<String>) {
+fn platform_prepare_command(
+    mode: crate::core::cli_registry::CliMode,
+    command: String,
+    args: Vec<String>,
+) -> (String, Vec<String>) {
     if let Some((shim_command, shim_args)) = try_resolve_windows_node_shim(&command, &args) {
         return (shim_command, shim_args);
     }
@@ -83,7 +82,11 @@ fn platform_prepare_command(mode: crate::core::cli_registry::CliMode, command: S
 }
 
 #[cfg(not(target_os = "windows"))]
-fn platform_prepare_command(_: crate::core::cli_registry::CliMode, command: String, args: Vec<String>) -> (String, Vec<String>) {
+fn platform_prepare_command(
+    _: crate::core::cli_registry::CliMode,
+    command: String,
+    args: Vec<String>,
+) -> (String, Vec<String>) {
     (command, args)
 }
 
@@ -98,7 +101,10 @@ fn should_wrap_windows_command(command: &str) -> bool {
         return false;
     }
 
-    if let Some(ext) = Path::new(command).extension().and_then(|value| value.to_str()) {
+    if let Some(ext) = Path::new(command)
+        .extension()
+        .and_then(|value| value.to_str())
+    {
         let ext = ext.to_ascii_lowercase();
         return ext == "cmd" || ext == "bat";
     }
@@ -190,7 +196,11 @@ fn parse_npm_cmd_shim_target(path: &Path) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, fs, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        collections::HashMap,
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     use super::ExecutionEngine;
     use crate::core::cli_registry::{CliDefinition, CliMode};
@@ -245,7 +255,11 @@ mod tests {
         let temp_dir = std::env::temp_dir().join(format!("ai-cli-manager-shim-test-{unique}"));
         fs::create_dir_all(&temp_dir).expect("failed to create temp dir");
 
-        let script_target = temp_dir.join("node_modules").join("acme-cli").join("bin").join("entry.js");
+        let script_target = temp_dir
+            .join("node_modules")
+            .join("acme-cli")
+            .join("bin")
+            .join("entry.js");
         fs::create_dir_all(script_target.parent().expect("missing script parent"))
             .expect("failed to create script parent");
         fs::write(&script_target, "console.log('ok');").expect("failed to write fake entry script");
@@ -259,7 +273,8 @@ endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\node_
         )
         .expect("failed to write fake shim");
 
-        let parsed = super::parse_npm_cmd_shim_target(&shim_path).expect("expected shim parser output");
+        let parsed =
+            super::parse_npm_cmd_shim_target(&shim_path).expect("expected shim parser output");
         assert_eq!(parsed, script_target);
 
         let _ = fs::remove_dir_all(&temp_dir);
@@ -277,7 +292,7 @@ endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\node_
             saved_directories: Vec::new(),
         };
         let resolved = ExecutionEngine::resolve_command(&cli, "write tests", None);
-        
+
         let actual_args = if resolved.command == "cmd.exe" {
             &resolved.args[3..]
         } else {

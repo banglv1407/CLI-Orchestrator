@@ -14,6 +14,8 @@ import type {
   CassSearchRequest,
   CassSearchResult,
   FileEntry,
+  SshConnection,
+  GitStatusEntry,
 } from '../types';
 
 export function listClis(): Promise<CliDefinition[]> {
@@ -123,4 +125,45 @@ export function cassSearch(request: CassSearchRequest): Promise<CassSearchResult
 export function listDirectoryFiles(path: string): Promise<FileEntry[]> {
   return invoke('list_directory_files', { path });
 }
+
+export function readFileContent(path: string): Promise<string> {
+  return invoke('read_file_content', { path });
+}
+
+export function writeFileContent(path: string, content: string): Promise<void> {
+  return invoke('write_file_content', { path, content });
+}
+
+export function pickFile(): Promise<string | null> {
+  return invoke('pick_file');
+}
+
+export function loadSshConnections(): Promise<SshConnection[]> {
+  return invoke('load_ssh_connections');
+}
+
+export function saveSshConnections(connections: SshConnection[]): Promise<void> {
+  return invoke('save_ssh_connections', { connections });
+}
+
+export function createSshSession(connection: SshConnection): Promise<SessionInfo> {
+  return invoke('create_ssh_session', { connection });
+}
+
+export function createRdpSession(connection: SshConnection): Promise<void> {
+  return invoke('create_rdp_session', { connection });
+}
+
+export function openWorkspaceFolder(path: string): Promise<void> {
+  return invoke('open_workspace_folder', { path });
+}
+
+export function getGitStatus(repoPath: string): Promise<any[]> {
+  return invoke('get_git_status', { repoPath });
+}
+
+export function getGitDiff(repoPath: string, filePath: string, isUntracked: boolean): Promise<string> {
+  return invoke('get_git_diff', { repoPath, filePath, isUntracked });
+}
+
 

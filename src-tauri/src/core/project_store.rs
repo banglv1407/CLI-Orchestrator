@@ -1,9 +1,4 @@
-﻿use std::{
-    collections::HashMap,
-    fs,
-    path::PathBuf,
-    sync::RwLock,
-};
+use std::{collections::HashMap, fs, path::PathBuf, sync::RwLock};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -92,7 +87,10 @@ impl ProjectStore {
             .and_then(|value| normalize_optional_path(Some(value)));
 
         {
-            let mut guard = self.tags.write().map_err(|_| ProjectStoreError::LockPoisoned)?;
+            let mut guard = self
+                .tags
+                .write()
+                .map_err(|_| ProjectStoreError::LockPoisoned)?;
             *guard = next;
         }
         {
@@ -106,7 +104,10 @@ impl ProjectStore {
     }
 
     pub fn list(&self) -> Result<Vec<ProjectTag>, ProjectStoreError> {
-        let guard = self.tags.read().map_err(|_| ProjectStoreError::LockPoisoned)?;
+        let guard = self
+            .tags
+            .read()
+            .map_err(|_| ProjectStoreError::LockPoisoned)?;
         let mut rows = guard
             .iter()
             .map(|(tag, path)| ProjectTag {
@@ -128,7 +129,10 @@ impl ProjectStore {
         let normalized_path = normalize_required_path(path)?;
 
         {
-            let mut guard = self.tags.write().map_err(|_| ProjectStoreError::LockPoisoned)?;
+            let mut guard = self
+                .tags
+                .write()
+                .map_err(|_| ProjectStoreError::LockPoisoned)?;
             guard.insert(normalized_tag, normalized_path.clone());
         }
         {

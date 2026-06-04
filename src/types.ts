@@ -151,6 +151,16 @@ export interface FileEntry {
   isDir: boolean;
 }
 
+export interface GitStatusEntry {
+  path: string;
+  status: 'modified' | 'added' | 'deleted' | 'untracked';
+}
+
+export interface FolderHistoryEntry {
+  path: string;
+  timestamp: number;
+}
+
 export interface LlmConfig {
   baseUrl: string;
   model: string;
@@ -165,4 +175,23 @@ export interface LlmChatMessage {
   content: string;
   timestamp: string;
 }
+
+export interface SshConnection {
+  id: string;
+  name: string;
+  protocol: 'ssh' | 'rdp';
+  host: string;
+  port: number;
+  user: string;
+  authMode?: 'password' | 'key';
+  keyPath?: string;
+  password?: string;
+  group: string;
+  rdpResolution?: 'fullscreen' | '1080p' | '720p' | 'custom';
+  rdpShareClipboard?: boolean;
+  rdpShareDrives?: boolean;
+  workingDir?: string;
+}
+
+
 

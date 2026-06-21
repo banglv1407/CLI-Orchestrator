@@ -177,38 +177,84 @@ export function TerminalPanel({
   }, []);
 
   const processWriteQueue = async (sessionId: string) => {
-    const handle = terminalRefs.current[sessionId];
-    if (!handle || handle.isWriting || handle.writeQueue.length === 0) {
-      return;
-    }
-
-    handle.isWriting = true;
-    // Capture scroll position BEFORE writing so writes don't forcibly move it
-    const wasAtBottom = handle.isAtBottom;
-
-    while (handle.writeQueue.length > 0) {
-      const chunk = handle.writeQueue.shift();
-      if (chunk) {
-        await new Promise<void>((resolve) => {
-          handle.term.write(chunk, () => resolve());
-          if (handle.miniTerm) {
-            handle.miniTerm.write(chunk);
-          }
-        });
+      const handle = terminalRefs.current[sessionId];
+      // Guard against re-entry while another drain is in flight. The recursion
+      // at the end of this function will pick up any chunks that arrive mid-drain.
+      if (!handle || handle.isWriting) {
+        return;
       }
-    }
+      if (handle.writeQueue.length === 0) {
+        return;
+      }
 
-    // Only auto-scroll to bottom if user was already at the bottom before writing
-    // This lets users freely scroll up to read older content while rendering
-    if (wasAtBottom) {
-      handle.term.scrollToBottom();
-    }
-    if (handle.miniTerm) {
-      handle.miniTerm.scrollToBottom();
-    }
+      handle.isWriting = true;
 
-    handle.isWriting = false;
-  };
+      // The actual scroll position lives in `buffer.ydisp` (= `viewportY`).
+      // We read it directly from xterm's public API instead of the DOM, because
+      // the DOM scrollable element does NOT reflect the buffer's scrollback
+      // height (verified: `lines.length=401` but `scrollHeight=432=clientHeight`).
+      const computeIsAtBottom = (): boolean => {
+        try {
+          return handle.term.buffer.active.viewportY >= handle.term.buffer.active.baseY - 1;
+        } catch {
+          return true; // safer to assume at-bottom on any error
+        }
+      };
+
+      while (handle.writeQueue.length > 0) {
+        const chunk = handle.writeQueue.shift();
+        if (chunk) {
+          // Refresh the cache from xterm's authoritative state right before
+          // the write. `term.onScroll` keeps this in sync, but a write may
+          // race the listener (xterm mutates ydisp synchronously inside the
+          // write callback path), so we re-read here.
+          const wasAtBottom = computeIsAtBottom();
+          handle.isAtBottom = wasAtBottom;
+
+          await new Promise<void>((resolve) => {
+            handle.term.write(chunk, () => resolve());
+            if (handle.miniTerm) {
+              handle.miniTerm.write(chunk);
+            }
+          });
+
+          // If the user was at the bottom, keep them there — they want to see
+          // the new output. xterm natively handles "stay at bottom" when
+          // `isUserScrolling=false` (the default), so the cursor stays in view
+          // and ydisp tracks ybase as content grows.
+          //
+          // If the user had scrolled up, DO NOT touch scroll. xterm's
+          // `isUserScrolling` flag (set automatically by wheel/keyboard scrolls
+          // via `BufferService.scrollLines`) tells the scroll() path to leave
+          // ydisp alone — the user keeps reading old content while new
+          // content pushes old content up.
+        }
+      }
+
+      // Final reconcile: sync the cache from xterm's real state in case the
+      // ydisp moved during the write burst (e.g. user scrolled mid-drain).
+      handle.isAtBottom = computeIsAtBottom();
+
+      // Only auto-scroll to bottom if the user is parked there. If they were
+      // reading history, leave them alone — this is the entire bug fix.
+      if (handle.isAtBottom) {
+        handle.term.scrollToBottom();
+      }
+      if (handle.miniTerm) {
+        // Mini terminal is read-only output; always follow.
+        handle.miniTerm.scrollToBottom();
+      }
+
+      handle.isWriting = false;
+
+      // If new chunks arrived while we were draining (the early-return guard at
+      // the top of this function would have rejected re-entry), recursively
+      // drain them now. Without this, late chunks sit in the queue forever
+      // until the next external event.
+      if (handle.writeQueue.length > 0) {
+        void processWriteQueue(sessionId);
+      }
+    };
 
   const visibleSessionId = useMemo(() => {
     if (activeSessionId && sessions.some((session) => session.id === activeSessionId)) {
@@ -303,8 +349,9 @@ export function TerminalPanel({
     const { miniTerm, miniFit } = createFreshMiniTerminal(handle);
     miniTerm.open(mountNode);
 
-    const viewport = mountNode.querySelector('.xterm-viewport') as HTMLElement;
-    if (viewport) viewport.style.overflowY = 'hidden';
+    const miniViewport = (mountNode.querySelector('.xterm-scrollable-element') as HTMLElement | null)
+      ?? (mountNode.querySelector('.xterm-viewport') as HTMLElement | null);
+    if (miniViewport) miniViewport.style.overflowY = 'hidden';
 
     replayHistoryIntoMiniTerm(sessionId, miniTerm, miniFit);
 
@@ -583,39 +630,40 @@ export function TerminalPanel({
         handle.cleanupScroll();
         handle.term.open(mountNode);
 
-        const viewport = mountNode.querySelector('.xterm-viewport') as HTMLElement;
-        if (viewport) {
-          viewport.style.overflowY = 'auto';
-        }
-
-        let scrollTimeout: number | null = null;
-        const handleScroll = () => {
-          if (scrollTimeout) {
-            window.clearTimeout(scrollTimeout);
+        // xterm v6 manages scroll position INTERNALLY via `buffer.ydisp` (a.k.a.
+        // `viewportY` in the public buffer API). The `.xterm-scrollable-element`
+        // and `.xterm-viewport` DOM nodes do NOT reflect the buffer's actual
+        // scrollback size — `scrollHeight` is hard-wired to the visible viewport
+        // height (432px = 24 rows × 18px) regardless of `buffer.lines.length`.
+        // Any "is at bottom" math against DOM geometry is a no-op.
+        //
+        // The CORRECT way to track scroll state:
+        //   - `term.buffer.active.viewportY` — current display line (ydisp)
+        //   - `term.buffer.active.baseY`     — bottom of buffer (ybase)
+        //   - `term.onScroll(ydisp => ...)`  — fires on every ydisp change,
+        //                                     including user wheel/keyboard scrolls
+        //
+        // When `isUserScrolling` is true (set automatically by xterm when the
+        // user scrolls up via wheel/keyboard), xterm's `scroll()` no longer
+        // snaps ydisp to ybase — the user stays at their position and new
+        // content pushes old content up. So once the user has scrolled up, we
+        // don't need any custom restore logic; we just have to STOP calling
+        // `term.scrollToBottom()` unconditionally.
+        const computeIsAtBottom = (): boolean => {
+          try {
+            return handle.term.buffer.active.viewportY >= handle.term.buffer.active.baseY - 1;
+          } catch {
+            return true; // safer to assume at-bottom on any error
           }
-          scrollTimeout = window.setTimeout(() => {
-            if (viewport) {
-              const container = containerRefs.current[session.id];
-              const isVisible = container && container.offsetWidth > 0 && container.offsetHeight > 0;
-              if (isVisible) {
-                const atBottom = Math.abs(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight) < 50;
-                handle.isAtBottom = atBottom;
-              }
-            }
-          }, 100);
         };
+        handle.isAtBottom = computeIsAtBottom();
 
-        if (viewport) {
-          viewport.addEventListener('scroll', handleScroll);
-        }
+        const scrollDisposable = handle.term.onScroll(() => {
+          handle.isAtBottom = computeIsAtBottom();
+        });
 
         handle.cleanupScroll = () => {
-          if (viewport) {
-            viewport.removeEventListener('scroll', handleScroll);
-          }
-          if (scrollTimeout) {
-            window.clearTimeout(scrollTimeout);
-          }
+          scrollDisposable.dispose();
         };
 
         setTimeout(() => {
@@ -647,9 +695,10 @@ export function TerminalPanel({
       const { miniTerm, miniFit } = createFreshMiniTerminal(handle);
       miniTerm.open(mountNode);
 
-      const viewport = mountNode.querySelector('.xterm-viewport') as HTMLElement;
-      if (viewport) {
-        viewport.style.overflowY = 'hidden';
+      const miniViewport = (mountNode.querySelector('.xterm-scrollable-element') as HTMLElement | null)
+        ?? (mountNode.querySelector('.xterm-viewport') as HTMLElement | null);
+      if (miniViewport) {
+        miniViewport.style.overflowY = 'hidden';
       }
 
       // Replay accumulated output history into the fresh terminal

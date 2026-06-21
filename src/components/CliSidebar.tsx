@@ -297,12 +297,61 @@ export function CliSidebar({
   const [chatInput, setChatInput] = useState('');
   const [isLoadingLlm, setIsLoadingLlm] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  // Auto-scroll toggle for the AI chat list. Persisted so the choice survives reloads.
+  // Default ON (most users want it), but Boss and other power users can flip it off to
+  // freely scroll back through older replies without being yanked to the bottom on each
+  // new message. Lives next to Config/Clear in the chat header.
+  const [autoScrollChat, setAutoScrollChat] = useState<boolean>(() => {
+    const saved = localStorage.getItem('ai-cli-auto-scroll-chat');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return true;
+  });
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  // Track whether the user is "near the bottom" of the chat list.
+  // Only auto-scroll on new messages when this is true — otherwise the
+  // user is reading older content and we'd yank them away from it.
+  const isNearBottomRef = useRef<boolean>(true);
 
-  // Scroll to bottom on new messages
+  // Keep `isNearBottom` in sync with the actual scroll position.
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory, isLoadingLlm]);
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const distanceFromBottom =
+        el.scrollHeight - el.scrollTop - el.clientHeight;
+      isNearBottomRef.current = distanceFromBottom < 50;
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    // Initialize once in case the container is already scrolled (e.g. on remount).
+    handleScroll();
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll on new messages, but only if auto-scroll is enabled AND the user
+  // is already at (or near) the bottom. If they've scrolled up to read older
+  // messages, leave them alone. The autoScrollChat flag lets the user opt out
+  // entirely via the header toggle.
+  useEffect(() => {
+    if (autoScrollChat && isNearBottomRef.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory, isLoadingLlm, autoScrollChat]);
+
+  const handleToggleAutoScroll = () => {
+    setAutoScrollChat((prev) => {
+      const next = !prev;
+      localStorage.setItem('ai-cli-auto-scroll-chat', String(next));
+      // When the user re-enables auto-scroll and is currently parked at the bottom,
+      // jump them straight to the latest message so the state matches the toggle.
+      if (next && isNearBottomRef.current) {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+      return next;
+    });
+  };
 
   const handleSaveLlmConfig = (newConfig: LlmConfig) => {
     setLlmConfig(newConfig);
@@ -1094,6 +1143,19 @@ export function CliSidebar({
                 >
                   Config
                 </button>
+                <button
+                  type="button"
+                  onClick={handleToggleAutoScroll}
+                  title={autoScrollChat ? 'Auto-scroll: ON — click to disable' : 'Auto-scroll: OFF — click to enable'}
+                  aria-pressed={autoScrollChat}
+                  className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold transition ${
+                    autoScrollChat
+                      ? 'border-cyber-neon/40 text-cyber-neon hover:border-cyber-neon hover:bg-cyber-neon/10'
+                      : 'border-slate-500/40 text-slate-500 hover:border-slate-400 hover:bg-slate-400/10'
+                  }`}
+                >
+                  ↓ {autoScrollChat ? 'Auto' : 'Manual'}
+                </button>
                 {chatHistory.length > 0 && (
                   <button
                     type="button"
@@ -1107,7 +1169,7 @@ export function CliSidebar({
             </div>
 
             {/* Chat messages — full height scrollable */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
               {chatHistory.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8">
                   <p className="text-[13px] italic">No messages yet.</p>

@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection } from '../types';
+import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry } from '../types';
 import { AnimeAssistant } from './AnimeAssistant';
 import { LlmConfigModal } from './LlmConfigModal';
+
 import { 
   listDirectoryFiles, 
   pickFolder,
@@ -50,6 +51,15 @@ function SettingsIcon() {
     </svg>
   );
 }
+
+function QuickAppsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+    </svg>
+  );
+}
+
 
 function FolderArrowIcon({ isExpanded }: { isExpanded: boolean }) {
   return (
@@ -142,13 +152,14 @@ interface CliSidebarProps {
   onDeleteSsh: (connection: SshConnection) => void;
 
   selectedFilePath: string | null;
-  gitStatusList: { path: string; status: 'modified' | 'added' | 'deleted' | 'untracked' }[];
+  gitStatusList: GitStatusEntry[];
   refreshGitStatus: (repo: string) => Promise<void>;
   onFileClick: (entry: FileEntry, rootPath: string | null) => Promise<void>;
   onCloseFile: () => void;
+  onQuickAppsTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'explorer' | 'cli-manager' | 'settings' | 'ai-chat' | 'operator';
+type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator';
 
 export function CliSidebar({
   clis,
@@ -180,8 +191,19 @@ export function CliSidebar({
   refreshGitStatus,
   onFileClick,
   onCloseFile,
+  onQuickAppsTabChange,
 }: CliSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
+
+  const handleSetActiveTab = useCallback((tab: SidebarTab) => {
+    const wasQuickApps = activeTab === 'quickapps';
+    const isQuickApps = tab === 'quickapps';
+    setActiveTab(tab);
+    // Only notify parent when quickapps state actually changes
+    if (onQuickAppsTabChange && wasQuickApps !== isQuickApps) {
+      onQuickAppsTabChange(isQuickApps);
+    }
+  }, [activeTab, onQuickAppsTabChange]);
 
   // --- Sidebar Resizer Code ---
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -777,7 +799,7 @@ export function CliSidebar({
         <div className="flex flex-col gap-5">
           <button
             type="button"
-            onClick={() => setActiveTab('cli-manager')}
+            onClick={() => handleSetActiveTab('cli-manager')}
             title="CLI Orchestrator"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
               activeTab === 'cli-manager'
@@ -793,7 +815,7 @@ export function CliSidebar({
 
           <button
             type="button"
-            onClick={() => setActiveTab('explorer')}
+            onClick={() => handleSetActiveTab('explorer')}
             title="File Explorer"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
               activeTab === 'explorer'
@@ -809,7 +831,23 @@ export function CliSidebar({
 
           <button
             type="button"
-            onClick={() => setActiveTab('operator')}
+            onClick={() => handleSetActiveTab('quickapps')}
+            title="Quick Apps (favorite apps launcher)"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'quickapps'
+                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
+                : 'text-slate-400 hover:text-cyber-electric hover:bg-cyber-electric/10'
+            }`}
+          >
+            {activeTab === 'quickapps' && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
+            )}
+            <QuickAppsIcon />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSetActiveTab('operator')}
             title="Operator (SSH VM Manager)"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
               activeTab === 'operator'
@@ -826,7 +864,7 @@ export function CliSidebar({
 
         <button
           type="button"
-          onClick={() => setActiveTab('settings')}
+          onClick={() => handleSetActiveTab('settings')}
           title="Settings"
           className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
             activeTab === 'settings'
@@ -846,7 +884,7 @@ export function CliSidebar({
         {/* Anime Assistant — click to toggle AI Chat panel */}
         <div
           className="p-3 border-b border-cyber-line bg-cyber-base/30 shrink-0 cursor-pointer transition-colors hover:bg-cyber-neon/5 select-none"
-          onClick={() => setActiveTab((prev) => prev === 'ai-chat' ? 'explorer' : 'ai-chat')}
+          onClick={() => handleSetActiveTab(activeTab === 'ai-chat' ? 'explorer' : 'ai-chat')}
           role="button"
           title={activeTab === 'ai-chat' ? 'Close AI Companion Chat' : 'Open AI Companion Chat'}
           aria-label="Toggle AI Companion Chat"
@@ -1228,6 +1266,21 @@ export function CliSidebar({
                   </div>
                 ) : null}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active Tab: Quick Apps — content renders in main area */}
+        {activeTab === 'quickapps' && (
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-cyber-muted p-6">
+            <div className="w-14 h-14 rounded-2xl bg-cyber-accent/10 border border-cyber-accent/30 flex items-center justify-center text-2xl">
+              🚀
+            </div>
+            <div className="text-center">
+              <p className="text-[13px] font-semibold text-cyber-text">Quick Apps</p>
+              <p className="text-[11px] text-cyber-muted mt-1 leading-relaxed">
+                Displayed in the main area →
+              </p>
             </div>
           </div>
         )}

@@ -6,6 +6,7 @@ import { CliStartModal } from '../components/CliStartModal';
 import { CliSidebar } from '../components/CliSidebar';
 import { TerminalPanel } from '../components/TerminalPanel';
 import { SshConnectionModal } from '../components/SshConnectionModal';
+import { QuickAppsPanel } from '../components/QuickAppsPanel';
 import {
   createTerminalSession,
   deleteCli,
@@ -68,6 +69,7 @@ export function Dashboard() {
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
+  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps'>('terminal');
 
 
   const [recentFolders, setRecentFolders] = useState<string[]>(() => {
@@ -745,10 +747,25 @@ export function Dashboard() {
 
   const handleOpenCliInteraction = useCallback(
     async (cli: CliDefinition) => {
-      setCliToStart(cli);
-      setCliStartModalOpen(true);
+      // If the CLI already has a path set, skip the modal and start directly
+      const savedDirs = cli.savedDirectories ?? [];
+      const pathToUse = savedDirs.length > 0
+        ? savedDirs[0].path
+        : cli.defaultWorkingDir;
+
+      if (pathToUse) {
+        const tag = savedDirs.length > 0 ? savedDirs[0].tag : '';
+        await createSessionForCli(cli.name, {
+          projectTag: tag,
+          workingDir: pathToUse,
+        });
+      } else {
+        // No path set → show the picker modal
+        setCliToStart(cli);
+        setCliStartModalOpen(true);
+      }
     },
-    [],
+    [createSessionForCli],
   );
 
   return (
@@ -763,6 +780,7 @@ export function Dashboard() {
         onSelectSession={(sessId) => {
           setActiveSessionId(sessId);
           handleCloseFile();
+          setActiveMainView('terminal');
         }}
         onAddCli={handleAddCli}
         onEditCli={handleEditCli}
@@ -786,43 +804,49 @@ export function Dashboard() {
         refreshGitStatus={refreshGitStatus}
         onFileClick={handleFileClick}
         onCloseFile={handleCloseFile}
+
+        onQuickAppsTabChange={(isActive) => setActiveMainView(isActive ? 'quickapps' : 'terminal')}
       />
 
       <section className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
         <div className="flex-1 h-full w-full">
-          <TerminalPanel
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            onSelectSession={(sessId) => {
-              setActiveSessionId(sessId);
-              handleCloseFile();
-            }}
-            onSendInput={handleSendTerminalInput}
-            onStopSession={handleStopSession}
-            onSaveTag={handleSaveProjectTag}
-            sshConnections={sshConnections}
-            onQuickSession={handleQuickSession}
+          {activeMainView === 'quickapps' ? (
+            <QuickAppsPanel />
+          ) : (
+            <TerminalPanel
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelectSession={(sessId) => {
+                setActiveSessionId(sessId);
+                handleCloseFile();
+              }}
+              onSendInput={handleSendTerminalInput}
+              onStopSession={handleStopSession}
+              onSaveTag={handleSaveProjectTag}
+              sshConnections={sshConnections}
+              onQuickSession={handleQuickSession}
 
-            openedFile={openedFile}
-            openedFileRootPath={openedFileRootPath}
-            fileContent={fileContent}
-            setFileContent={setFileContent}
-            fileOriginalContent={fileOriginalContent}
-            isSavingFile={isSavingFile}
-            fileLoadError={fileLoadError}
-            isFileLoading={isFileLoading}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            gitDiffContent={gitDiffContent}
-            isDiffLoading={isDiffLoading}
-            gitStatusList={gitStatusList}
-            onSaveFile={handleSaveFile}
-            onCloseFile={handleCloseFile}
+              openedFile={openedFile}
+              openedFileRootPath={openedFileRootPath}
+              fileContent={fileContent}
+              setFileContent={setFileContent}
+              fileOriginalContent={fileOriginalContent}
+              isSavingFile={isSavingFile}
+              fileLoadError={fileLoadError}
+              isFileLoading={isFileLoading}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              gitDiffContent={gitDiffContent}
+              isDiffLoading={isDiffLoading}
+              gitStatusList={gitStatusList}
+              onSaveFile={handleSaveFile}
+              onCloseFile={handleCloseFile}
 
-            onReorderSessions={handleReorderSessions}
-            onMoveSessionToPanel={handleMoveSessionToPanel}
-            theme={theme}
-          />
+              onReorderSessions={handleReorderSessions}
+              onMoveSessionToPanel={handleMoveSessionToPanel}
+              theme={theme}
+            />
+          )}
         </div>
       </section>
 

@@ -21,6 +21,9 @@ use commands::{
         send_cli_input, send_llm_chat, set_account_cooldown, stop_cli, switch_to_next_account,
         upsert_cli, write_file_content, write_ssh_file_content,
     },
+    quickapps_commands::{
+        delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
+    },
 };
 use tauri::Manager;
 
@@ -82,6 +85,11 @@ fn main() {
             write_ssh_file_content,
             list_all_files_recursive,
             list_ssh_files_recursive,
+            list_quickapps,
+            upsert_quickapp,
+            delete_quickapp,
+            reextract_icons,
+            launch_quickapp,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

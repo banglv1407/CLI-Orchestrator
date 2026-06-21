@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     core::{
         account_manager::AccountManager, cass_index::CassIndex, cli_registry::CliRegistry,
-        project_store::ProjectStore,
+        project_store::ProjectStore, quickapp_registry::QuickAppRegistry,
     },
     terminal::session_manager::SessionManager,
 };
@@ -14,6 +14,7 @@ pub struct AppState {
     pub session_manager: Arc<SessionManager>,
     pub account_manager: Arc<AccountManager>,
     pub cass_index: Arc<CassIndex>,
+    pub quickapps: Arc<QuickAppRegistry>,
 }
 
 impl AppState {
@@ -23,6 +24,7 @@ impl AppState {
             Arc::new(ProjectStore::new(&registry).map_err(|error| error.to_string())?);
         let account_manager = Arc::new(AccountManager::new().map_err(|error| error.to_string())?);
         let cass_index = Arc::new(CassIndex::new().map_err(|error| error.to_string())?);
+        let quickapps = Arc::new(QuickAppRegistry::new().map_err(|error| error.to_string())?);
 
         Ok(Self {
             registry,
@@ -30,6 +32,7 @@ impl AppState {
             session_manager: Arc::new(SessionManager::new()),
             account_manager,
             cass_index,
+            quickapps,
         })
     }
 }

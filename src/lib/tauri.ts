@@ -16,6 +16,7 @@ import type {
   FileEntry,
   SshConnection,
   GitStatusEntry,
+  QuickApp,
 } from '../types';
 
 export function listClis(): Promise<CliDefinition[]> {
@@ -186,4 +187,23 @@ export function getGitDiff(repoPath: string, filePath: string, isUntracked: bool
   return invoke('get_git_diff', { repoPath, filePath, isUntracked });
 }
 
+export function listQuickapps(): Promise<QuickApp[]> {
+  return invoke('list_quickapps');
+}
+
+export function upsertQuickapp(app: QuickApp): Promise<QuickApp> {
+  return invoke('upsert_quickapp', { app });
+}
+
+export function deleteQuickapp(id: string): Promise<void> {
+  return invoke('delete_quickapp', { id });
+}
+
+export function reextractQuickappIcons(): Promise<QuickApp[]> {
+  return invoke('reextract_icons');
+}
+
+export function launchQuickapp(id: string): Promise<number> {
+  return invoke('launch_quickapp', { id });
+}
 

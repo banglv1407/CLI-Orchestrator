@@ -16,9 +16,28 @@ import {
   listSshDirectoryFiles,
   listAllFilesRecursive,
   listSshFilesRecursive,
+  startSshServer,
+  stopSshServer,
+  getSshServerStatus,
 } from '../lib/tauri';
 
 // --- SVG Icons ---
+
+function RemoteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+    </svg>
+  );
+}
+
+function BookOpenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+    </svg>
+  );
+}
 
 function CloudIcon() {
   return (
@@ -159,7 +178,7 @@ interface CliSidebarProps {
   onQuickAppsTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator';
+type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'readme';
 
 export function CliSidebar({
   clis,
@@ -264,6 +283,57 @@ export function CliSidebar({
   // --- SSH VM Manager States ---
   const [sshSearchQuery, setSshSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  // --- SSH Remote Server States & Actions ---
+  const [sshServerRunning, setSshServerRunning] = useState(false);
+  const [sshServerPort, setSshServerPort] = useState(2222);
+  const [sshServerIp, setSshServerIp] = useState('127.0.0.1');
+  const [sshServerLoading, setSshServerLoading] = useState(false);
+  const [sshServerErr, setSshServerErr] = useState<string | null>(null);
+  const [sshServerLogs, setSshServerLogs] = useState<string[]>([]);
+
+  const fetchSshServerStatus = useCallback(async () => {
+    try {
+      const status = await getSshServerStatus();
+      setSshServerRunning(status.running);
+      setSshServerPort(status.port);
+      setSshServerIp(status.localIp);
+      setSshServerLogs(status.logs);
+    } catch (err) {
+      console.error('Failed to get SSH server status:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSshServerStatus();
+    let interval: any = null;
+    if (activeTab === 'remote') {
+      interval = setInterval(fetchSshServerStatus, 5000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeTab, fetchSshServerStatus]);
+
+  const handleToggleSshServer = async () => {
+    setSshServerLoading(true);
+    setSshServerErr(null);
+    try {
+      if (sshServerRunning) {
+        await stopSshServer();
+        setSshServerRunning(false);
+      } else {
+        await startSshServer(sshServerPort);
+        setSshServerRunning(true);
+      }
+      await fetchSshServerStatus();
+    } catch (err: any) {
+      console.error('Failed to toggle SSH server:', err);
+      setSshServerErr(err?.message || String(err));
+    } finally {
+      setSshServerLoading(false);
+    }
+  };
 
   // Auto-switch to Explorer tab when an active session changes and has a workingDir
   useEffect(() => {
@@ -932,23 +1002,57 @@ export function CliSidebar({
             )}
             <CloudIcon />
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleSetActiveTab('remote')}
+            title="Remote SSH Server"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'remote' && !isSidebarCollapsed
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {activeTab === 'remote' && !isSidebarCollapsed && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+            )}
+            <RemoteIcon />
+          </button>
         </div>
  
-        <button
-          type="button"
-          onClick={() => handleSetActiveTab('settings')}
-          title="Settings"
-          className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-            activeTab === 'settings' && !isSidebarCollapsed
-              ? 'text-cyber-neon bg-cyber-neon/10'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          {activeTab === 'settings' && !isSidebarCollapsed && (
-            <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-          )}
-          <SettingsIcon />
-        </button>
+        <div className="flex flex-col gap-4 items-center">
+          <button
+            type="button"
+            onClick={() => handleSetActiveTab('readme')}
+            title="User Guide"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'readme' && !isSidebarCollapsed
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {activeTab === 'readme' && !isSidebarCollapsed && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+            )}
+            <BookOpenIcon />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSetActiveTab('settings')}
+            title="Settings"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'settings' && !isSidebarCollapsed
+                ? 'text-cyber-neon bg-cyber-neon/10'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {activeTab === 'settings' && !isSidebarCollapsed && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+            )}
+            <SettingsIcon />
+          </button>
+        </div>
       </nav>
  
       {/* 2. Primary Sidebar Panel Content */}
@@ -1500,6 +1604,219 @@ export function CliSidebar({
                   );
                 })
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Active Tab: Remote SSH Server */}
+        {activeTab === 'remote' && (
+          <div className="flex h-full flex-col overflow-hidden animate-slide-up">
+            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
+              <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">Remote Access</h2>
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold font-mono tracking-wider uppercase ${
+                sshServerRunning ? 'bg-cyber-neon/10 text-cyber-neon border border-cyber-neon/30 animate-pulse' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+              }`}>
+                {sshServerRunning ? '🟢 Active' : '🔴 Inactive'}
+              </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* Server Control Card */}
+              <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-200">SSH Server</span>
+                  <button
+                    onClick={handleToggleSshServer}
+                    disabled={sshServerLoading}
+                    className={`px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider transition ${
+                      sshServerRunning
+                        ? 'bg-red-500/20 hover:bg-red-500/35 text-red-400 border border-red-500/40 shadow-neon-red-sm'
+                        : 'bg-cyber-neon/20 hover:bg-cyber-neon/35 text-cyber-neon border border-cyber-neon/40 shadow-neon-sm'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {sshServerLoading ? 'Processing...' : sshServerRunning ? 'Stop Server' : 'Start Server'}
+                  </button>
+                </div>
+
+                {sshServerErr && (
+                  <div className="text-[10px] text-red-400 bg-red-950/20 border border-red-500/30 p-2.5 rounded-lg font-mono leading-relaxed">
+                    ⚠ {sshServerErr}
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <label className="block space-y-1">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Server Port</span>
+                    <input
+                      type="number"
+                      value={sshServerPort}
+                      disabled={sshServerRunning}
+                      onChange={(e) => setSshServerPort(parseInt(e.target.value, 10) || 2222)}
+                      className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition disabled:opacity-50"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Instruction Panel */}
+              <div className="rounded-xl border border-cyber-electric/40 bg-cyber-electric/5 p-4 space-y-3">
+                <h3 className="text-[10px] uppercase font-bold tracking-wider text-cyber-electric">Connection Instruction</h3>
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  Other machines on your network can connect directly to your CLX sessions.
+                </p>
+
+                <div className="space-y-1.5 font-mono text-[10px]">
+                  <div className="text-slate-400 font-semibold">Command:</div>
+                  <div className="relative flex items-center justify-between rounded border border-cyber-line/65 bg-[#0d162a] p-2 pr-10 text-cyber-electric select-all">
+                    <span>ssh admin@{sshServerIp} -p {sshServerPort}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`ssh admin@${sshServerIp} -p ${sshServerPort}`);
+                        alert('Copied connection command to clipboard!');
+                      }}
+                      className="absolute right-2 text-slate-500 hover:text-cyber-electric transition"
+                      title="Copy command"
+                    >
+                      <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                        <path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12a1.5 1.5 0 0 1 .439 1.061V16.5A1.5 1.5 0 0 1 15.5 18h-7A1.5 1.5 0 0 1 7 16.5v-13Zm1.5-.5a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V7h-3a1 1 0 0 1-1-1V3H8.5Z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-[9px] font-mono leading-relaxed space-y-1 text-slate-500">
+                  <div>🔐 Default Credentials:</div>
+                  <div>• Username: <span className="text-slate-300 font-bold">admin</span></div>
+                  <div>• Password: <span className="text-slate-300 font-bold">admin</span></div>
+                </div>
+              </div>
+
+              {/* Collaborative details */}
+              <div className="rounded-xl border border-cyber-line/30 bg-cyber-base/20 p-3 text-[10px] leading-relaxed text-slate-400 space-y-2">
+                <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                  <span>💡</span> Collaborative REPL Shell
+                </div>
+                <p>
+                  Connected users enter a custom shell displaying all active sessions. Pressing <span className="text-cyber-neon font-mono font-bold">Ctrl+X</span> detaches from a session.
+                </p>
+              </div>
+
+              {/* Server Logs */}
+              <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4 space-y-3">
+                <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Server Logs</h3>
+                <div className="h-32 overflow-y-auto scrollbar-thin bg-black/60 rounded border border-cyber-line/30 p-2.5 font-mono text-[9px] text-slate-300 space-y-1 select-text">
+                  {sshServerLogs.length === 0 ? (
+                    <div className="text-slate-500 italic">No logs yet.</div>
+                  ) : (
+                    sshServerLogs.map((log, idx) => (
+                      <div key={idx} className="leading-relaxed break-all">
+                        {log}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active Tab: User Guide README */}
+        {activeTab === 'readme' && (
+          <div className="flex h-full flex-col overflow-hidden animate-slide-up">
+            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
+              <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">User Guide</h2>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin text-xs text-slate-350 select-text leading-relaxed font-sans">
+              
+              {/* Introduction */}
+              <div className="space-y-2">
+                <h3 className="text-cyber-electric font-semibold text-[11px] uppercase tracking-wider font-mono">⚡ Welcome to CLX</h3>
+                <p>
+                  CLX is an advanced desktop orchestrator for terminal interfaces and AI CLI companions (like aider, gemini-cli, etc.), featuring network collaboration and intelligent terminal overlays.
+                </p>
+              </div>
+
+              {/* Autocomplete Section */}
+              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
+                <h3 className="text-cyber-neon font-semibold text-[11px] uppercase tracking-wider font-mono">🔎 Autocomplete overlays</h3>
+                <div className="space-y-3 pl-1.5">
+                  <div>
+                    <span className="text-cyber-neon font-bold font-mono">@ Mention File/Folder:</span>
+                    <p className="mt-1">
+                      Type <code className="text-cyber-neon bg-cyber-neon/10 px-1 rounded font-mono font-bold">@</code> inside any terminal panel to pop up the local file/folder search. Press <kbd className="bg-cyber-line/50 px-1.5 rounded text-[10px]">Arrow Up/Down</kbd> to navigate, and <kbd className="bg-cyber-line/50 px-1.5 rounded text-[10px]">Enter</kbd> to insert.
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-cyber-electric font-bold font-mono">! Ripgrep Content Search:</span>
+                    <p className="mt-1">
+                      Type <code className="text-cyber-electric bg-cyber-electric/10 px-1 rounded font-mono font-bold">!</code> to fuzzy search file contents using Ripgrep. Displays matching code snippets and line numbers (<code className="text-cyber-electric font-mono text-[10px]">L12</code>).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Collaborative SSH Section */}
+              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
+                <h3 className="text-cyber-neon font-semibold text-[11px] uppercase tracking-wider font-mono">🤝 Collaborative Remote SSH</h3>
+                <p>
+                  CLX embeds a high-security <span className="text-cyber-neon font-bold">SSH Server</span> that allows co-programming.
+                </p>
+                <ul className="list-disc pl-4 space-y-1.5 mt-2">
+                  <li>Start the server in the <span className="text-cyber-neon font-bold">Remote</span> sidebar tab.</li>
+                  <li>Type <code className="text-cyber-neon font-mono bg-cyber-neon/10 px-1 rounded">ssh admin@&lt;local_ip&gt; -p 2222</code> from another machine (e.g. Termux, Laptop).</li>
+                  <li>Log in with default credentials <code className="font-mono bg-cyber-line/25 px-1 rounded">admin / admin</code>.</li>
+                  <li>Select a terminal session to attach. Keypresses and screens will sync in real-time between devices!</li>
+                  <li>Press <kbd className="bg-cyber-line/50 px-1.5 rounded text-[10px] font-mono">Ctrl + X</kbd> to detach and return to menu.</li>
+                </ul>
+              </div>
+
+              {/* Quick Apps & Operator Section */}
+              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
+                <h3 className="text-cyber-neon font-semibold text-[11px] uppercase tracking-wider font-mono">🚀 Favorite & VM Operator</h3>
+                <div className="space-y-2.5 pl-1.5">
+                  <div>
+                    <span className="text-slate-200 font-bold">Quick Apps:</span>
+                    <p className="mt-1">
+                      Pin and launch favorited CLI scripts or local applications with a single click.
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-200 font-bold">Operator Tab:</span>
+                    <p className="mt-1">
+                      Manage multiple SSH and RDP configurations for virtual machines or remote servers.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Companion Section */}
+              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
+                <h3 className="text-cyber-neon font-semibold text-[11px] uppercase tracking-wider font-mono">🤖 AI Companion Chat</h3>
+                <p>
+                  Click on the character avatar in the sidebar to open the AI Companion Chat. Configure your LLM providers (API key, model, endpoints) to get live commands and programming support.
+                </p>
+              </div>
+
+              {/* System shortcuts */}
+              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
+                <h3 className="text-cyber-electric font-semibold text-[11px] uppercase tracking-wider font-mono">⌨ Shortcuts</h3>
+                <div className="rounded-lg border border-cyber-line/30 bg-cyber-base/40 p-3 space-y-2 text-[10px] font-mono">
+                  <div className="flex justify-between">
+                    <span>Ctrl + P</span>
+                    <span className="text-cyber-electric font-semibold">Search Files Modal</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Ctrl + N</span>
+                    <span className="text-cyber-electric font-semibold">New Quick Shell</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Ctrl + X (SSH)</span>
+                    <span className="text-cyber-electric font-semibold">Detach Remote Session</span>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         )}

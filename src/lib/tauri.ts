@@ -212,3 +212,22 @@ export function ripgrepSearch(path: string, query: string): Promise<RipgrepMatch
   return invoke('ripgrep_search', { path, query });
 }
 
+export interface SshServerStatus {
+  running: boolean;
+  port: number;
+  localIp: string;
+  logs: string[];
+}
+
+export function startSshServer(port: number): Promise<void> {
+  return invoke('start_ssh_server', { port });
+}
+
+export function stopSshServer(): Promise<void> {
+  return invoke('stop_ssh_server');
+}
+
+export function getSshServerStatus(): Promise<SshServerStatus> {
+  return invoke('get_ssh_server_status');
+}
+

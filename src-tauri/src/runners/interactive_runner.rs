@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use thiserror::Error;
 
 use crate::{
@@ -201,6 +201,9 @@ pub fn start_interactive_session(
                                 );
                             }
                         }
+
+                        let app_state = thread_app.state::<crate::app_state::AppState>();
+                        app_state.session_manager.broadcast_output(&thread_session_id, &chunk);
 
                         emit_output(
                             &thread_app,

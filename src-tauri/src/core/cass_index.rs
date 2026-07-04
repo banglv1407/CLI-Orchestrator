@@ -76,6 +76,7 @@ struct CassSourceDefinition {
 struct CassSourceFile {
     cli_name: String,
     path: PathBuf,
+    #[allow(dead_code)]
     source: String,
 }
 
@@ -594,7 +595,7 @@ fn build_session_id(cli_name: &str, path: &Path) -> String {
 }
 
 fn read_file_with_limit(path: &Path, max_bytes: usize) -> Result<String, std::io::Error> {
-    let mut file = fs::File::open(path)?;
+    let file = fs::File::open(path)?;
     let mut buffer = Vec::new();
     file.take(max_bytes as u64).read_to_end(&mut buffer)?;
     Ok(String::from_utf8_lossy(&buffer).to_string())

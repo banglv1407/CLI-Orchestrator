@@ -178,7 +178,7 @@ pub async fn create_terminal_session(
 ) -> Result<SessionInfo, String> {
     state.registry.reload().map_err(|error| error.to_string())?;
 
-    let mut cli = if request.cli_name == "shell" || request.cli_name == "Quick - shell" {
+    let cli = if request.cli_name == "shell" || request.cli_name == "Quick - shell" {
         let mut def = shell_cli_definition();
         def.name = request.cli_name.clone();
         def
@@ -1279,4 +1279,49 @@ pub async fn ripgrep_search(path: String, query: String) -> Result<Vec<RipgrepMa
     }
 
     Ok(matches)
+}
+
+#[derive(serde::Serialize)]
+pub struct SshStatusResponse {
+    pub running: bool,
+    pub port: u16,
+    pub local_ip: String,
+    pub logs: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn start_ssh_server(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::app_state::AppState>,
+    port: u16,
+) -> Result<(), String> {
+    let mut manager = state.ssh_server_manager.lock().map_err(|e| e.to_string())?;
+    manager.start(app, state.session_manager.clone(), port)
+}
+
+#[tauri::command]
+pub async fn stop_ssh_server(
+    state: tauri::State<'_, crate::app_state::AppState>,
+) -> Result<(), String> {
+    let mut manager = state.ssh_server_manager.lock().map_err(|e| e.to_string())?;
+    manager.stop();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_ssh_server_status(
+    state: tauri::State<'_, crate::app_state::AppState>,
+) -> Result<SshStatusResponse, String> {
+    let manager = state.ssh_server_manager.lock().map_err(|e| e.to_string())?;
+    let (running, port, logs) = manager.status();
+    
+    let local_ip = std::net::UdpSocket::bind("0.0.0.0:0")
+        .and_then(|socket| {
+            socket.connect("8.8.8.8:80")?;
+            socket.local_addr()
+        })
+        .map(|addr| addr.ip().to_string())
+        .unwrap_or_else(|_| "127.0.0.1".to_string());
+        
+    Ok(SshStatusResponse { running, port, local_ip, logs })
 }

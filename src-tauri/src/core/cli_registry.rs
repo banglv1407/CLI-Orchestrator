@@ -78,6 +78,7 @@ pub struct DetectedCli {
     pub suggested_mode: CliMode,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct DataDirs {
     pub root_dir: PathBuf,

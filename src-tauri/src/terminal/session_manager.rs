@@ -58,12 +58,30 @@ pub enum SessionError {
 
 pub struct SessionManager {
     sessions: Arc<RwLock<HashMap<String, Arc<Session>>>>,
+    listeners: Arc<Mutex<HashMap<String, Vec<tokio::sync::mpsc::UnboundedSender<String>>>>>,
 }
 
 impl SessionManager {
     pub fn new() -> Self {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
+            listeners: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    pub fn add_listener(&self, session_id: String, tx: tokio::sync::mpsc::UnboundedSender<String>) {
+        if let Ok(mut map) = self.listeners.lock() {
+            map.entry(session_id).or_insert_with(Vec::new).push(tx);
+        }
+    }
+
+    pub fn broadcast_output(&self, session_id: &str, chunk: &str) {
+        if let Ok(mut map) = self.listeners.lock() {
+            if let Some(senders) = map.get_mut(session_id) {
+                senders.retain(|tx| {
+                    tx.send(chunk.to_string()).is_ok()
+                });
+            }
         }
     }
 

@@ -15,6 +15,7 @@ pub struct AppState {
     pub account_manager: Arc<AccountManager>,
     pub cass_index: Arc<CassIndex>,
     pub quickapps: Arc<QuickAppRegistry>,
+    pub ssh_server_manager: Arc<std::sync::Mutex<crate::core::ssh_server::SshServerManager>>,
 }
 
 impl AppState {
@@ -33,6 +34,7 @@ impl AppState {
             account_manager,
             cass_index,
             quickapps,
+            ssh_server_manager: Arc::new(std::sync::Mutex::new(crate::core::ssh_server::SshServerManager::new())),
         })
     }
 }

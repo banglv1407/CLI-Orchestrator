@@ -155,6 +155,7 @@ impl ProjectStore {
         Ok(guard.clone())
     }
 
+    #[allow(dead_code)]
     pub fn set_last_working_dir(
         &self,
         path: Option<String>,

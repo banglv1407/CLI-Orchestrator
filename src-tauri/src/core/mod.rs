@@ -6,3 +6,4 @@ pub mod execution_engine;
 pub mod icon_extractor;
 pub mod project_store;
 pub mod quickapp_registry;
+pub mod ssh_server;

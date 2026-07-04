@@ -17,6 +17,7 @@ pub struct AccountProfile {
     pub last_used: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountAuthFile {
     pub id: String,
@@ -51,6 +52,7 @@ pub enum AccountError {
     MissingHomeDirectory,
     #[error("Profile not found: {0}")]
     ProfileNotFound(String),
+    #[allow(dead_code)]
     #[error("CLI not supported: {0}")]
     UnsupportedCli(String),
     #[error("No auth files found for CLI: {0}")]
@@ -264,18 +266,6 @@ impl AccountManager {
     pub fn get_active_profile(&self, cli_name: &str) -> Result<Option<String>, AccountError> {
         let auth_paths = Self::get_auth_file_paths(cli_name);
 
-        let mut current_hash: Option<String> = None;
-        for (path, _) in &auth_paths {
-            if path.exists() {
-                let content = fs::read(path)?;
-                let mut hasher = Sha256::new();
-                hasher.update(&content);
-                let hash = hex::encode(hasher.finalize());
-                current_hash = Some(hash);
-                break;
-            }
-        }
-
         let vault_dir = self.vault_dir.join(cli_name);
         if !vault_dir.exists() {
             return Ok(None);
@@ -415,6 +405,7 @@ impl AccountManager {
         Ok(profiles.first().map(|p| p.profile_name.clone()))
     }
 
+    #[allow(dead_code)]
     pub fn get_all_cli_names(&self) -> Result<Vec<String>, AccountError> {
         let db = self.db.lock().map_err(|_| AccountError::DbLockPoisoned)?;
         let mut stmt = db.prepare("SELECT DISTINCT cli_name FROM accounts")?;

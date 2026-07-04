@@ -49,6 +49,7 @@ pub enum QuickAppError {
     InvalidId,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct DataDirs {
     pub root_dir: PathBuf,

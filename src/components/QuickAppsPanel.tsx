@@ -784,23 +784,26 @@ export function QuickAppsPanel() {
                         </div>
                     </div>
                 ) : apps.length === 0 ? (
-                    /* Empty state */
-                    <div className="flex flex-col items-center justify-center gap-4 h-full text-cyber-muted">
-                        <div className="w-16 h-16 rounded-2xl bg-cyber-surface/40 border border-cyber-line/40 flex items-center justify-center text-3xl">
-                            📂
-                        </div>
-                        <div className="text-center">
-                            <p className="text-[14px] font-semibold text-cyber-text">No quick apps yet</p>
-                            <p className="text-[12px] text-cyber-muted mt-1">Add your favorite apps for quick access</p>
-                        </div>
+                    /* Empty state — no apps at all */
+                    <div className="flex flex-col items-center justify-center gap-6 h-full text-cyber-muted">
+                        {/* Add tile mirroring the grid tile style */}
                         <button
                             type="button"
                             onClick={handleAdd}
-                            className="flex items-center gap-2 px-4 py-2 text-[12px] rounded-lg bg-cyber-accent text-cyber-base hover:bg-cyber-accent-hover font-bold transition-all shadow-md shadow-cyber-accent/20"
+                            title="Add new quick app"
+                            className="group flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dashed border-cyber-accent/40 hover:border-cyber-accent hover:bg-cyber-accent/5 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyber-accent shadow-lg shadow-cyber-accent/5 hover:shadow-cyber-accent/20"
                         >
-                            <PlusIcon />
-                            Add your first app
+                            <div className="w-16 h-16 rounded-xl bg-cyber-surface/30 flex items-center justify-center group-hover:bg-cyber-accent/15 transition-colors border border-cyber-line/30 group-hover:border-cyber-accent/40">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-8 w-8 text-cyber-muted/50 group-hover:text-cyber-accent transition-colors">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[14px] font-bold text-cyber-text group-hover:text-cyber-accent transition-colors">Add your first app</p>
+                                <p className="text-[11px] text-cyber-muted/70 mt-1">Click to add a quick launch shortcut</p>
+                            </div>
                         </button>
+                        <p className="text-[10px] text-cyber-muted/50">Or click the <span className="text-cyber-accent font-semibold">+ Add App</span> button above</p>
                     </div>
                 ) : totalVisible === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-3 h-full text-cyber-muted">

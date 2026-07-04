@@ -1146,6 +1146,11 @@ fn walk_dir_recursive(dir: &std::path::Path, entries: &mut Vec<FileEntry>) {
                     continue;
                 }
                 if path.is_dir() {
+                    entries.push(FileEntry {
+                        name,
+                        path: path.to_string_lossy().to_string(),
+                        is_dir: true,
+                    });
                     walk_dir_recursive(&path, entries);
                 } else {
                     entries.push(FileEntry {
@@ -1210,4 +1215,68 @@ pub async fn list_ssh_files_recursive(
     }
 
     Ok(entries)
+}
+
+#[derive(serde::Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RipgrepMatch {
+    pub file_path: String,
+    pub line_number: usize,
+    pub content: String,
+}
+
+#[tauri::command]
+pub async fn ripgrep_search(path: String, query: String) -> Result<Vec<RipgrepMatch>, String> {
+    if query.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let root_path = std::path::PathBuf::from(&path);
+    if !root_path.exists() {
+        return Err("Directory does not exist".to_string());
+    }
+
+    let mut cmd = std::process::Command::new("rg");
+    cmd.current_dir(&root_path)
+        .args(&[
+            "--line-number",
+            "--color=never",
+            "--smart-case",
+            "--max-count=2",
+            "--",
+            &query,
+            ".",
+        ]);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let output = cmd.output()
+        .map_err(|e| format!("Failed to execute ripgrep (is rg installed?): {}", e))?;
+
+    let stdout_str = String::from_utf8_lossy(&output.stdout);
+    let mut matches = Vec::new();
+
+    for line in stdout_str.lines() {
+        let parts: Vec<&str> = line.splitn(3, ':').collect();
+        if parts.len() == 3 {
+            let file_path = parts[0].to_string();
+            let line_number = parts[1].parse::<usize>().unwrap_or(0);
+            let content = parts[2].trim().to_string();
+
+            matches.push(RipgrepMatch {
+                file_path,
+                line_number,
+                content,
+            });
+        }
+        if matches.len() >= 50 {
+            break;
+        }
+    }
+
+    Ok(matches)
 }

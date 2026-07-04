@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { FitAddon } from '@xterm/addon-fit';
+import { SearchAddon } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import type { CliOutputEvent, CliStatusEvent, SessionInfo, SshConnection, AppTheme } from '../types';
+import type { CliOutputEvent, CliStatusEvent, SessionInfo, SshConnection, AppTheme, FileEntry, RipgrepMatch } from '../types';
+import { listAllFilesRecursive, listSshFilesRecursive, ripgrepSearch } from '../lib/tauri';
 
 function FileIcon() {
   return (
@@ -75,6 +77,7 @@ interface TerminalPanelProps {
 interface TerminalHandle {
   term: Terminal;
   fit: FitAddon;
+  search: SearchAddon;
   miniTerm: Terminal;
   miniFit: FitAddon;
   writeQueue: string[];
@@ -117,6 +120,81 @@ export function TerminalPanel({
   onMoveSessionToPanel,
   theme,
 }: TerminalPanelProps) {
+  // Search state
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResultCount, setSearchResultCount] = useState<number | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  // Ref for searchVisible — lets xterm key-handler closures read the latest value
+  const searchVisibleRef = useRef(false);
+
+  // visibleSessionId must be declared before search callbacks that depend on it
+  // (defined here by hoisting the computation up; the actual useMemo stays below
+  //  but we keep a ref so callbacks capture the latest value without stale closures)
+  const visibleSessionIdRef = useRef<string | null>(null);
+
+  // ── Right Panel Toggle State ──
+  const [rightPanelVisible, setRightPanelVisible] = useState(() => {
+    return localStorage.getItem('ai-cli-right-panel-visible') === 'true';
+  });
+  useEffect(() => {
+    localStorage.setItem('ai-cli-right-panel-visible', String(rightPanelVisible));
+  }, [rightPanelVisible]);
+
+  // ── @ Mention Autocomplete State ──
+  const [mentionActive, setMentionActive] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const mentionActiveRef = useRef(false);
+  const mentionQueryRef = useRef('');
+  const fileIndexCache = useRef<Record<string, FileEntry[]>>({});
+  const [fileIndex, setFileIndex] = useState<FileEntry[]>([]);
+  const [fileIndexLoading, setFileIndexLoading] = useState(false);
+  const mentionInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── ! Ripgrep Search Autocomplete State ──
+  const [rgActive, setRgActive] = useState(false);
+  const [rgQuery, setRgQuery] = useState('');
+  const [rgSelectedIndex, setRgSelectedIndex] = useState(0);
+  const rgActiveRef = useRef(false);
+  const rgQueryRef = useRef('');
+  const [rgResults, setRgResults] = useState<RipgrepMatch[]>([]);
+  const [rgLoading, setRgLoading] = useState(false);
+  const rgInputRef = useRef<HTMLInputElement | null>(null);
+  const mentionListRef = useRef<HTMLDivElement | null>(null);
+  const rgListRef = useRef<HTMLDivElement | null>(null);
+
+  const openSearch = useCallback(() => {
+    setSearchVisible(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    setSearchVisible(false);
+    setSearchQuery('');
+    setSearchResultCount(null);
+    // Clear highlight in current terminal
+    const sid = visibleSessionIdRef.current;
+    if (sid) {
+      try { terminalRefs.current[sid]?.search.clearDecorations(); } catch (_e) {}
+    }
+  }, []);
+
+  const doSearch = useCallback((query: string, direction: 'next' | 'prev' = 'next') => {
+    const sid = visibleSessionIdRef.current;
+    if (!sid) return;
+    const handle = terminalRefs.current[sid];
+    if (!handle || !query.trim()) {
+      setSearchResultCount(null);
+      return;
+    }
+    const opts = { caseSensitive: false, regex: false, decorations: { matchBackground: '#f8e16a55', matchBorder: '#f8e16a', matchOverviewRuler: '#f8e16a', activeMatchBackground: '#f8e16acc', activeMatchBorder: '#00ffd1', activeMatchColorOverviewRuler: '#00ffd1' } };
+    const found = direction === 'next'
+      ? handle.search.findNext(query, opts)
+      : handle.search.findPrevious(query, opts);
+    setSearchResultCount(found ? 1 : 0);
+  }, []);
+
   // Custom Mouse Drag-to-Swap States and Handlers
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
@@ -256,12 +334,29 @@ export function TerminalPanel({
       }
     };
 
+
   const visibleSessionId = useMemo(() => {
     if (activeSessionId && sessions.some((session) => session.id === activeSessionId)) {
       return activeSessionId;
     }
     return sessions[0]?.id ?? null;
   }, [activeSessionId, sessions]);
+
+  // Keep the refs in sync so callbacks always see the latest values
+  useEffect(() => {
+    visibleSessionIdRef.current = visibleSessionId;
+  }, [visibleSessionId]);
+  useEffect(() => {
+    searchVisibleRef.current = searchVisible;
+  }, [searchVisible]);
+  // Re-run search when switching sessions (if search bar is open)
+  useEffect(() => {
+    if (!searchVisibleRef.current) return;
+    if (!visibleSessionId) return;
+    if (searchQuery.trim()) doSearch(searchQuery, 'next');
+    setTimeout(() => searchInputRef.current?.focus(), 80);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleSessionId]);
   const lastQuickSessionTime = useRef(0);
   const triggerQuickSession = useCallback(() => {
     const now = Date.now();
@@ -272,16 +367,273 @@ export function TerminalPanel({
     onQuickSession?.();
   }, [onQuickSession]);
 
+  // ── @ Mention Refs Sync ──
+  useEffect(() => {
+    mentionActiveRef.current = mentionActive;
+  }, [mentionActive]);
+  useEffect(() => {
+    mentionQueryRef.current = mentionQuery;
+  }, [mentionQuery]);
+
+  // ── Fuzzy Search Helper ──
+  const fuzzyMatch = useCallback((query: string, target: string): { match: boolean; score: number } => {
+    if (!query) return { match: true, score: 0 };
+    const lq = query.toLowerCase();
+    const lt = target.toLowerCase();
+
+    // Exact substring → highest score
+    if (lt.includes(lq)) {
+      const idx = lt.indexOf(lq);
+      return { match: true, score: 100 - idx + (lt === lq ? 50 : 0) };
+    }
+
+    // Sequential character match (fuzzy)
+    let qi = 0;
+    for (let ti = 0; ti < lt.length && qi < lq.length; ti++) {
+      if (lt[ti] === lq[qi]) qi++;
+    }
+    if (qi === lq.length) {
+      return { match: true, score: (qi / lt.length) * 50 };
+    }
+    return { match: false, score: 0 };
+  }, []);
+
+  // ── Mention Filtered Results (derived, memoized) ──
+  const mentionResults = useMemo(() => {
+    if (!mentionActive || fileIndex.length === 0) return [];
+    const q = mentionQuery.trim();
+    if (!q) {
+      // Show first 50 entries (dirs first, then files)
+      return fileIndex.slice(0, 50);
+    }
+    const scored: { entry: FileEntry; score: number }[] = [];
+    for (const entry of fileIndex) {
+      // Match against relative path (from workingDir) for better UX
+      const { match, score } = fuzzyMatch(q, entry.name);
+      if (match) scored.push({ entry, score });
+      if (scored.length >= 200) break; // Pre-cap for performance
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 50).map(s => s.entry);
+  }, [mentionActive, mentionQuery, fileIndex, fuzzyMatch]);
+
+  // Reset selected index when results change
+  useEffect(() => {
+    setMentionSelectedIndex(0);
+  }, [mentionResults.length, mentionQuery]);
+
+  // ── Load File Index ──
+  const loadFileIndex = useCallback(async (workingDir: string, isSsh: boolean, sshConn?: SshConnection) => {
+    // Check cache first
+    const cacheKey = `${isSsh ? 'ssh:' : ''}${workingDir}`;
+    if (fileIndexCache.current[cacheKey]) {
+      setFileIndex(fileIndexCache.current[cacheKey]);
+      return;
+    }
+
+    setFileIndexLoading(true);
+    try {
+      let entries: FileEntry[];
+      if (isSsh && sshConn) {
+        entries = await listSshFilesRecursive(sshConn, workingDir);
+      } else {
+        entries = await listAllFilesRecursive(workingDir);
+      }
+      // Sort: dirs first, then alpha
+      entries.sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
+      // Convert absolute paths to relative for display
+      entries = entries.map(e => ({
+        ...e,
+        name: e.path.replace(workingDir, '').replace(/^[/\\]+/, '').replace(/\\/g, '/'),
+      }));
+      // Cap at 10K entries
+      if (entries.length > 10000) entries = entries.slice(0, 10000);
+      fileIndexCache.current[cacheKey] = entries;
+      setFileIndex(entries);
+    } catch (err) {
+      console.error('Failed to load file index:', err);
+      setFileIndex([]);
+    } finally {
+      setFileIndexLoading(false);
+    }
+  }, []);
+
+  // ── Open / Close Mention ──
+  const openMention = useCallback((workingDir: string, isSsh: boolean, sshConn?: SshConnection) => {
+    setMentionActive(true);
+    setMentionQuery('');
+    setMentionSelectedIndex(0);
+    void loadFileIndex(workingDir, isSsh, sshConn);
+    setTimeout(() => mentionInputRef.current?.focus(), 50);
+  }, [loadFileIndex]);
+
+  const closeMention = useCallback(() => {
+    setMentionActive(false);
+    setMentionQuery('');
+    setMentionSelectedIndex(0);
+  }, []);
+
+  // ── ! Ripgrep Refs Sync ──
+  useEffect(() => {
+    rgActiveRef.current = rgActive;
+  }, [rgActive]);
+  useEffect(() => {
+    rgQueryRef.current = rgQuery;
+  }, [rgQuery]);
+
+  // ── Open / Close Ripgrep ──
+  const openRg = useCallback((workingDir: string) => {
+    setRgActive(true);
+    setRgQuery('');
+    setRgSelectedIndex(0);
+    setRgResults([]);
+    setTimeout(() => rgInputRef.current?.focus(), 50);
+  }, []);
+
+  const closeRg = useCallback(() => {
+    setRgActive(false);
+    setRgQuery('');
+    setRgSelectedIndex(0);
+    setRgResults([]);
+  }, []);
+
+  // ── Debounced Ripgrep search query execution ──
+  useEffect(() => {
+    if (!rgActive) return;
+    const q = rgQuery.trim();
+    if (!q) {
+      setRgResults([]);
+      return;
+    }
+
+    const session = sessions.find(s => s.id === visibleSessionId);
+    const wd = session?.workingDir;
+    if (!wd) return;
+
+    setRgLoading(true);
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const matches = await ripgrepSearch(wd, q);
+        // Normalize file paths to relative paths
+        const normalized = matches.map(m => ({
+          ...m,
+          filePath: m.filePath.replace(wd, '').replace(/^\.[\/\\]/, '').replace(/^[/\\]+/, '').replace(/\\/g, '/'),
+        }));
+        setRgResults(normalized);
+      } catch (err) {
+        console.error('Ripgrep search failed:', err);
+        setRgResults([]);
+      } finally {
+        setRgLoading(false);
+      }
+    }, 300); // 300ms debounce for typing responsiveness
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [rgQuery, rgActive, visibleSessionId, sessions]);
+
+  // ── Auto-scroll selected item into view for Mention list ──
+  useEffect(() => {
+    const listEl = mentionListRef.current;
+    if (!listEl) return;
+    const selectedEl = listEl.children[mentionSelectedIndex] as HTMLElement | null;
+    if (selectedEl) {
+      selectedEl.scrollIntoView({ block: 'nearest' });
+    }
+  }, [mentionSelectedIndex]);
+
+  // ── Auto-scroll selected item into view for Ripgrep list ──
+  useEffect(() => {
+    const listEl = rgListRef.current;
+    if (!listEl) return;
+    const selectedEl = listEl.children[rgSelectedIndex] as HTMLElement | null;
+    if (selectedEl) {
+      selectedEl.scrollIntoView({ block: 'nearest' });
+    }
+  }, [rgSelectedIndex]);
+
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'n') {
         e.preventDefault();
         triggerQuickSession();
       }
+      if (e.ctrlKey && e.key === 'f') {
+        // Only intercept Ctrl+F when a terminal session is visible and focus is not in a text input
+        const tag = (document.activeElement as HTMLElement | null)?.tagName ?? '';
+        if (!['INPUT', 'TEXTAREA'].includes(tag)) {
+          e.preventDefault();
+          openSearch();
+        }
+      }
+      if (e.key === 'Escape' && searchVisible) {
+        closeSearch();
+      }
+      // Close mention on Escape (global fallback)
+      if (e.key === 'Escape' && mentionActive) {
+        closeMention();
+      }
+      // Close Ripgrep search on Escape
+      if (e.key === 'Escape' && rgActive) {
+        closeRg();
+      }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [triggerQuickSession]);
+  }, [triggerQuickSession, openSearch, closeSearch, searchVisible, mentionActive, closeMention, rgActive, closeRg]);
+
+  // ── Mention Selection via Custom Event ──
+  useEffect(() => {
+    const handleMentionSelect = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const sessionId = detail?.sessionId || visibleSessionIdRef.current;
+      if (!sessionId) return;
+
+      const results = mentionResults;
+      // Use a clamped index from the ref to avoid stale closure
+      const idx = Math.min(Math.max(0, mentionSelectedIndex), results.length - 1);
+      const selected = results[idx];
+      if (!selected) {
+        closeMention();
+        return;
+      }
+
+      // Send the relative path to the terminal (replacing the '@' query with the full path)
+      const pathToInsert = selected.name;
+      onSendInput(sessionId, pathToInsert);
+      closeMention();
+    };
+
+    window.addEventListener('mention-select-current', handleMentionSelect);
+    return () => window.removeEventListener('mention-select-current', handleMentionSelect);
+  }, [mentionResults, mentionSelectedIndex, closeMention, onSendInput]);
+
+  // ── Ripgrep Selection via Custom Event ──
+  useEffect(() => {
+    const handleRgSelect = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const sessionId = detail?.sessionId || visibleSessionIdRef.current;
+      if (!sessionId) return;
+
+      const results = rgResults;
+      const idx = Math.min(Math.max(0, rgSelectedIndex), results.length - 1);
+      const selected = results[idx];
+      if (!selected) {
+        closeRg();
+        return;
+      }
+
+      // Send the relative path to the terminal (replacing the '!' query with the full path)
+      const pathToInsert = selected.filePath;
+      onSendInput(sessionId, pathToInsert);
+      closeRg();
+    };
+
+    window.addEventListener('rg-select-current', handleRgSelect);
+    return () => window.removeEventListener('rg-select-current', handleRgSelect);
+  }, [rgResults, rgSelectedIndex, closeRg, onSendInput]);
   const flushInput = useCallback(
     (sessionId: string) => {
       const payload = inputBuffers.current[sessionId];
@@ -518,6 +870,90 @@ export function TerminalPanel({
       });
 
       term.attachCustomKeyEventHandler((event) => {
+        // ── @ Mention intercepts (must be first) ──
+        if (mentionActiveRef.current) {
+          if (event.type !== 'keydown') return false; // block keyup too
+          if (event.key === 'ArrowDown') {
+            setMentionSelectedIndex(prev => prev + 1);
+            return false;
+          }
+          if (event.key === 'ArrowUp') {
+            setMentionSelectedIndex(prev => Math.max(0, prev - 1));
+            return false;
+          }
+          if (event.key === 'Enter' || event.key === 'Tab') {
+            // Selection is handled via a custom event dispatched from the mention overlay
+            const evt = new CustomEvent('mention-select-current', { detail: { sessionId: session.id } });
+            window.dispatchEvent(evt);
+            return false;
+          }
+          if (event.key === 'Escape') {
+            closeMention();
+            return false;
+          }
+          // Let printable chars through to onData (they'll be routed to mentionQuery)
+          if (event.key === 'Backspace') {
+            // Handle backspace in mention query
+            const currentQ = mentionQueryRef.current;
+            if (currentQ.length > 0) {
+              setMentionQuery(currentQ.slice(0, -1));
+            } else {
+              closeMention();
+            }
+            return false;
+          }
+          // Block modifier combos from going to terminal while mention is active
+          if (event.ctrlKey || event.altKey || event.metaKey) {
+            return false;
+          }
+          // Single printable character → append to mention query (handled in onData below)
+          // Return false to prevent xterm from processing it
+          if (event.key.length === 1) {
+            setMentionQuery(prev => prev + event.key);
+            return false;
+          }
+          return false;
+        }
+
+        // ── ! Ripgrep Search intercepts ──
+        if (rgActiveRef.current) {
+          if (event.type !== 'keydown') return false;
+          if (event.key === 'ArrowDown') {
+            setRgSelectedIndex(prev => prev + 1);
+            return false;
+          }
+          if (event.key === 'ArrowUp') {
+            setRgSelectedIndex(prev => Math.max(0, prev - 1));
+            return false;
+          }
+          if (event.key === 'Enter' || event.key === 'Tab') {
+            const evt = new CustomEvent('rg-select-current', { detail: { sessionId: session.id } });
+            window.dispatchEvent(evt);
+            return false;
+          }
+          if (event.key === 'Escape') {
+            closeRg();
+            return false;
+          }
+          if (event.key === 'Backspace') {
+            const currentQ = rgQueryRef.current;
+            if (currentQ.length > 0) {
+              setRgQuery(currentQ.slice(0, -1));
+            } else {
+              closeRg();
+            }
+            return false;
+          }
+          if (event.ctrlKey || event.altKey || event.metaKey) {
+            return false;
+          }
+          if (event.key.length === 1) {
+            setRgQuery(prev => prev + event.key);
+            return false;
+          }
+          return false;
+        }
+
         if (event.ctrlKey && event.key === 'c') {
           if (term.hasSelection()) {
             const selected = term.getSelection();
@@ -548,11 +984,26 @@ export function TerminalPanel({
           event.preventDefault();
           return false;
         }
+        if (event.ctrlKey && event.key === 'f') {
+          if (event.type === 'keydown') {
+            openSearch();
+          }
+          return false;
+        }
+        if (event.key === 'Escape') {
+          if (searchVisibleRef.current) {
+            closeSearch();
+            return false;
+          }
+        }
         return true;
       });
 
       const fit = new FitAddon();
       term.loadAddon(fit);
+
+      const search = new SearchAddon();
+      term.loadAddon(search);
 
       const miniFit = new FitAddon();
       miniTerm.loadAddon(miniFit);
@@ -560,6 +1011,7 @@ export function TerminalPanel({
       terminalRefs.current[session.id] = {
         term,
         fit,
+        search,
         miniTerm,
         miniFit,
         writeQueue: [],
@@ -593,6 +1045,48 @@ export function TerminalPanel({
       }
 
       term.onData((data) => {
+        // Detect '@' trigger for file mention
+        if (data === '@' && !mentionActiveRef.current && !rgActiveRef.current) {
+          const activeSession = sessions.find(s => s.id === session.id);
+          const wd = activeSession?.workingDir;
+          if (wd) {
+            const isSsh = !!activeSession?.cliName.startsWith('SSH: ');
+            openMention(wd, isSsh);
+            // Still send the '@' to the terminal so user sees it
+            inputBuffers.current[session.id] = `${inputBuffers.current[session.id] ?? ''}${data}`;
+            if (!inputTimers.current[session.id]) {
+              inputTimers.current[session.id] = window.setTimeout(() => {
+                flushInput(session.id);
+              }, INPUT_FLUSH_MS);
+            }
+            return;
+          }
+        }
+
+        // Detect '!' trigger for ripgrep search
+        if (data === '!' && !rgActiveRef.current && !mentionActiveRef.current) {
+          const activeSession = sessions.find(s => s.id === session.id);
+          const wd = activeSession?.workingDir;
+          // Only support local sessions for ripgrep for now
+          const isSsh = !!activeSession?.cliName.startsWith('SSH: ');
+          if (wd && !isSsh) {
+            openRg(wd);
+            // Still send the '!' to the terminal so user sees it
+            inputBuffers.current[session.id] = `${inputBuffers.current[session.id] ?? ''}${data}`;
+            if (!inputTimers.current[session.id]) {
+              inputTimers.current[session.id] = window.setTimeout(() => {
+                flushInput(session.id);
+              }, INPUT_FLUSH_MS);
+            }
+            return;
+          }
+        }
+
+        // When mention or ripgrep is active, don't send data to PTY
+        if (mentionActiveRef.current || rgActiveRef.current) {
+          return;
+        }
+
         inputBuffers.current[session.id] = `${inputBuffers.current[session.id] ?? ''}${data}`;
 
         if (inputTimers.current[session.id]) {
@@ -614,7 +1108,7 @@ export function TerminalPanel({
 
       return handle;
     },
-    [flushInput, onSendInput, triggerQuickSession],
+    [flushInput, onSendInput, triggerQuickSession, openSearch, closeSearch, openMention, closeMention, sessions, openRg, closeRg],
   );
 
   const ensureTerminal = useCallback(
@@ -735,6 +1229,7 @@ export function TerminalPanel({
       if (!sessions.some((session) => session.id === sessionId)) {
         terminalRefs.current[sessionId].cleanupScroll();
         terminalRefs.current[sessionId].cleanupMiniScroll();
+        try { terminalRefs.current[sessionId].search.dispose(); } catch (_e) {}
         terminalRefs.current[sessionId].term.dispose();
         terminalRefs.current[sessionId].miniTerm.dispose();
         terminalRefs.current[sessionId].writeQueue = [];
@@ -926,6 +1421,7 @@ export function TerminalPanel({
       Object.values(terminalRefs.current).forEach((item) => {
         item.cleanupScroll();
         item.cleanupMiniScroll();
+        try { item.search.dispose(); } catch (_e) {}
         item.term.dispose();
         item.miniTerm.dispose();
         item.writeQueue = [];
@@ -985,6 +1481,62 @@ export function TerminalPanel({
               className="relative flex-1 min-h-0 bg-[#0a0f1f] flex flex-col justify-between"
               onContextMenu={(e) => visibleSessionId && handleContextMenu(e, visibleSessionId)}
             >
+              {/* ── Terminal Search Overlay ── */}
+              {searchVisible && !openedFile && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyber-accent/60 bg-[#0a0f1f]/95 shadow-2xl shadow-cyber-accent/20 backdrop-blur-sm select-none" style={{ minWidth: '320px' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 text-cyber-muted shrink-0">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                  </svg>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      doSearch(e.target.value, 'next');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); doSearch(searchQuery, e.shiftKey ? 'prev' : 'next'); }
+                      if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+                    }}
+                    placeholder="Search terminal… (Enter=next, Shift+Enter=prev)"
+                    className="flex-1 bg-transparent text-cyber-text text-[12px] font-mono outline-none placeholder:text-cyber-muted/50 caret-cyber-accent"
+                    style={{ minWidth: 0 }}
+                  />
+                  {searchResultCount !== null && (
+                    <span className={`text-[10px] font-mono shrink-0 ${searchResultCount === 0 ? 'text-cyber-warn' : 'text-cyber-neon'}`}>
+                      {searchResultCount === 0 ? 'No match' : '✓ Found'}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => doSearch(searchQuery, 'prev')}
+                      title="Previous match (Shift+Enter)"
+                      className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-accent hover:bg-cyber-accent/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-accent/50"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => doSearch(searchQuery, 'next')}
+                      title="Next match (Enter)"
+                      className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-accent hover:bg-cyber-accent/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-accent/50"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeSearch}
+                      title="Close (Esc)"
+                      className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-warn hover:bg-cyber-warn/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-warn/50 ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Active Session Info Header */}
               {activeSession && !openedFile && (
                 <div className="absolute top-3 left-4 z-20 flex items-center gap-2 select-none">
@@ -992,6 +1544,18 @@ export function TerminalPanel({
                     🟢 {activeSession.cliName} - {activeSession.workingDir || ''}
                   </div>
                 </div>
+              )}
+
+              {/* Toggle Right Panel Button */}
+              {visibleSessionId && !openedFile && (cliSessions.length >= 1 || !!activeDragId) && (
+                <button
+                  type="button"
+                  onClick={() => setRightPanelVisible(prev => !prev)}
+                  className="absolute top-3 right-12 z-20 flex h-6 w-8 items-center justify-center rounded-lg border border-cyber-neon/60 bg-[#0a0f1f]/90 text-cyber-neon hover:bg-cyber-neon hover:text-black transition cursor-pointer select-none font-bold text-xs shadow-neon-sm"
+                  title={rightPanelVisible ? "Hide Right Panel" : "Show Right Panel"}
+                >
+                  {rightPanelVisible ? '▶' : '◀'}
+                </button>
               )}
 
               {/* Stop Session (Close) Button on top right */}
@@ -1004,6 +1568,191 @@ export function TerminalPanel({
                 >
                   ✕
                 </button>
+              )}
+
+              {/* @ Mention Autocomplete Overlay */}
+              {mentionActive && (
+                <div 
+                  className="absolute bottom-4 left-4 z-50 flex flex-col w-96 max-h-60 rounded-xl border border-cyber-neon/60 bg-[#0a0f1f]/95 shadow-2xl shadow-cyber-neon/15 backdrop-blur-sm select-none font-mono text-[11px] overflow-hidden animate-slide-up"
+                >
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/50 bg-[#0d1527]">
+                    <span className="text-cyber-neon text-[10px] font-bold tracking-wider">
+                      ⚡ MENTION FILE/FOLDER
+                    </span>
+                    {fileIndexLoading ? (
+                      <span className="text-[10px] text-cyber-electric animate-pulse">Indexing...</span>
+                    ) : (
+                      <span className="text-[9px] text-slate-500">{mentionResults.length} matches</span>
+                    )}
+                  </div>
+
+                  {/* Filter query display */}
+                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-cyber-line/30 bg-[#080d1a]">
+                    <span className="text-cyber-neon font-bold">@</span>
+                    <input
+                      ref={mentionInputRef}
+                      type="text"
+                      value={mentionQuery}
+                      onChange={(e) => setMentionQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          setMentionSelectedIndex(prev => Math.min(mentionResults.length - 1, prev + 1));
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          setMentionSelectedIndex(prev => Math.max(0, prev - 1));
+                        } else if (e.key === 'Enter' || e.key === 'Tab') {
+                          e.preventDefault();
+                          const selected = mentionResults[mentionSelectedIndex];
+                          if (selected) {
+                            onSendInput(visibleSessionId!, "\x7f" + selected.name);
+                          }
+                          closeMention();
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          closeMention();
+                        }
+                      }}
+                      placeholder="type to search..."
+                      className="flex-1 bg-transparent text-cyber-text text-xs outline-none caret-cyber-neon"
+                    />
+                  </div>
+
+                  <div ref={mentionListRef} className="flex-1 overflow-y-auto scrollbar-thin p-1 max-h-40">
+                    {mentionResults.length === 0 ? (
+                      <div className="p-3 text-center text-slate-500 italic text-[10px]">
+                        {fileIndexLoading ? 'Loading directory files...' : 'No files or folders found'}
+                      </div>
+                    ) : (
+                      mentionResults.map((item, index) => {
+                        const isSelected = index === mentionSelectedIndex;
+                        return (
+                          <div
+                            key={item.path}
+                            onClick={() => {
+                              onSendInput(visibleSessionId!, "\x7f" + item.name);
+                              closeMention();
+                            }}
+                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-cyber-neon/20 text-cyber-neon border-l-2 border-cyber-neon'
+                                : 'hover:bg-[#121c33]/50 text-slate-300'
+                            }`}
+                          >
+                            {item.isDir ? (
+                              <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 text-cyber-electric shrink-0">
+                                <path fillRule="evenodd" d="M19.5 21a3 3 0 0 0 3-3V9a3 3 0 0 0-3-3h-5.379a.75.75 0 0 1-.53-.22L11.47 3.66A2.25 2.25 0 0 0 9.879 3H4.5a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h15Zm-6.75-10.5a.75.75 0 0 0-1.5 0v2.25H9a.75.75 0 0 0 0 1.5h2.25V16.5a.75.75 0 0 0 1.5 0v-2.25H15a.75.75 0 0 0 0-1.5h-2.25V10.5Z" clipRule="evenodd" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 text-slate-400 shrink-0">
+                                <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                            <span className="truncate flex-1 text-[10px]">{item.name}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="px-3 py-1.5 border-t border-cyber-line/30 bg-[#0d1527] flex items-center justify-between text-[9px] text-slate-500">
+                    <span>↑↓ Navigate</span>
+                    <span>⏎ Select</span>
+                    <span>Esc Close</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ! Ripgrep Autocomplete Overlay */}
+              {rgActive && (
+                <div 
+                  className="absolute bottom-4 left-4 z-50 flex flex-col w-96 max-h-60 rounded-xl border border-cyber-electric/60 bg-[#0a0f1f]/95 shadow-2xl shadow-cyber-electric/15 backdrop-blur-sm select-none font-mono text-[11px] overflow-hidden animate-slide-up"
+                >
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/50 bg-[#0c162b]">
+                    <span className="text-cyber-electric text-[10px] font-bold tracking-wider">
+                      🔍 RIPGREP SEARCH
+                    </span>
+                    {rgLoading ? (
+                      <span className="text-[10px] text-cyber-electric animate-pulse">Searching...</span>
+                    ) : (
+                      <span className="text-[9px] text-slate-500">{rgResults.length} matches</span>
+                    )}
+                  </div>
+
+                  {/* Filter query display */}
+                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-cyber-line/30 bg-[#080d1a]">
+                    <span className="text-cyber-electric font-bold">!</span>
+                    <input
+                      ref={rgInputRef}
+                      type="text"
+                      value={rgQuery}
+                      onChange={(e) => setRgQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          setRgSelectedIndex(prev => Math.min(rgResults.length - 1, prev + 1));
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          setRgSelectedIndex(prev => Math.max(0, prev - 1));
+                        } else if (e.key === 'Enter' || e.key === 'Tab') {
+                          e.preventDefault();
+                          const selected = rgResults[rgSelectedIndex];
+                          if (selected) {
+                            onSendInput(visibleSessionId!, "\x7f" + selected.filePath);
+                          }
+                          closeRg();
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          closeRg();
+                        }
+                      }}
+                      placeholder="text to find inside files..."
+                      className="flex-1 bg-transparent text-cyber-text text-xs outline-none caret-cyber-electric"
+                    />
+                  </div>
+
+                  <div ref={rgListRef} className="flex-1 overflow-y-auto scrollbar-thin p-1 max-h-40">
+                    {rgResults.length === 0 ? (
+                      <div className="p-3 text-center text-slate-500 italic text-[10px]">
+                        {rgLoading ? 'Searching file contents...' : 'Type something to search inside files'}
+                      </div>
+                    ) : (
+                      rgResults.map((item, index) => {
+                        const isSelected = index === rgSelectedIndex;
+                        return (
+                          <div
+                            key={`${item.filePath}:${item.lineNumber}:${index}`}
+                            onClick={() => {
+                              onSendInput(visibleSessionId!, "\x7f" + item.filePath);
+                              closeRg();
+                            }}
+                            className={`flex flex-col gap-0.5 px-2.5 py-1.5 rounded cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-cyber-electric/20 text-cyber-electric border-l-2 border-cyber-electric'
+                                : 'hover:bg-[#121c33]/50 text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold truncate">
+                              <span className="truncate max-w-[280px]">{item.filePath}</span>
+                              <span className="text-cyber-electric font-mono text-[8px] bg-cyber-electric/10 px-1 rounded shrink-0">
+                                L{item.lineNumber}
+                              </span>
+                            </div>
+                            <span className="text-[10px] truncate text-slate-200 font-mono pl-1 border-l border-slate-700/50 italic">
+                              {item.content || '(empty line)'}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="px-3 py-1.5 border-t border-cyber-line/30 bg-[#0c162b] flex items-center justify-between text-[9px] text-slate-500">
+                    <span>↑↓ Navigate</span>
+                    <span>⏎ Select</span>
+                    <span>Esc Close</span>
+                  </div>
+                </div>
               )}
 
               {/* Active terminal canvas viewport — always mounted to preserve xterm state */}
@@ -1321,7 +2070,7 @@ export function TerminalPanel({
           {/* Right live scaled session thumbnails panel */}
           {(cliSessions.length >= 1 || !!activeDragId) && (
             <div 
-              style={{ width: `${thumbSizes.containerWidth}px` }}
+              style={{ width: rightPanelVisible ? `${thumbSizes.containerWidth}px` : '0px' }}
               onMouseEnter={() => {
                 if (activeDragId) {
                   const sess = sessions.find(s => s.id === activeDragId);
@@ -1331,7 +2080,9 @@ export function TerminalPanel({
                   }
                 }
               }}
-              className="h-full border-l border-cyber-line bg-cyber-base/40 p-3.5 flex flex-col gap-2 shrink-0 select-none overflow-hidden transition-all duration-300"
+              className={`h-full border-cyber-line bg-cyber-base/40 flex flex-col gap-2 shrink-0 select-none overflow-hidden transition-all duration-300 ease-in-out ${
+                rightPanelVisible ? 'border-l p-3.5 opacity-100' : 'border-l-0 p-0 opacity-0'
+              }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">

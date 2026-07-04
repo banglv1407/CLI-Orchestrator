@@ -194,16 +194,26 @@ export function CliSidebar({
   onQuickAppsTabChange,
 }: CliSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('ai-cli-sidebar-collapsed') === 'true';
+  });
 
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
-    const wasQuickApps = activeTab === 'quickapps';
-    const isQuickApps = tab === 'quickapps';
-    setActiveTab(tab);
-    // Only notify parent when quickapps state actually changes
-    if (onQuickAppsTabChange && wasQuickApps !== isQuickApps) {
-      onQuickAppsTabChange(isQuickApps);
+    if (activeTab === tab && !isSidebarCollapsed) {
+      setIsSidebarCollapsed(true);
+      localStorage.setItem('ai-cli-sidebar-collapsed', 'true');
+    } else {
+      setIsSidebarCollapsed(false);
+      localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
+      const wasQuickApps = activeTab === 'quickapps';
+      const isQuickApps = tab === 'quickapps';
+      setActiveTab(tab);
+      // Only notify parent when quickapps state actually changes
+      if (onQuickAppsTabChange && wasQuickApps !== isQuickApps) {
+        onQuickAppsTabChange(isQuickApps);
+      }
     }
-  }, [activeTab, onQuickAppsTabChange]);
+  }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange]);
 
   // --- Sidebar Resizer Code ---
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -216,8 +226,15 @@ export function CliSidebar({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizingRef.current) return;
+      if (e.clientX < 120) {
+        setIsSidebarCollapsed(true);
+        localStorage.setItem('ai-cli-sidebar-collapsed', 'true');
+        return;
+      }
       const newWidth = Math.max(220, Math.min(e.clientX, 800));
       setSidebarWidth(newWidth);
+      setIsSidebarCollapsed(false);
+      localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
     };
 
     const handleMouseUp = () => {
@@ -835,109 +852,116 @@ export function CliSidebar({
 
   return (
     <div
-      className="relative flex h-full shrink-0 border-r border-cyber-line bg-cyber-panel/75 backdrop-blur"
-      style={{ width: `${sidebarWidth}px` }}
+      className="relative flex h-full shrink-0 border-r border-cyber-line bg-cyber-panel/75 backdrop-blur transition-all duration-300 ease-in-out"
+      style={{ width: isSidebarCollapsed ? '56px' : `${sidebarWidth}px` }}
     >
       {/* Resizable drag handle bar */}
-      <div
-        onMouseDown={handleMouseDown}
-        className="absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-cyber-neon/40 active:bg-cyber-neon transition-colors z-50"
-      />
+      {!isSidebarCollapsed && (
+        <div
+          onMouseDown={handleMouseDown}
+          onDoubleClick={() => {
+            setIsSidebarCollapsed(true);
+            localStorage.setItem('ai-cli-sidebar-collapsed', 'true');
+          }}
+          className="absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-cyber-neon/40 active:bg-cyber-neon transition-colors z-50"
+        />
+      )}
       {/* 1. Left-most Activity Bar (VSCode Style) */}
-      <nav className="flex h-full w-14 flex-col items-center justify-between border-r border-cyber-line/50 bg-cyber-base/70 py-4">
+      <nav className="flex h-full w-14 flex-col items-center justify-between border-r border-cyber-line/50 bg-cyber-base/70 py-4 shrink-0">
         <div className="flex flex-col gap-5">
           <button
             type="button"
             onClick={() => handleSetActiveTab('cli-manager')}
             title="CLI Orchestrator"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'cli-manager'
+              activeTab === 'cli-manager' && !isSidebarCollapsed
                 ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            {activeTab === 'cli-manager' && (
+            {activeTab === 'cli-manager' && !isSidebarCollapsed && (
               <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
             )}
             <TerminalIcon />
           </button>
-
+ 
           <button
             type="button"
             onClick={() => handleSetActiveTab('explorer')}
             title="File Explorer"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'explorer'
+              activeTab === 'explorer' && !isSidebarCollapsed
                 ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            {activeTab === 'explorer' && (
+            {activeTab === 'explorer' && !isSidebarCollapsed && (
               <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
             )}
             <ExplorerIcon />
           </button>
-
+ 
           <button
             type="button"
             onClick={() => handleSetActiveTab('quickapps')}
             title="Quick Apps (favorite apps launcher)"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'quickapps'
+              activeTab === 'quickapps' && !isSidebarCollapsed
                 ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
                 : 'text-slate-400 hover:text-cyber-electric hover:bg-cyber-electric/10'
             }`}
           >
-            {activeTab === 'quickapps' && (
+            {activeTab === 'quickapps' && !isSidebarCollapsed && (
               <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
             )}
             <QuickAppsIcon />
           </button>
-
+ 
           <button
             type="button"
             onClick={() => handleSetActiveTab('operator')}
             title="Operator (SSH VM Manager)"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'operator'
+              activeTab === 'operator' && !isSidebarCollapsed
                 ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            {activeTab === 'operator' && (
+            {activeTab === 'operator' && !isSidebarCollapsed && (
               <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
             )}
             <CloudIcon />
           </button>
         </div>
-
+ 
         <button
           type="button"
           onClick={() => handleSetActiveTab('settings')}
           title="Settings"
           className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-            activeTab === 'settings'
+            activeTab === 'settings' && !isSidebarCollapsed
               ? 'text-cyber-neon bg-cyber-neon/10'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          {activeTab === 'settings' && (
+          {activeTab === 'settings' && !isSidebarCollapsed && (
             <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
           )}
           <SettingsIcon />
         </button>
       </nav>
-
+ 
       {/* 2. Primary Sidebar Panel Content */}
-      <aside className="flex flex-1 flex-col overflow-hidden">
-        {/* Anime Assistant — click to toggle AI Chat panel */}
-        <div
-          className="p-3 border-b border-cyber-line bg-cyber-base/30 shrink-0 cursor-pointer transition-colors hover:bg-cyber-neon/5 select-none"
-          onClick={() => handleSetActiveTab(activeTab === 'ai-chat' ? 'explorer' : 'ai-chat')}
-          role="button"
-          title={activeTab === 'ai-chat' ? 'Close AI Companion Chat' : 'Open AI Companion Chat'}
-          aria-label="Toggle AI Companion Chat"
-        >
+      {!isSidebarCollapsed && (
+        <aside className="flex flex-1 flex-col overflow-hidden">
+          {/* Anime Assistant — click to toggle AI Chat panel */}
+          <div
+            className="p-3 border-b border-cyber-line bg-cyber-base/30 shrink-0 cursor-pointer transition-colors hover:bg-cyber-neon/5 select-none"
+            onClick={() => handleSetActiveTab(activeTab === 'ai-chat' ? 'explorer' : 'ai-chat')}
+            role="button"
+            title={activeTab === 'ai-chat' ? 'Close AI Companion Chat' : 'Open AI Companion Chat'}
+            aria-label="Toggle AI Companion Chat"
+          >
           <div className={`relative transition-all ${activeTab === 'ai-chat' ? 'ring-1 ring-cyber-neon/60 rounded-xl' : ''}`}>
             <AnimeAssistant state={assistantState} text={assistantText} />
             {activeTab !== 'ai-chat' && chatHistory.length > 0 && (
@@ -1521,6 +1545,7 @@ export function CliSidebar({
           </div>
         )}
       </aside>
+      )}
 
       {/* LLM Configuration Modal */}
       <LlmConfigModal

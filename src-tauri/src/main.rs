@@ -19,7 +19,7 @@ use commands::{
         open_workspace_folder, pick_file, pick_folder, read_file_content, read_ssh_file_content,
         resize_cli, save_account, save_cli_tag, save_project_tag, save_ssh_connections,
         send_cli_input, send_llm_chat, set_account_cooldown, stop_cli, switch_to_next_account,
-        upsert_cli, write_file_content, write_ssh_file_content,
+        upsert_cli, write_file_content, write_ssh_file_content, ripgrep_search,
     },
     quickapps_commands::{
         delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
@@ -90,6 +90,7 @@ fn main() {
             delete_quickapp,
             reextract_icons,
             launch_quickapp,
+            ripgrep_search,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

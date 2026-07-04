@@ -17,6 +17,7 @@ import type {
   SshConnection,
   GitStatusEntry,
   QuickApp,
+  RipgrepMatch,
 } from '../types';
 
 export function listClis(): Promise<CliDefinition[]> {
@@ -205,5 +206,9 @@ export function reextractQuickappIcons(): Promise<QuickApp[]> {
 
 export function launchQuickapp(id: string): Promise<number> {
   return invoke('launch_quickapp', { id });
+}
+
+export function ripgrepSearch(path: string, query: string): Promise<RipgrepMatch[]> {
+  return invoke('ripgrep_search', { path, query });
 }
 

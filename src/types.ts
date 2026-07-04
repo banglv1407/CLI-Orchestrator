@@ -165,6 +165,12 @@ export interface FileEntry {
   isDir: boolean;
 }
 
+export interface RipgrepMatch {
+  filePath: string;
+  lineNumber: number;
+  content: string;
+}
+
 export interface GitStatusEntry {
   path: string;
   status: 'modified' | 'added' | 'deleted' | 'untracked';

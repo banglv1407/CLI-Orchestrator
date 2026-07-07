@@ -21,6 +21,7 @@ use commands::{
         send_cli_input, send_llm_chat, set_account_cooldown, stop_cli, switch_to_next_account,
         upsert_cli, write_file_content, write_ssh_file_content, ripgrep_search,
         start_ssh_server, stop_ssh_server, get_ssh_server_status,
+        get_ssh_server_config, save_ssh_server_config,
     },
     quickapps_commands::{
         delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
@@ -95,6 +96,8 @@ fn main() {
             start_ssh_server,
             stop_ssh_server,
             get_ssh_server_status,
+            get_ssh_server_config,
+            save_ssh_server_config,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

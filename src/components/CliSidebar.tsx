@@ -19,6 +19,9 @@ import {
   startSshServer,
   stopSshServer,
   getSshServerStatus,
+  getSshServerConfig,
+  saveSshServerConfig,
+  type SshServerConfig,
 } from '../lib/tauri';
 
 // --- SVG Icons ---
@@ -291,6 +294,12 @@ export function CliSidebar({
   const [sshServerLoading, setSshServerLoading] = useState(false);
   const [sshServerErr, setSshServerErr] = useState<string | null>(null);
   const [sshServerLogs, setSshServerLogs] = useState<string[]>([]);
+  const [sshServerConfig, setSshServerConfig] = useState<SshServerConfig>({
+    username: 'admin',
+    password: 'admin',
+    publicKeys: [],
+  });
+  const [newPublicKey, setNewPublicKey] = useState('');
 
   const fetchSshServerStatus = useCallback(async () => {
     try {
@@ -304,8 +313,20 @@ export function CliSidebar({
     }
   }, []);
 
+  const fetchSshServerConfig = useCallback(async () => {
+    try {
+      const config = await getSshServerConfig();
+      setSshServerConfig(config);
+    } catch (err) {
+      console.error('Failed to get SSH server config:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSshServerStatus();
+    if (activeTab === 'remote') {
+      fetchSshServerConfig();
+    }
     let interval: any = null;
     if (activeTab === 'remote') {
       interval = setInterval(fetchSshServerStatus, 5000);
@@ -313,7 +334,17 @@ export function CliSidebar({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [activeTab, fetchSshServerStatus]);
+  }, [activeTab, fetchSshServerStatus, fetchSshServerConfig]);
+
+  const handleUpdateSshConfig = async (updated: SshServerConfig) => {
+    try {
+      await saveSshServerConfig(updated);
+      setSshServerConfig(updated);
+    } catch (err: any) {
+      console.error('Failed to save SSH server config:', err);
+      setSshServerErr(err?.message || String(err));
+    }
+  };
 
   const handleToggleSshServer = async () => {
     setSshServerLoading(true);
@@ -1658,6 +1689,101 @@ export function CliSidebar({
                 </div>
               </div>
 
+              {/* Server Configuration Card */}
+              <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4 space-y-4">
+                <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Server Authentication</h3>
+                
+                <div className="space-y-3">
+                  <label className="block space-y-1">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Username</span>
+                    <input
+                      type="text"
+                      value={sshServerConfig.username}
+                      onChange={(e) => handleUpdateSshConfig({ ...sshServerConfig, username: e.target.value })}
+                      placeholder="e.g. admin"
+                      className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Password Auth</span>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={sshServerConfig.password || ''}
+                        onChange={(e) => handleUpdateSshConfig({ ...sshServerConfig, password: e.target.value || undefined })}
+                        placeholder="Leave empty to disable password login"
+                        className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-2 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition"
+                      />
+                      {sshServerConfig.password && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateSshConfig({ ...sshServerConfig, password: undefined })}
+                          className="px-2.5 py-2 text-xs border border-red-500/30 bg-red-500/10 text-red-400 rounded hover:bg-red-500/20 font-bold"
+                          title="Disable Password Auth"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </label>
+
+                  {/* Public Keys Section */}
+                  <div className="space-y-2 pt-2 border-t border-cyber-line/30">
+                    <span className="block text-[10px] uppercase font-bold tracking-wider text-slate-400">Authorized Public Keys ({sshServerConfig.publicKeys.length})</span>
+                    
+                    {sshServerConfig.publicKeys.length > 0 && (
+                      <div className="max-h-24 overflow-y-auto space-y-1.5 scrollbar-thin border border-cyber-line bg-cyber-base/40 p-2 rounded">
+                        {sshServerConfig.publicKeys.map((key, index) => (
+                          <div key={index} className="flex items-center justify-between text-[9px] font-mono bg-cyber-panel/50 p-1.5 rounded border border-cyber-line/20 text-slate-300">
+                            <span className="truncate flex-1 pr-2" title={key}>
+                              {key.substring(0, 20)}...{key.substring(key.length - 15)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedKeys = [...sshServerConfig.publicKeys];
+                                updatedKeys.splice(index, 1);
+                                handleUpdateSshConfig({ ...sshServerConfig, publicKeys: updatedKeys });
+                              }}
+                              className="text-red-400 hover:text-red-300 px-1 font-bold text-[10px]"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-1">
+                      <input
+                        type="text"
+                        value={newPublicKey}
+                        onChange={(e) => setNewPublicKey(e.target.value)}
+                        placeholder="Paste ssh-rsa/ssh-ed25519 public key"
+                        className="flex-1 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-[10px] font-mono text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newPublicKey.trim()) return;
+                          const updatedKeys = [...sshServerConfig.publicKeys, newPublicKey.trim()];
+                          handleUpdateSshConfig({ ...sshServerConfig, publicKeys: updatedKeys });
+                          setNewPublicKey('');
+                        }}
+                        className="px-2.5 py-1.5 text-[10px] bg-cyber-neon/20 hover:bg-cyber-neon/35 text-cyber-neon border border-cyber-neon/40 rounded font-bold uppercase tracking-wider"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[9px] text-slate-500 font-medium leading-relaxed italic">
+                  💡 Note: Restart the SSH Server to apply authentication changes.
+                </div>
+              </div>
+
               {/* Instruction Panel */}
               <div className="rounded-xl border border-cyber-electric/40 bg-cyber-electric/5 p-4 space-y-3">
                 <h3 className="text-[10px] uppercase font-bold tracking-wider text-cyber-electric">Connection Instruction</h3>
@@ -1668,10 +1794,10 @@ export function CliSidebar({
                 <div className="space-y-1.5 font-mono text-[10px]">
                   <div className="text-slate-400 font-semibold">Command:</div>
                   <div className="relative flex items-center justify-between rounded border border-cyber-line/65 bg-[#0d162a] p-2 pr-10 text-cyber-electric select-all">
-                    <span>ssh admin@{sshServerIp} -p {sshServerPort}</span>
+                    <span>ssh {sshServerConfig.username}@{sshServerIp} -p {sshServerPort}</span>
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(`ssh admin@${sshServerIp} -p ${sshServerPort}`);
+                        navigator.clipboard.writeText(`ssh ${sshServerConfig.username}@${sshServerIp} -p ${sshServerPort}`);
                         alert('Copied connection command to clipboard!');
                       }}
                       className="absolute right-2 text-slate-500 hover:text-cyber-electric transition"
@@ -1685,9 +1811,16 @@ export function CliSidebar({
                 </div>
 
                 <div className="text-[9px] font-mono leading-relaxed space-y-1 text-slate-500">
-                  <div>🔐 Default Credentials:</div>
-                  <div>• Username: <span className="text-slate-300 font-bold">admin</span></div>
-                  <div>• Password: <span className="text-slate-300 font-bold">admin</span></div>
+                  <div>🔐 Active Credentials:</div>
+                  <div>• Username: <span className="text-slate-300 font-bold">{sshServerConfig.username}</span></div>
+                  {sshServerConfig.password ? (
+                    <div>• Password: <span className="text-slate-300 font-bold">{sshServerConfig.password}</span></div>
+                  ) : (
+                    <div className="text-red-400">• Password authentication is disabled</div>
+                  )}
+                  {sshServerConfig.publicKeys.length > 0 && (
+                    <div className="text-cyber-neon/80">• Public Key Authentication is active ({sshServerConfig.publicKeys.length} key(s))</div>
+                  )}
                 </div>
               </div>
 
@@ -1697,7 +1830,7 @@ export function CliSidebar({
                   <span>💡</span> Collaborative REPL Shell
                 </div>
                 <p>
-                  Connected users enter a custom shell displaying all active sessions. Pressing <span className="text-cyber-neon font-mono font-bold">Ctrl+X</span> detaches from a session.
+                  Connected users enter a custom shell displaying all active sessions. Pressing <span className="text-cyber-neon font-mono font-bold">Ctrl+X</span> or <span className="text-cyber-neon font-mono font-bold">Ctrl+Q</span> detaches from a session.
                 </p>
               </div>
 

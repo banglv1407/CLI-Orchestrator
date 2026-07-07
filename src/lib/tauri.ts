@@ -231,3 +231,17 @@ export function getSshServerStatus(): Promise<SshServerStatus> {
   return invoke('get_ssh_server_status');
 }
 
+export interface SshServerConfig {
+  username: string;
+  password?: string;
+  publicKeys: string[];
+}
+
+export function getSshServerConfig(): Promise<SshServerConfig> {
+  return invoke('get_ssh_server_config');
+}
+
+export function saveSshServerConfig(config: SshServerConfig): Promise<void> {
+  return invoke('save_ssh_server_config', { config });
+}
+

@@ -245,3 +245,42 @@ export function saveSshServerConfig(config: SshServerConfig): Promise<void> {
   return invoke('save_ssh_server_config', { config });
 }
 
+
+export interface ApiProxyRequest {
+  method: string;
+  url: string;
+  headers: [string, string][];
+  body?: string | null;
+  requestId?: string | null;
+}
+
+export interface ApiProxyResponse {
+  status: number;
+  statusText: string;
+  headers: [string, string][];
+  body: string;
+  duration: number;
+  requestId?: string | null;
+}
+
+export interface ApiProxyStreamChunk {
+  requestId: string;
+  chunk: string;
+  eventType: 'start' | 'data' | 'done' | 'error';
+  status?: number | null;
+  statusText?: string | null;
+  headers?: [string, string][] | null;
+  error?: string | null;
+}
+
+export function apiProxyRequest(request: ApiProxyRequest): Promise<ApiProxyResponse> {
+  return invoke('api_proxy_request', { request });
+}
+
+export function apiProxyStream(request: ApiProxyRequest): Promise<string> {
+  return invoke('api_proxy_stream', { request });
+}
+
+export function apiProxyAbort(requestId: string): Promise<void> {
+  return invoke('api_proxy_abort', { requestId });
+}

@@ -504,11 +504,6 @@ pub async fn list_directory_files(path: String) -> Result<Vec<FileEntry>, String
                 .to_string_lossy()
                 .to_string();
 
-            // Filter out hidden files / folders to keep explorer UI clean
-            if name.starts_with('.') {
-                continue;
-            }
-
             let is_dir = path_buf.is_dir();
             entries.push(FileEntry {
                 name,
@@ -1057,7 +1052,7 @@ pub async fn list_ssh_directory_files(
         path.clone()
     };
 
-    let cmd_str = format!("ls -p -1 \"{}\"", target_path.replace('"', "\\\""));
+    let cmd_str = format!("ls -p -1 -A \"{}\"", target_path.replace('"', "\\\""));
 
     let output = run_ssh_command(&connection, &cmd_str, None)?;
     let mut entries = Vec::new();
@@ -1074,11 +1069,6 @@ pub async fn list_ssh_directory_files(
         } else {
             trimmed.to_string()
         };
-
-        // Filter out hidden files
-        if name.starts_with('.') {
-            continue;
-        }
 
         let file_path = if target_path.ends_with('/') {
             format!("{}{}", target_path, name)
@@ -1139,9 +1129,6 @@ fn walk_dir_recursive(dir: &std::path::Path, entries: &mut Vec<FileEntry>) {
                     .unwrap_or_default()
                     .to_string_lossy()
                     .to_string();
-                if name.starts_with('.') {
-                    continue;
-                }
                 if name == "node_modules" || name == "target" || name == "dist" || name == ".git" {
                     continue;
                 }
@@ -1187,7 +1174,7 @@ pub async fn list_ssh_files_recursive(
     };
 
     let cmd_str = format!(
-        "find \"{}\" -maxdepth 4 -type f -not -path '*/.*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*'",
+        "find \"{}\" -maxdepth 4 -type f -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*'",
         target_path.replace('"', "\\\"")
     );
 

@@ -7,6 +7,7 @@ import { CliSidebar } from '../components/CliSidebar';
 import { TerminalPanel } from '../components/TerminalPanel';
 import { SshConnectionModal } from '../components/SshConnectionModal';
 import { QuickAppsPanel } from '../components/QuickAppsPanel';
+import { ApiClientPanel } from '../components/ApiClientPanel';
 import {
   createTerminalSession,
   deleteCli,
@@ -69,8 +70,17 @@ export function Dashboard() {
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
-  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps'>('terminal');
+  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'apiclient'>('terminal');
 
+
+  // Listen for API client history selection from sidebar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setActiveMainView('apiclient');
+    };
+    window.addEventListener('apiclient-history-select', handler);
+    return () => window.removeEventListener('apiclient-history-select', handler);
+  }, []);
 
   const [recentFolders, setRecentFolders] = useState<string[]>(() => {
     try {
@@ -806,12 +816,15 @@ export function Dashboard() {
         onCloseFile={handleCloseFile}
 
         onQuickAppsTabChange={(isActive) => setActiveMainView(isActive ? 'quickapps' : 'terminal')}
+        onApiClientTabChange={(isActive) => setActiveMainView(isActive ? 'apiclient' : 'terminal')}
       />
 
       <section className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
         <div className="flex-1 h-full w-full">
           {activeMainView === 'quickapps' ? (
             <QuickAppsPanel />
+          ) : activeMainView === 'apiclient' ? (
+            <ApiClientPanel />
           ) : (
             <TerminalPanel
               sessions={sessions}

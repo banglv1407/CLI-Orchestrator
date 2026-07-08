@@ -23,6 +23,7 @@ use commands::{
         start_ssh_server, stop_ssh_server, get_ssh_server_status,
         get_ssh_server_config, save_ssh_server_config,
     },
+    api_proxy::{api_proxy_request, api_proxy_stream, api_proxy_abort},
     quickapps_commands::{
         delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
     },
@@ -40,6 +41,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(state.api_proxy.clone())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             list_clis,
@@ -98,6 +100,9 @@ fn main() {
             get_ssh_server_status,
             get_ssh_server_config,
             save_ssh_server_config,
+            api_proxy_request,
+            api_proxy_stream,
+            api_proxy_abort,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

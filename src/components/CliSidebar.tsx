@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry } from '../types';
 import { AnimeAssistant } from './AnimeAssistant';
+import { loadApiHistory, clearApiHistory, type ApiHistoryEntry, METHOD_COLORS } from '../lib/api-history';
 import { LlmConfigModal } from './LlmConfigModal';
 
 import { 
@@ -46,6 +47,14 @@ function CloudIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" />
+    </svg>
+  );
+}
+
+function ApiIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
     </svg>
   );
 }
@@ -179,9 +188,97 @@ interface CliSidebarProps {
   onFileClick: (entry: FileEntry, rootPath: string | null) => Promise<void>;
   onCloseFile: () => void;
   onQuickAppsTabChange?: (isActive: boolean) => void;
+  onApiClientTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'readme';
+type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'readme' | 'apiclient';
+
+
+function ApiHistoryList() {
+  const [history, setHistory] = useState<ApiHistoryEntry[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => { setHistory(loadApiHistory()); }, []);
+
+  const handlerRef = useRef<EventListener>(null!);
+  if (!handlerRef.current) {
+    handlerRef.current = (e: Event) => {
+      setHistory((e as CustomEvent<ApiHistoryEntry[]>).detail);
+    };
+  }
+  useEffect(() => {
+    window.addEventListener('apiclient-history-changed', handlerRef.current);
+    return () => window.removeEventListener('apiclient-history-changed', handlerRef.current);
+  }, []);
+
+  const handleClear = () => { clearApiHistory(); setHistory([]); };
+  const handleSelect = (entry: ApiHistoryEntry) => {
+    window.dispatchEvent(new CustomEvent('apiclient-history-select', { detail: entry }));
+  };
+
+  const filteredHistory = useMemo(() => {
+    if (!searchQuery.trim()) return history;
+    const q = searchQuery.toLowerCase();
+    return history.filter((entry) =>
+      entry.url.toLowerCase().includes(q) ||
+      entry.method.toLowerCase().includes(q)
+    );
+  }, [history, searchQuery]);
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
+        <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">API History</h2>
+        <button type="button" onClick={handleClear} className="rounded border border-cyber-line/40 px-2 py-0.5 text-[9px] font-semibold text-slate-400 hover:text-red-400 hover:border-red-400/40 transition uppercase">Clear</button>
+      </div>
+      {/* Search Box */}
+      <div className="shrink-0 p-2 border-b border-cyber-line/50">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search URL or method..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white text-xs"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {history.length === 0 ? (
+          <div className="p-6 text-center text-[11px] text-slate-600">No requests yet.<br/><span className="text-[10px]">Send a request from the API Client to see it here.</span></div>
+        ) : filteredHistory.length === 0 ? (
+          <div className="p-6 text-center text-[11px] text-slate-600">No results for "{searchQuery}".</div>
+        ) : (
+          filteredHistory.map((entry, idx) => (
+            <button key={entry.url + entry.method + idx} type="button" onClick={() => handleSelect(entry)} className="w-full text-left px-4 py-2.5 border-b border-cyber-line/20 hover:bg-cyber-neon/5 transition flex items-start gap-2 group">
+              <span className="text-[10px] font-bold font-mono mt-px shrink-0 min-w-[44px]" style={{ color: METHOD_COLORS[entry.method] }}>{entry.method}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] text-slate-300 truncate font-mono leading-tight">{entry.url}</div>
+                <div className="text-[9px] text-slate-600 mt-0.5 flex items-center gap-2">
+                  <span>{new Date(entry.timestamp).toLocaleString()}</span>
+                  {entry.headers?.length > 0 && <span className="text-cyber-electric/60">{entry.headers.length}h</span>}
+                  {entry.params?.length > 0 && <span className="text-cyber-neon/60">{entry.params.length}p</span>}
+                  {entry.body && <span className="text-slate-500">{'·'} body</span>}
+                </div>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 
 export function CliSidebar({
   clis,
@@ -214,6 +311,7 @@ export function CliSidebar({
   onFileClick,
   onCloseFile,
   onQuickAppsTabChange,
+  onApiClientTabChange,
 }: CliSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -229,13 +327,17 @@ export function CliSidebar({
       localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
       const wasQuickApps = activeTab === 'quickapps';
       const isQuickApps = tab === 'quickapps';
+      const wasApiClient = activeTab === 'apiclient';
+      const isApiClient = tab === 'apiclient';
       setActiveTab(tab);
-      // Only notify parent when quickapps state actually changes
       if (onQuickAppsTabChange && wasQuickApps !== isQuickApps) {
         onQuickAppsTabChange(isQuickApps);
       }
+      if (onApiClientTabChange && wasApiClient !== isApiClient) {
+        onApiClientTabChange(isApiClient);
+      }
     }
-  }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange]);
+  }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange, onApiClientTabChange]);
 
   // --- Sidebar Resizer Code ---
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -1049,6 +1151,22 @@ export function CliSidebar({
             )}
             <RemoteIcon />
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleSetActiveTab('apiclient')}
+            title="API Client (Postman-like)"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'apiclient' && !isSidebarCollapsed
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
+            }`}
+          >
+            {activeTab === 'apiclient' && !isSidebarCollapsed && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+            )}
+            <ApiIcon />
+          </button>
         </div>
  
         <div className="flex flex-col gap-4 items-center">
@@ -1113,44 +1231,9 @@ export function CliSidebar({
         {/* Active Tab: Explorer */}
         {activeTab === 'explorer' && (
           <div className="flex h-full flex-col overflow-hidden">
-            {/* Explorer header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
-              <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">Explorer</h2>
-              <div className="flex gap-1.5">
-                {rootPath && (
-                  <button
-                    type="button"
-                    onClick={() => void openWorkspaceFolder(rootPath)}
-                    title="Open directory in Windows Explorer"
-                    className="rounded border border-cyber-electric/40 px-2 py-0.5 text-[10px] uppercase font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10"
-                  >
-                    Reveal
-                  </button>
-                )}
-                {rootPath && (
-                  <button
-                    type="button"
-                    onClick={() => setIsSearchModalOpen(true)}
-                    title="Search files (Ctrl+P)"
-                    className="rounded border border-cyber-neon/60 bg-cyber-neon/10 px-2 py-0.5 text-[10px] uppercase font-semibold text-cyber-neon transition hover:border-cyber-neon hover:bg-cyber-neon/20 shadow-neon-sm"
-                  >
-                    🔍 Find File (Ctrl+P)
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleSelectFolder}
-                  title="Open Local Folder"
-                  className="rounded border border-cyber-neon/40 px-2 py-0.5 text-[10px] uppercase font-semibold text-cyber-neon transition hover:border-cyber-neon hover:bg-cyber-neon/10"
-                >
-                  Open Folder
-                </button>
-              </div>
-            </div>
-
             {/* Accordion Panels Container */}
             <div
-              className="flex flex-col overflow-hidden shrink-0 border-b border-cyber-line/20 flex-1"
+              className="flex flex-col overflow-hidden shrink-0 flex-1 pr-1.5"
             >
               {rootPath ? (
                 <div className="flex flex-col h-full overflow-hidden">
@@ -1506,6 +1589,12 @@ export function CliSidebar({
           </div>
         )}
 
+
+        {/* Active Tab: API Client History */}
+        {activeTab === 'apiclient' && (
+          <ApiHistoryList />
+        )}
+
         {/* Active Tab: Operator (SSH VM Manager) */}
         {activeTab === 'operator' && (
           <div className="flex h-full flex-col overflow-hidden">
@@ -1580,48 +1669,46 @@ export function CliSidebar({
                           {conns.map((conn) => (
                             <div
                               key={conn.id}
-                              className="rounded border border-cyber-line bg-cyber-base/40 p-2.5 transition hover:border-cyber-electric/60 hover:bg-cyber-electric/5"
+                              onDoubleClick={() => conn.protocol === 'rdp' ? onConnectRdp(conn) : onConnectSsh(conn)}
+                              className="rounded border border-cyber-line bg-cyber-base/40 px-1.5 py-1.5 transition hover:border-cyber-electric/60 hover:bg-cyber-electric/5 cursor-pointer"
                             >
                               <div className="flex items-start gap-1.5">
-                                <div className="min-w-0 flex-1">
-                                  <span className="block truncate text-[12.5px] font-bold text-slate-100">{conn.name}</span>
-                                  <span className="block truncate text-[9.5px] text-slate-400 font-mono mt-0.5">
-                                    {conn.user}@{conn.host}:{conn.port}
-                                  </span>
-                                  <span className={`inline-block rounded border px-1 py-0.5 text-[8.5px] font-semibold mt-1.5 uppercase tracking-wider ${
+                                <div className="min-w-0 flex-1 text-left">
+                                  <span className="block truncate text-[11px] font-semibold text-slate-200 leading-tight">{conn.name}</span>
+                                  <span className="block truncate text-[9px] text-slate-500 font-mono leading-tight">{conn.user}@{conn.host}:{conn.port}</span>
+                                </div>
+                                <div className="flex shrink-0 items-center gap-1">
+                                  <span className={`rounded border px-1 py-px text-[7px] font-semibold uppercase tracking-wider ${
                                     conn.protocol === 'rdp'
                                       ? 'bg-cyber-electric/10 border-cyber-electric/40 text-cyber-electric'
                                       : 'bg-cyber-neon/10 border-cyber-neon/40 text-cyber-neon'
                                   }`}>
-                                    {conn.protocol === 'rdp' ? '💻 RDP' : conn.authMode === 'key' ? '🔑 SSH Key' : '⌨ SSH Pass'}
+                                    {conn.protocol === 'rdp' ? 'RDP' : conn.authMode === 'key' ? 'KEY' : 'SSH'}
                                   </span>
-                                </div>
-
-                                <div className="mt-0.5 flex shrink-0 items-center gap-1">
                                   <button
                                     type="button"
-                                    onClick={() => conn.protocol === 'rdp' ? onConnectRdp(conn) : onConnectSsh(conn)}
+                                    onClick={(e) => { e.stopPropagation(); conn.protocol === 'rdp' ? onConnectRdp(conn) : onConnectSsh(conn); }}
                                     aria-label={conn.protocol === 'rdp' ? `Remote Desktop to ${conn.name}` : `Connect SSH to ${conn.name}`}
-                                    title={conn.protocol === 'rdp' ? "Launch RDP Session" : "Connect SSH Session"}
-                                    className="flex h-5.5 w-5.5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
+                                    title={conn.protocol === 'rdp' ? "Launch RDP" : "Connect SSH"}
+                                    className="flex h-5 w-5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
                                   >
                                     <PlayIcon />
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => onEditSsh(conn)}
+                                    onClick={(e) => { e.stopPropagation(); onEditSsh(conn); }}
                                     aria-label={`Edit ${conn.name}`}
-                                    title="Edit Profile"
-                                    className="flex h-5.5 w-5.5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
+                                    title="Edit"
+                                    className="flex h-5 w-5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
                                   >
                                     <EditIcon />
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => onDeleteSsh(conn)}
+                                    onClick={(e) => { e.stopPropagation(); onDeleteSsh(conn); }}
                                     aria-label={`Delete ${conn.name}`}
-                                    title="Delete Profile"
-                                    className="flex h-5.5 w-5.5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
+                                    title="Delete"
+                                    className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
                                   >
                                     <TrashIcon />
                                   </button>

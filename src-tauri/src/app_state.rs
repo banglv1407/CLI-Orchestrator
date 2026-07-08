@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    commands::api_proxy::{ApiProxyState, SharedApiProxyState},
     core::{
         account_manager::AccountManager, cass_index::CassIndex, cli_registry::CliRegistry,
         project_store::ProjectStore, quickapp_registry::QuickAppRegistry,
@@ -9,6 +10,7 @@ use crate::{
 };
 
 pub struct AppState {
+    pub api_proxy: SharedApiProxyState,
     pub registry: Arc<CliRegistry>,
     pub project_store: Arc<ProjectStore>,
     pub session_manager: Arc<SessionManager>,
@@ -34,6 +36,7 @@ impl AppState {
             account_manager,
             cass_index,
             quickapps,
+            api_proxy: Arc::new(ApiProxyState::new()),
             ssh_server_manager: Arc::new(std::sync::Mutex::new(crate::core::ssh_server::SshServerManager::new())),
         })
     }

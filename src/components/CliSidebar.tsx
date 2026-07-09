@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry } from '../types';
-import { AnimeAssistant } from './AnimeAssistant';
 import { loadApiHistory, clearApiHistory, type ApiHistoryEntry, METHOD_COLORS } from '../lib/api-history';
+import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled } from '../lib/mythical-pets';
 import { LlmConfigModal } from './LlmConfigModal';
 
 import { 
@@ -318,6 +318,10 @@ export function CliSidebar({
     return localStorage.getItem('ai-cli-sidebar-collapsed') === 'true';
   });
 
+  // Pet state (for Settings picker)
+  const [petId, setPetIdLocal] = useState(getActivePetId);
+  const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
+
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
     if (activeTab === tab && !isSidebarCollapsed) {
       setIsSidebarCollapsed(true);
@@ -338,6 +342,13 @@ export function CliSidebar({
       }
     }
   }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange, onApiClientTabChange]);
+
+  // Listen for pet click → open AI chat
+  useEffect(() => {
+    const handler = () => handleSetActiveTab('ai-chat');
+    window.addEventListener('mythical-pet-click', handler);
+    return () => window.removeEventListener('mythical-pet-click', handler);
+  }, [handleSetActiveTab]);
 
   // --- Sidebar Resizer Code ---
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -1207,26 +1218,6 @@ export function CliSidebar({
       {/* 2. Primary Sidebar Panel Content */}
       {!isSidebarCollapsed && (
         <aside className="flex flex-1 flex-col overflow-hidden">
-          {/* Anime Assistant — click to toggle AI Chat panel */}
-          <div
-            className="p-3 border-b border-cyber-line bg-cyber-base/30 shrink-0 cursor-pointer transition-colors hover:bg-cyber-neon/5 select-none"
-            onClick={() => handleSetActiveTab(activeTab === 'ai-chat' ? 'explorer' : 'ai-chat')}
-            role="button"
-            title={activeTab === 'ai-chat' ? 'Close AI Companion Chat' : 'Open AI Companion Chat'}
-            aria-label="Toggle AI Companion Chat"
-          >
-          <div className={`relative transition-all ${activeTab === 'ai-chat' ? 'ring-1 ring-cyber-neon/60 rounded-xl' : ''}`}>
-            <AnimeAssistant state={assistantState} text={assistantText} />
-            {activeTab !== 'ai-chat' && chatHistory.length > 0 && (
-              <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-cyber-neon animate-pulse shadow-neon-sm" title="New messages" />
-            )}
-            <div className={`absolute bottom-1.5 right-2 text-[8px] font-bold uppercase tracking-widest transition ${
-              activeTab === 'ai-chat' ? 'text-cyber-neon' : 'text-slate-500'
-            }`}>
-              {activeTab === 'ai-chat' ? '▲ close chat' : '▼ open chat'}
-            </div>
-          </div>
-        </div>
 
         {/* Active Tab: Explorer */}
         {activeTab === 'explorer' && (
@@ -2063,6 +2054,62 @@ export function CliSidebar({
                     <option value="light">Light</option>
                   </select>
                 </label>
+              </div>
+
+              {/* Mythical Pet Settings */}
+              <div>
+                <h3 className="font-display text-xs uppercase tracking-wider text-slate-400 mb-2 font-bold">Mythical Pet</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-3 text-xs text-slate-200 transition hover:border-cyber-neon/80 cursor-pointer">
+                    <div>
+                      <span className="font-semibold">Enable Pet</span>
+                      <p className="text-[9px] text-slate-500 mt-0.5">Show pet overlay on screen</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !petEnabled;
+                        setPetEnabledLocal(next);
+                        setPetEnabled(next);
+                        window.dispatchEvent(new CustomEvent('mythical-pet-change', { detail: { enabled: next } }));
+                      }}
+                      className={`w-10 h-5 rounded-full transition relative ${petEnabled ? 'bg-cyber-neon' : 'bg-slate-600'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition ${petEnabled ? 'left-5' : 'left-0.5'}`} />
+                    </button>
+                  </label>
+                  {petEnabled && (
+                    <div className="rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-3">
+                      <p className="text-[10px] text-slate-400 mb-2 font-semibold uppercase tracking-wider">Select Pet</p>
+                      <div className="space-y-1.5">
+                        {ALL_PETS.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setPetIdLocal(p.id);
+                              setActivePetId(p.id);
+                              window.dispatchEvent(new CustomEvent('mythical-pet-change', { detail: { id: p.id } }));
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-lg border transition text-xs ${
+                              p.id === petId
+                                ? 'border-cyber-neon bg-cyber-neon/10 text-cyber-neon'
+                                : 'border-cyber-line/40 bg-cyber-base/30 text-slate-300 hover:border-cyber-electric/60 hover:bg-cyber-electric/5'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{p.id === 'dragon' ? '🐉' : p.id === 'phoenix' ? '🔥' : p.id === 'qilin' ? '🦄' : '🪽'}</span>
+                              <div>
+                                <div className="font-semibold">{p.name}</div>
+                                <div className="text-[9px] text-slate-500">{p.nameVn}</div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

@@ -8,6 +8,7 @@ import { TerminalPanel } from '../components/TerminalPanel';
 import { SshConnectionModal } from '../components/SshConnectionModal';
 import { QuickAppsPanel } from '../components/QuickAppsPanel';
 import { ApiClientPanel } from '../components/ApiClientPanel';
+import { MythicalPet } from '../components/MythicalPet';
 import {
   createTerminalSession,
   deleteCli,
@@ -888,6 +889,10 @@ export function Dashboard() {
         onClose={() => setSshModalOpen(false)}
         onSave={handleSaveSshConnection}
       />
+      {/* Mythical Pet — flies across the entire app window */}
+      <MythicalPet onOpenChat={() => {
+        window.dispatchEvent(new CustomEvent('mythical-pet-click'));
+      }} />
     </main>
   );
 }

@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { CliDefinition } from '../types';
 
 interface CliStartModalProps {
     isOpen: boolean;
     cli: CliDefinition | null;
-    accountProfiles: string[];
-    activeProfile?: string | null;
-    isLoadingAccounts: boolean;
     recentFolders: string[];
     onClose: () => void;
     onConfirm: (cliName: string, directory: string, tag: string, profileName: string | null) => void;

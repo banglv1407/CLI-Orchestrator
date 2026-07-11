@@ -8,17 +8,16 @@ mod terminal;
 
 use app_state::AppState;
 use commands::{
-    cass_commands::{cass_index_logs, cass_search, cass_stats},
     cli_commands::{
-        activate_account, backend_logs_path, clear_account_cooldown, create_rdp_session,
-        create_ssh_session, create_terminal_session, delete_account, delete_cli,
-        detect_installed_clis, get_account_status, get_all_account_statuses, get_git_diff,
-        get_git_status, list_account_cooldowns, list_accounts, list_all_files_recursive, list_clis,
+        backend_logs_path, create_rdp_session,
+        create_ssh_session, create_terminal_session, delete_cli,
+        detect_installed_clis, get_git_diff,
+        get_git_status, list_all_files_recursive, list_clis,
         list_directory_files, list_project_tags, list_sessions, list_ssh_directory_files,
         list_ssh_files_recursive, load_ssh_connections, open_backend_logs_folder,
         open_workspace_folder, pick_file, pick_folder, read_file_content, read_ssh_file_content,
-        resize_cli, save_account, save_cli_tag, save_project_tag, save_ssh_connections,
-        send_cli_input, send_llm_chat, set_account_cooldown, stop_cli, switch_to_next_account,
+        resize_cli, save_cli_tag, save_project_tag, save_ssh_connections,
+        send_cli_input, send_llm_chat, stop_cli,
         upsert_cli, write_file_content, write_ssh_file_content, ripgrep_search,
         start_ssh_server, stop_ssh_server, get_ssh_server_status,
         get_ssh_server_config, save_ssh_server_config,
@@ -59,25 +58,12 @@ fn main() {
             backend_logs_path,
             open_backend_logs_folder,
             pick_folder,
-            list_accounts,
-            save_account,
-            activate_account,
-            delete_account,
-            get_account_status,
-            switch_to_next_account,
-            set_account_cooldown,
-            clear_account_cooldown,
-            list_account_cooldowns,
-            get_all_account_statuses,
             list_directory_files,
             read_file_content,
             write_file_content,
             get_git_status,
             get_git_diff,
             send_llm_chat,
-            cass_index_logs,
-            cass_stats,
-            cass_search,
             pick_file,
             load_ssh_connections,
             save_ssh_connections,
@@ -184,7 +170,8 @@ fn main() {
                 use tauri_plugin_dialog::DialogExt;
                 let w = window.clone();
                 window.dialog()
-                    .message("Bạn có muốn ẩn ứng dụng xuống khay hệ thống (minitray) không?\nChọn 'Yes' để ẩn xuống khay, 'No' để thoát hoàn toàn ứng dụng.")
+                    .message("Bạn có muốn ẩn ứng dụng xuống khay hệ thống (minitray) không?
+Chọn 'Yes' để ẩn xuống khay, 'No' để thoát hoàn toàn ứng dụng.")
                     .title("Thoát ứng dụng")
                     .kind(tauri_plugin_dialog::MessageDialogKind::Info)
                     .buttons(tauri_plugin_dialog::MessageDialogButtons::YesNo)

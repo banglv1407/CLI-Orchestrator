@@ -9,10 +9,10 @@ import { SshConnectionModal } from '../components/SshConnectionModal';
 import { QuickAppsPanel } from '../components/QuickAppsPanel';
 import { ApiClientPanel } from '../components/ApiClientPanel';
 import { MythicalPet } from '../components/MythicalPet';
+import { CommandPalette } from '../components/CommandPalette';
 import {
   createTerminalSession,
   deleteCli,
-  getAccountStatus,
   listClis,
   listProjectTags,
   listSessions,
@@ -20,7 +20,6 @@ import {
   sendCliInput,
   stopCli,
   upsertCli,
-  activateAccount,
   loadSshConnections,
   saveSshConnections,
   createSshSession,
@@ -59,9 +58,6 @@ export function Dashboard() {
   const [editingCli, setEditingCli] = useState<CliDefinition | null>(null);
   const [cliStartModalOpen, setCliStartModalOpen] = useState(false);
   const [cliToStart, setCliToStart] = useState<CliDefinition | null>(null);
-  const [startAccountProfiles, setStartAccountProfiles] = useState<string[]>([]);
-  const [startAccountActive, setStartAccountActive] = useState<string | null>(null);
-  const [startAccountsLoading, setStartAccountsLoading] = useState(false);
   const [theme, setTheme] = useState<AppTheme>(() => {
     const stored = localStorage.getItem('ai-cli-theme');
     return (stored === 'kawaii' || stored === 'light') ? stored : 'cyberpunk';
@@ -72,6 +68,7 @@ export function Dashboard() {
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
   const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'apiclient'>('terminal');
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
 
   // Listen for API client history selection from sidebar
@@ -81,6 +78,18 @@ export function Dashboard() {
     };
     window.addEventListener('apiclient-history-select', handler);
     return () => window.removeEventListener('apiclient-history-select', handler);
+  }, []);
+
+  // Command Palette keyboard shortcut (Ctrl+Shift+P)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   const [recentFolders, setRecentFolders] = useState<string[]>(() => {
@@ -490,20 +499,8 @@ export function Dashboard() {
     async (cliName: string, directory: string, tag: string, profileName: string | null) => {
       setCliStartModalOpen(false);
       setCliToStart(null);
-      setStartAccountProfiles([]);
-      setStartAccountActive(null);
-
       if (profileName) {
-        try {
-          await activateAccount(cliName, profileName);
-          setAssistantState('Done');
-          setAssistantText(`Activated ${profileName} for ${cliName}.`);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          setAssistantState('Error');
-          setAssistantText(`Account activation failed: ${message}`);
-          return;
-        }
+        return;
       }
       await createSessionForCli(cliName, {
         projectTag: tag,
@@ -758,7 +755,6 @@ export function Dashboard() {
 
   const handleOpenCliInteraction = useCallback(
     async (cli: CliDefinition) => {
-      // If the CLI already has a path set, skip the modal and start directly
       const savedDirs = cli.savedDirectories ?? [];
       const pathToUse = savedDirs.length > 0
         ? savedDirs[0].path
@@ -771,7 +767,6 @@ export function Dashboard() {
           workingDir: pathToUse,
         });
       } else {
-        // No path set → show the picker modal
         setCliToStart(cli);
         setCliStartModalOpen(true);
       }
@@ -874,9 +869,6 @@ export function Dashboard() {
       <CliStartModal
         isOpen={cliStartModalOpen}
         cli={cliToStart}
-        accountProfiles={startAccountProfiles}
-        activeProfile={startAccountActive}
-        isLoadingAccounts={startAccountsLoading}
         recentFolders={recentFolders}
         onClose={() => setCliStartModalOpen(false)}
         onConfirm={handleConfirmStart}
@@ -893,6 +885,29 @@ export function Dashboard() {
       <MythicalPet onOpenChat={() => {
         window.dispatchEvent(new CustomEvent('mythical-pet-click'));
       }} />
+
+      <CommandPalette
+        isOpen={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        sessions={displaySessions}
+        clis={clis}
+        sshConnections={sshConnections}
+        theme={theme}
+        onSelectSession={(sessId) => {
+          setActiveSessionId(sessId);
+          handleCloseFile();
+          setActiveMainView('terminal');
+        }}
+        onOpenCliInteraction={handleOpenCliInteraction}
+        onConnectSsh={handleConnectSsh}
+        onConnectRdp={handleConnectRdp}
+        onAddCli={handleAddCli}
+        onAddSsh={handleAddSsh}
+        onQuickSession={handleQuickSession}
+        onSwitchView={(view) => setActiveMainView(view)}
+        onSwitchTheme={(t) => setTheme(t)}
+        activeMainView={activeMainView}
+      />
     </main>
   );
 }

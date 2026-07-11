@@ -61,89 +61,6 @@ export interface UpsertCliRequest {
   originalName?: string;
 }
 
-export interface AccountProfile {
-  id: string;
-  cliName: string;
-  profileName: string;
-  createdAt: string;
-  lastUsed?: string;
-}
-
-export interface AccountStatus {
-  cliName: string;
-  activeProfile?: string;
-  availableProfiles: string[];
-}
-
-export interface CooldownEntry {
-  cliName: string;
-  profileName: string;
-  until: string;
-}
-
-export interface SaveAccountRequest {
-  cliName: string;
-  profileName: string;
-}
-
-export interface ActivateAccountRequest {
-  cliName: string;
-  profileName: string;
-}
-
-export interface DeleteAccountRequest {
-  cliName: string;
-  profileName: string;
-}
-
-export interface SetCooldownRequest {
-  cliName: string;
-  profileName: string;
-  minutes: number;
-}
-
-export interface CassIndexSummary {
-  indexed: number;
-  skipped: number;
-  removed: number;
-  tokens: number;
-  sessionsTotal: number;
-  tokensTotal: number;
-  sources: CassSourceInfo[];
-  lastIndexedAt: string;
-  errors: number;
-}
-
-export interface CassIndexStats {
-  sessionsTotal: number;
-  tokensTotal: number;
-  sources: CassSourceInfo[];
-  lastIndexedAt?: string;
-}
-
-export interface CassSourceInfo {
-  name: string;
-  path: string;
-  exists: boolean;
-  files: number;
-}
-
-export interface CassSearchResult {
-  sessionId: string;
-  cliName: string;
-  path: string;
-  updatedAt: string;
-  score: number;
-  snippet: string;
-  cwd?: string;
-}
-
-export interface CassSearchRequest {
-  query: string;
-  limit?: number;
-  refresh?: boolean;
-}
-
 export type AppTheme = 'cyberpunk' | 'kawaii' | 'light';
 
 export interface QuickApp {
@@ -212,6 +129,4 @@ export interface SshConnection {
   rdpShareDrives?: boolean;
   workingDir?: string;
 }
-
-
 

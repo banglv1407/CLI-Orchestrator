@@ -372,6 +372,23 @@ pub async fn write_file_content(path: String, content: String) -> Result<(), Str
     fs::write(&path, content).map_err(|e| format!("Failed to write file '{}': {}", path, e))
 }
 
+#[tauri::command]
+pub async fn create_directory(path: String) -> Result<(), String> {
+    use std::fs;
+    fs::create_dir_all(&path)
+        .map_err(|e| format!("Failed to create directory '{}': {}", path, e))
+}
+
+#[tauri::command]
+pub async fn create_file_content(path: String, content: String) -> Result<(), String> {
+    use std::fs;
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create parent directory for '{}': {}", path, e))?;
+    }
+    fs::write(&path, content).map_err(|e| format!("Failed to create file '{}': {}", path, e))
+}
+
 fn create_silent_command(program: &str) -> std::process::Command {
     let mut cmd = std::process::Command::new(program);
     #[cfg(target_os = "windows")]

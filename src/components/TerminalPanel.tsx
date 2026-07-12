@@ -72,6 +72,10 @@ interface TerminalPanelProps {
   onReorderSessions: (draggedId: string, targetId: string) => void;
   onMoveSessionToPanel: (sessionId: string, panel: 'bottom' | 'right') => void;
   theme?: AppTheme;
+
+  // Global context menu state lifted to Dashboard
+  contextMenu: { x: number; y: number; sessionId: string | null; workingDir: string | null } | null;
+  setContextMenu: (menu: { x: number; y: number; sessionId: string | null; workingDir: string | null } | null) => void;
 }
 
 interface TerminalHandle {
@@ -119,6 +123,8 @@ export function TerminalPanel({
   onReorderSessions,
   onMoveSessionToPanel,
   theme,
+  contextMenu,
+  setContextMenu,
 }: TerminalPanelProps) {
   // Search state
   const [searchVisible, setSearchVisible] = useState(false);
@@ -231,28 +237,19 @@ export function TerminalPanel({
   // Accumulate ALL raw terminal output so we can replay it into mini terminals after DOM moves
   const mainOutputHistory = useRef<Record<string, string[]>>({});
 
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    sessionId: string;
-  } | null>(null);
-
+  // Context menu is now lifted to Dashboard — reuse its state
+  // But keep local handleContextMenu for TerminalPanel internal wiring (disabled for now)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleContextMenu = (e: React.MouseEvent, sessionId: string) => {
     e.preventDefault();
-    setContextMenu({
+    const activeSess = sessions.find((s) => s.id === sessionId);
+    setContextMenu?.({
       x: e.clientX,
       y: e.clientY,
       sessionId,
+      workingDir: activeSess?.workingDir ?? null,
     });
   };
-
-  useEffect(() => {
-    const handleGlobalClick = () => {
-      setContextMenu(null);
-    };
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
-  }, []);
 
   const processWriteQueue = async (sessionId: string) => {
       const handle = terminalRefs.current[sessionId];
@@ -556,7 +553,7 @@ export function TerminalPanel({
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'n') {
+      if (e.ctrlKey && e.shiftKey && e.key === 'N') {
         e.preventDefault();
         triggerQuickSession();
       }
@@ -2194,14 +2191,16 @@ export function TerminalPanel({
         </div>
       )}
 
-      {/* Cyberpunk Right-click Context Menu */}
+      {/* Cyberpunk Right-click Context Menu — lifted state from Dashboard */}
       {contextMenu && (
         <div
           style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-          className="fixed z-[100] w-48 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
+          className="fixed z-[100] w-52 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
+          onClick={(e) => e.stopPropagation()}
         >
           {(() => {
-            const sessionTerminal = terminalRefs.current[contextMenu.sessionId]?.term;
+            const sid = contextMenu.sessionId;
+            const sessionTerminal = sid ? terminalRefs.current[sid]?.term : null;
             const terminalSelection = sessionTerminal?.hasSelection() ? sessionTerminal.getSelection() : '';
             const pageSelection = window.getSelection()?.toString() || '';
             const selectedText = (terminalSelection || pageSelection).trim();
@@ -2226,54 +2225,45 @@ export function TerminalPanel({
             return null;
           })()}
 
+          {contextMenu.sessionId && (
+            <button
+              type="button"
+              onClick={() => {
+                refreshMainTerminal(contextMenu.sessionId!);
+                setContextMenu(null);
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition"
+            >
+              🔄 Refresh
+            </button>
+          )}
 
+          {contextMenu.sessionId && (
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(contextMenu.sessionId!);
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
+            >
+              📋 Copy Session ID
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => {
-              const session = sessions.find((s) => s.id === contextMenu.sessionId);
-              if (session && session.workingDir) {
-                void invoke('open_workspace_folder', { path: session.workingDir }).catch(console.error);
-              }
-            }}
-            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/25 hover:text-cyber-electric transition"
-          >
-            📁 Reveal in Explorer
-          </button>
-
-
-          <button
-            type="button"
-            onClick={() => {
-              refreshMainTerminal(contextMenu.sessionId);
-              setContextMenu(null);
-            }}
-            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition"
-          >
-            🔄 Refresh
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              void navigator.clipboard.writeText(contextMenu.sessionId);
-            }}
-            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
-          >
-            📋 Copy Session ID
-          </button>
-
-          <div className="my-1 border-t border-cyber-line/50" />
-
-          <button
-            type="button"
-            onClick={() => {
-              onStopSession(contextMenu.sessionId);
-            }}
-            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 font-bold transition"
-          >
-            ❌ Stop / Close Session
-          </button>
+          {contextMenu.sessionId && (
+            <>
+              <div className="my-1 border-t border-cyber-line/50" />
+              <button
+                type="button"
+                onClick={() => {
+                  onStopSession(contextMenu.sessionId!);
+                }}
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 font-bold transition"
+              >
+                ❌ Stop / Close Session
+              </button>
+            </>
+          )}
         </div>
       )}
     </section>

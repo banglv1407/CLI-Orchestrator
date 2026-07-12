@@ -21,11 +21,19 @@ use commands::{
         upsert_cli, write_file_content, write_ssh_file_content, ripgrep_search,
         start_ssh_server, stop_ssh_server, get_ssh_server_status,
         get_ssh_server_config, save_ssh_server_config,
+        create_directory, create_file_content,
     },
     api_proxy::{api_proxy_request, api_proxy_stream, api_proxy_abort},
     quickapps_commands::{
         delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
     },
+    proxy_commands::{
+        proxy_status, proxy_start, proxy_stop,
+        proxy_get_config, proxy_save_config,
+        proxy_add_backend, proxy_remove_backend, proxy_get_logs,
+    },
+    system_commands::get_system_logs,
+    notepad_commands::{get_notepad, save_notepad},
 };
 use tauri::Manager;
 
@@ -33,7 +41,7 @@ fn main() {
     let state = match AppState::new() {
         Ok(state) => state,
         Err(error) => {
-            eprintln!("failed to initialize app state: {}", error);
+            eprintln!("failed to initialize app state: {}", error); // startup error, no logger yet
             std::process::exit(1);
         }
     };
@@ -89,6 +97,19 @@ fn main() {
             api_proxy_request,
             api_proxy_stream,
             api_proxy_abort,
+            proxy_status,
+            proxy_start,
+            proxy_stop,
+            proxy_get_config,
+            proxy_save_config,
+            proxy_add_backend,
+            proxy_remove_backend,
+            proxy_get_logs,
+            get_system_logs,
+            get_notepad,
+            save_notepad,
+            create_directory,
+            create_file_content,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -145,11 +166,7 @@ fn main() {
                     {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            let is_focused = window.is_focused().unwrap_or(false);
-                            let is_minimized = window.is_minimized().unwrap_or(false);
-
-                            if is_visible && is_focused && !is_minimized {
+                            if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
                             } else {
                                 let _ = window.show();

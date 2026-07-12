@@ -11,6 +11,12 @@ import type {
   GitStatusEntry,
   QuickApp,
   RipgrepMatch,
+  ProxyBackend,
+  ProxyConfig,
+  ProxyLogEntry,
+  ProxyStatus,
+  SystemLogEntry,
+  NotepadContent,
 } from '../types';
 
 export function listClis(): Promise<CliDefinition[]> {
@@ -73,6 +79,14 @@ export function readFileContent(path: string): Promise<string> {
 
 export function writeFileContent(path: string, content: string): Promise<void> {
   return invoke('write_file_content', { path, content });
+}
+
+export function createDirectory(path: string): Promise<void> {
+  return invoke('create_directory', { path });
+}
+
+export function createFileContent(path: string, content: string): Promise<void> {
+  return invoke('create_file_content', { path, content });
 }
 
 export function listSshDirectoryFiles(connection: SshConnection, path: string): Promise<FileEntry[]> {
@@ -221,4 +235,50 @@ export function apiProxyStream(request: ApiProxyRequest): Promise<string> {
 
 export function apiProxyAbort(requestId: string): Promise<void> {
   return invoke('api_proxy_abort', { requestId });
+}
+
+// ── CliProxyAI ────────────────────────────────────────────
+
+export function proxyStatus(): Promise<ProxyStatus> {
+  return invoke('proxy_status');
+}
+
+export function proxyStart(): Promise<ProxyStatus> {
+  return invoke('proxy_start');
+}
+
+export function proxyStop(): Promise<ProxyStatus> {
+  return invoke('proxy_stop');
+}
+
+export function proxyGetConfig(): Promise<ProxyConfig> {
+  return invoke('proxy_get_config');
+}
+
+export function proxySaveConfig(config: ProxyConfig): Promise<ProxyConfig> {
+  return invoke('proxy_save_config', { config });
+}
+
+export function proxyAddBackend(backend: ProxyBackend): Promise<ProxyConfig> {
+  return invoke('proxy_add_backend', { backend });
+}
+
+export function proxyRemoveBackend(name: string): Promise<ProxyConfig> {
+  return invoke('proxy_remove_backend', { name });
+}
+
+export function proxyGetLogs(): Promise<ProxyLogEntry[]> {
+  return invoke('proxy_get_logs');
+}
+
+export function getSystemLogs(limit?: number): Promise<SystemLogEntry[]> {
+  return invoke('get_system_logs', { limit });
+}
+
+export function getNotepad(): Promise<NotepadContent> {
+  return invoke('get_notepad');
+}
+
+export function saveNotepad(content: NotepadContent): Promise<void> {
+  return invoke('save_notepad', { content });
 }

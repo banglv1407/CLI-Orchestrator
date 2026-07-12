@@ -4,6 +4,7 @@ import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, L
 import { loadApiHistory, clearApiHistory, type ApiHistoryEntry, METHOD_COLORS } from '../lib/api-history';
 import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled } from '../lib/mythical-pets';
 import { LlmConfigModal } from './LlmConfigModal';
+import { ProxyPanel } from './ProxyPanel';
 
 import { 
   listDirectoryFiles, 
@@ -189,9 +190,11 @@ interface CliSidebarProps {
   onCloseFile: () => void;
   onQuickAppsTabChange?: (isActive: boolean) => void;
   onApiClientTabChange?: (isActive: boolean) => void;
+  onProxyTabChange?: (isActive: boolean) => void;
+  onLogsTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'readme' | 'apiclient';
+type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'apiclient' | 'proxy' | 'logs';
 
 
 function ApiHistoryList() {
@@ -312,6 +315,8 @@ export function CliSidebar({
   onCloseFile,
   onQuickAppsTabChange,
   onApiClientTabChange,
+  onProxyTabChange,
+  onLogsTabChange,
 }: CliSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -329,19 +334,26 @@ export function CliSidebar({
     } else {
       setIsSidebarCollapsed(false);
       localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
-      const wasQuickApps = activeTab === 'quickapps';
-      const isQuickApps = tab === 'quickapps';
-      const wasApiClient = activeTab === 'apiclient';
-      const isApiClient = tab === 'apiclient';
+      const trackedTabs = new Set(['quickapps', 'apiclient', 'proxy', 'logs']);
+      const leavingTracked = trackedTabs.has(activeTab);
+      const enteringTracked = trackedTabs.has(tab);
+
       setActiveTab(tab);
-      if (onQuickAppsTabChange && wasQuickApps !== isQuickApps) {
-        onQuickAppsTabChange(isQuickApps);
-      }
-      if (onApiClientTabChange && wasApiClient !== isApiClient) {
-        onApiClientTabChange(isApiClient);
+
+      if (!enteringTracked && leavingTracked) {
+        // Leaving a tracked tab for a non-tracked tab → reset to terminal
+        if (onQuickAppsTabChange) onQuickAppsTabChange(false);
+        if (onApiClientTabChange) onApiClientTabChange(false);
+        if (onProxyTabChange) onProxyTabChange(false);
+      } else if (enteringTracked) {
+        // Entering a tracked tab (possibly from another tracked tab)
+        if (tab === 'quickapps' && onQuickAppsTabChange) onQuickAppsTabChange(true);
+        else if (tab === 'apiclient' && onApiClientTabChange) onApiClientTabChange(true);
+        else if (tab === 'proxy' && onProxyTabChange) onProxyTabChange(true);
+        else if (tab === 'logs' && onLogsTabChange) onLogsTabChange(true);
       }
     }
-  }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange, onApiClientTabChange]);
+  }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange, onApiClientTabChange, onProxyTabChange, onLogsTabChange]);
 
   // Listen for pet click → open AI chat
   useEffect(() => {
@@ -1147,6 +1159,47 @@ export function CliSidebar({
             <CloudIcon />
           </button>
 
+
+
+          <button
+            type="button"
+            onClick={() => handleSetActiveTab('apiclient')}
+            title="API Client (Postman-like)"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'apiclient' && !isSidebarCollapsed
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
+            }`}
+          >
+            {activeTab === 'apiclient' && !isSidebarCollapsed && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+            )}
+            <ApiIcon />
+          </button>
+
+
+        </div>
+ 
+        <div className="flex flex-col gap-4 items-center">
+          <button
+            type="button"
+            onClick={() => handleSetActiveTab('logs')}
+            title="System Logs"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+              activeTab === 'logs' && !isSidebarCollapsed
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
+            }`}
+          >
+            {activeTab === 'logs' && !isSidebarCollapsed && (
+              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+            )}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
+            </svg>
+          </button>
+
+
           <button
             type="button"
             onClick={() => handleSetActiveTab('remote')}
@@ -1165,36 +1218,20 @@ export function CliSidebar({
 
           <button
             type="button"
-            onClick={() => handleSetActiveTab('apiclient')}
-            title="API Client (Postman-like)"
+            onClick={() => handleSetActiveTab('proxy')}
+            title="CliProxyAI (API Proxy)"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'apiclient' && !isSidebarCollapsed
+              activeTab === 'proxy' && !isSidebarCollapsed
                 ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
                 : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
             }`}
           >
-            {activeTab === 'apiclient' && !isSidebarCollapsed && (
+            {activeTab === 'proxy' && !isSidebarCollapsed && (
               <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
             )}
-            <ApiIcon />
-          </button>
-        </div>
- 
-        <div className="flex flex-col gap-4 items-center">
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('readme')}
-            title="User Guide"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'readme' && !isSidebarCollapsed
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {activeTab === 'readme' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-            )}
-            <BookOpenIcon />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+            </svg>
           </button>
 
           <button
@@ -1520,6 +1557,7 @@ export function CliSidebar({
                           <button
                             type="button"
                             onClick={() => onSelectCli(cli.name)}
+                              onDoubleClick={() => onOpenCliInteraction(cli)}
                             className="min-w-0 flex-1 text-left leading-tight"
                           >
                             <span className="block truncate text-[13px] font-semibold text-slate-100">{cli.name}</span>
@@ -1584,6 +1622,28 @@ export function CliSidebar({
         {/* Active Tab: API Client History */}
         {activeTab === 'apiclient' && (
           <ApiHistoryList />
+        )}
+
+        {/* Active Tab: CliProxyAI — render ProxyPanel in sidebar */}
+        {activeTab === 'proxy' && (
+          <div className="h-full overflow-hidden">
+            <ProxyPanel isInSidebar={true} />
+          </div>
+        )}
+
+        {/* Active Tab: System Logs */}
+        {activeTab === 'logs' && (
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-cyber-muted p-6">
+            <div className="w-14 h-14 rounded-2xl bg-cyber-accent/10 border border-cyber-accent/30 flex items-center justify-center text-2xl">
+              📋
+            </div>
+            <div className="text-center">
+              <p className="text-[13px] font-semibold text-cyber-text">System Logs</p>
+              <p className="text-[11px] text-cyber-muted mt-1 leading-relaxed">
+                View in the main panel →
+              </p>
+            </div>
+          </div>
         )}
 
         {/* Active Tab: Operator (SSH VM Manager) */}
@@ -1927,107 +1987,6 @@ export function CliSidebar({
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Active Tab: User Guide README */}
-        {activeTab === 'readme' && (
-          <div className="flex h-full flex-col overflow-hidden animate-slide-up">
-            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
-              <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">User Guide</h2>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin text-xs text-slate-350 select-text leading-relaxed font-sans">
-              
-              {/* Introduction */}
-              <div className="space-y-2">
-                <h3 className="text-cyber-electric font-semibold text-[11px] uppercase tracking-wider font-mono">⚡ Welcome to CLX</h3>
-                <p>
-                  CLX is an advanced desktop orchestrator for terminal interfaces and AI CLI companions (like aider, gemini-cli, etc.), featuring network collaboration and intelligent terminal overlays.
-                </p>
-              </div>
-
-              {/* Autocomplete Section */}
-              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
-                <h3 className="text-cyber-neon font-semibold text-[11px] uppercase tracking-wider font-mono">🔎 Autocomplete overlays</h3>
-                <div className="space-y-3 pl-1.5">
-                  <div>
-                    <span className="text-cyber-neon font-bold font-mono">@ Mention File/Folder:</span>
-                    <p className="mt-1">
-                      Type <code className="text-cyber-neon bg-cyber-neon/10 px-1 rounded font-mono font-bold">@</code> inside any terminal panel to pop up the local file/folder search. Press <kbd className="bg-cyber-line/50 px-1.5 rounded text-[10px]">Arrow Up/Down</kbd> to navigate, and <kbd className="bg-cyber-line/50 px-1.5 rounded text-[10px]">Enter</kbd> to insert.
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-cyber-electric font-bold font-mono">! Ripgrep Content Search:</span>
-                    <p className="mt-1">
-                      Type <code className="text-cyber-electric bg-cyber-electric/10 px-1 rounded font-mono font-bold">!</code> to fuzzy search file contents using Ripgrep. Displays matching code snippets and line numbers (<code className="text-cyber-electric font-mono text-[10px]">L12</code>).
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Collaborative SSH Section */}
-              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
-                <h3 className="text-cyber-neon font-semibold text-[11px] uppercase tracking-wider font-mono">🤝 Collaborative Remote SSH</h3>
-                <p>
-                  CLX embeds a high-security <span className="text-cyber-neon font-bold">SSH Server</span> that allows co-programming.
-                </p>
-                <ul className="list-disc pl-4 space-y-1.5 mt-2">
-                  <li>Start the server in the <span className="text-cyber-neon font-bold">Remote</span> sidebar tab.</li>
-                  <li>Type <code className="text-cyber-neon font-mono bg-cyber-neon/10 px-1 rounded">ssh admin@&lt;local_ip&gt; -p 2222</code> from another machine (e.g. Termux, Laptop).</li>
-                  <li>Log in with default credentials <code className="font-mono bg-cyber-line/25 px-1 rounded">admin / admin</code>.</li>
-                  <li>Select a terminal session to attach. Keypresses and screens will sync in real-time between devices!</li>
-                  <li>Press <kbd className="bg-cyber-line/50 px-1.5 rounded text-[10px] font-mono">Ctrl + X</kbd> to detach and return to menu.</li>
-                </ul>
-              </div>
-
-              {/* Quick Apps & Operator Section */}
-              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
-                <h3 className="text-cyber-neon font-semibold text-[11px] uppercase tracking-wider font-mono">🚀 Favorite & VM Operator</h3>
-                <div className="space-y-2.5 pl-1.5">
-                  <div>
-                    <span className="text-slate-200 font-bold">Quick Apps:</span>
-                    <p className="mt-1">
-                      Pin and launch favorited CLI scripts or local applications with a single click.
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-200 font-bold">Operator Tab:</span>
-                    <p className="mt-1">
-                      Manage multiple SSH and RDP configurations for virtual machines or remote servers.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI Companion Section */}
-              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
-                <h3 className="text-cyber-neon font-semibold text-[11px] uppercase tracking-wider font-mono">🤖 AI Companion Chat</h3>
-                <p>
-                  Click on the character avatar in the sidebar to open the AI Companion Chat. Configure your LLM providers (API key, model, endpoints) to get live commands and programming support.
-                </p>
-              </div>
-
-              {/* System shortcuts */}
-              <div className="space-y-2 border-t border-cyber-line/25 pt-4">
-                <h3 className="text-cyber-electric font-semibold text-[11px] uppercase tracking-wider font-mono">⌨ Shortcuts</h3>
-                <div className="rounded-lg border border-cyber-line/30 bg-cyber-base/40 p-3 space-y-2 text-[10px] font-mono">
-                  <div className="flex justify-between">
-                    <span>Ctrl + P</span>
-                    <span className="text-cyber-electric font-semibold">Search Files Modal</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Ctrl + N</span>
-                    <span className="text-cyber-electric font-semibold">New Quick Shell</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Ctrl + X (SSH)</span>
-                    <span className="text-cyber-electric font-semibold">Detach Remote Session</span>
-                  </div>
-                </div>
-              </div>
-
             </div>
           </div>
         )}

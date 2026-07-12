@@ -1,3 +1,5 @@
+pub mod system_log;
+pub mod proxy_server;
 pub mod cli_registry;
 pub mod events;
 pub mod execution_engine;

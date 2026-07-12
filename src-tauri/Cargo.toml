@@ -34,6 +34,10 @@ russh = "0.62.1"
 russh-keys = "0.49.2"
 rand = "0.10.2"
 
+axum = { version = "0.8", features = ["json"] }
+tower-http = { version = "0.6", features = ["cors"] }
+tower = "0.5"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

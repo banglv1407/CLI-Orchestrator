@@ -25,7 +25,7 @@ interface CommandPaletteProps {
   onAddCli: () => void;
   onAddSsh: () => void;
   onQuickSession: (panel: 'bottom' | 'right') => void;
-  onSwitchView: (view: 'terminal' | 'quickapps' | 'apiclient') => void;
+  onSwitchView: (view: 'terminal' | 'quickapps' | 'apiclient' | 'proxy') => void;
   onSwitchTheme: (theme: AppTheme) => void;
   activeMainView: string;
 }

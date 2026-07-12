@@ -129,4 +129,53 @@ export interface SshConnection {
   rdpShareDrives?: boolean;
   workingDir?: string;
 }
+export interface ProxyBackend {
+  name: string;
+  url: string;
+  apiKey: string;
+  model: string;
+  weight: number;
+  maxRetries: number;
+  headers: Record<string, string>;
+}
+
+export interface ProxyConfig {
+  port: number;
+  backends: ProxyBackend[];
+  enabled: boolean;
+  customUserAgent?: string;
+}
+
+export interface ProxyStatus {
+  running: boolean;
+  port: number;
+  activeBackends: number;
+  totalRequests: number;
+}
+export interface ProxyLogEntry {
+  id: number;
+  timestamp: string;
+  backend: string;
+  model: string;
+  requestJson: string;
+  responseJson: string;
+  status: number;
+  durationMs: number;
+  success: boolean;
+  errorMsg?: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+export interface SystemLogEntry {
+  timestamp: string;
+  level: string;
+  source: string;
+  message: string;
+}
+
+export interface NotepadContent {
+  text: string;
+  language: string;
+}
 

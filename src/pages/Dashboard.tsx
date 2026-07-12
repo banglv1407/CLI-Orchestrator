@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { CliEditorModal } from '../components/CliEditorModal';
 import { CliStartModal } from '../components/CliStartModal';
@@ -9,6 +10,9 @@ import { SshConnectionModal } from '../components/SshConnectionModal';
 import { QuickAppsPanel } from '../components/QuickAppsPanel';
 import { ApiClientPanel } from '../components/ApiClientPanel';
 import { MythicalPet } from '../components/MythicalPet';
+import { ProxyPanel } from '../components/ProxyPanel';
+import { SystemLogPanel } from '../components/SystemLogPanel';
+import { Notepad } from '../components/Notepad';
 import { CommandPalette } from '../components/CommandPalette';
 import {
   createTerminalSession,
@@ -30,6 +34,8 @@ import {
   writeFileContent,
   readSshFileContent,
   writeSshFileContent,
+  createDirectory,
+  createFileContent,
 } from '../lib/tauri';
 import type {
   AssistantState,
@@ -67,9 +73,79 @@ export function Dashboard() {
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
-  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'apiclient'>('terminal');
+  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'apiclient' | 'proxy' | 'logs'>('terminal');
+  const [showNotepad, setShowNotepad] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  // ── Global right-click context menu ──
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    sessionId: string | null;
+    workingDir: string | null;
+  } | null>(null);
+
+  // ── New File/Directory modal ──
+  const [newFileModal, setNewFileModal] = useState<{
+    open: boolean;
+    type: 'file' | 'directory';
+    basePath: string;
+  } | null>(null);
+  const [newFileName, setNewFileName] = useState('');
+  const [newFileContent, setNewFileContent] = useState('');
+  const [newFileError, setNewFileError] = useState<string | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, sessionId: string | null, workingDir: string | null) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, sessionId, workingDir });
+  }, []);
+
+  useEffect(() => {
+    const handleGlobalClick = () => setContextMenu(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  const handleNewFile = useCallback(() => {
+    if (!contextMenu?.workingDir) return;
+    setNewFileModal({ open: true, type: 'file', basePath: contextMenu.workingDir });
+    setNewFileName('');
+    setNewFileContent('');
+    setNewFileError(null);
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const handleNewDirectory = useCallback(() => {
+    if (!contextMenu?.workingDir) return;
+    setNewFileModal({ open: true, type: 'directory', basePath: contextMenu.workingDir });
+    setNewFileName('');
+    setNewFileContent('');
+    setNewFileError(null);
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const handleCreateFileOrDir = useCallback(async () => {
+    if (!newFileModal || !newFileName.trim()) return;
+    const name = newFileName.trim();
+    const fullPath = newFileModal.basePath.replace(/[\\/]+$/, '') + '/' + name;
+
+    try {
+      if (newFileModal.type === 'directory') {
+        await createDirectory(fullPath);
+      } else {
+        await createFileContent(fullPath, newFileContent);
+      }
+      setNewFileModal(null);
+      setNewFileName('');
+      setNewFileContent('');
+      setAssistantState('Done');
+      setAssistantText(`Created: ${name}`);
+      setTimeout(() => setAssistantState('Idle'), 2500);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setNewFileError(msg);
+    }
+  }, [newFileModal, newFileName, newFileContent]);
 
   // Listen for API client history selection from sidebar
   useEffect(() => {
@@ -80,12 +156,16 @@ export function Dashboard() {
     return () => window.removeEventListener('apiclient-history-select', handler);
   }, []);
 
-  // Command Palette keyboard shortcut (Ctrl+Shift+P)
+  // Command Palette keyboard shortcut (Ctrl+P)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         setPaletteOpen((v) => !v);
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        setShowNotepad((v) => !v);
       }
     };
     window.addEventListener('keydown', handler);
@@ -319,8 +399,8 @@ export function Dashboard() {
   // Path helper
   const getRelativePath = useCallback((fullPath: string, root: string) => {
     let rel = fullPath.replace(root, '');
-    rel = rel.replace(/^[/\\]+/, '');
-    return rel.replace(/\\/g, '/');
+    rel = rel.replace(/^[/\\\\]+/, '');
+    return rel.replace(/\\\\/g, '/');
   }, []);
 
   // Fetch Git Status
@@ -590,32 +670,18 @@ export function Dashboard() {
     setCliEditorOpen(true);
   }, []);
 
-  const handleSaveCli = useCallback(
-    async (payload: { cli: CliDefinition; originalName?: string }) => {
-      await upsertCli(payload);
-      await refreshSidebarData();
-      setActiveCli(payload.cli.name);
-      setAssistantState('Done');
-      setAssistantText(`CLI saved: ${payload.cli.name}`);
-    },
-    [refreshSidebarData],
-  );
-
   const handleDeleteCli = useCallback(
     async (cli: CliDefinition) => {
       try {
-        const ok = await confirm(`Are you sure you want to delete the CLI \"${cli.name}\"?`, {
+        const ok = await confirm(`Are you sure you want to delete the CLI "${cli.name}"?`, {
           title: 'Delete CLI',
           kind: 'warning',
         });
-        if (!ok) {
-          return;
-        }
-
+        if (!ok) return;
         await deleteCli(cli.name);
-        await refreshSidebarData();
+        void refreshSidebarData();
         setAssistantState('Done');
-        setAssistantText(`CLI deleted: ${cli.name}`);
+        setAssistantText(`CLI "${cli.name}" deleted.`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setAssistantState('Error');
@@ -625,49 +691,50 @@ export function Dashboard() {
     [refreshSidebarData],
   );
 
-  const handleConnectSsh = useCallback(
-    async (connection: SshConnection) => {
-      const pendingId = `pending-${Date.now()}`;
-      const fakeSession: SessionInfo = {
-        id: pendingId,
-        cliName: `SSH: ${connection.name}`,
-        status: 'loading',
-      };
-
-      setPendingSessions((current) => [...current, fakeSession]);
-      setActiveSessionId(pendingId);
-
+  const handleSaveCli = useCallback(
+    async (payload: { cli: CliDefinition; originalName?: string }) => {
       try {
-        const session = await createSshSession(connection);
-        setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
-        mergeCliIntoState(session);
+        await upsertCli(payload);
+        setCliEditorOpen(false);
         void refreshSidebarData();
-        setAssistantState('Done');
-        setAssistantText(`SSH Session started for ${connection.name}`);
-      } catch (error) {
-        setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
         setActiveSessionId(null);
-        await refreshSidebarData();
+        setAssistantState('Done');
+        setAssistantText(`CLI "${payload.cli.name}" saved.`);
+      } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setAssistantState('Error');
-        setAssistantText(`SSH Connection failed: ${message}`);
+        setAssistantText(`Save CLI failed: ${message}`);
       }
     },
-    [mergeCliIntoState, refreshSidebarData],
+    [refreshSidebarData],
+  );
+
+  const handleConnectSsh = useCallback(
+    async (connection: SshConnection) => {
+      try {
+        await createSshSession(connection);
+        void refreshSidebarData();
+        setAssistantState('Done');
+        setAssistantText(`SSH session connected to ${connection.host}.`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setAssistantState('Error');
+        setAssistantText(`SSH connection failed: ${message}`);
+      }
+    },
+    [refreshSidebarData],
   );
 
   const handleConnectRdp = useCallback(
     async (connection: SshConnection) => {
       try {
-        setAssistantState('Thinking');
-        setAssistantText(`Launching RDP Connection to ${connection.name}...`);
         await createRdpSession(connection);
         setAssistantState('Done');
-        setAssistantText(`RDP session launched for ${connection.name}`);
+        setAssistantText(`RDP session launched for ${connection.host}.`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setAssistantState('Error');
-        setAssistantText(`RDP Connection failed: ${message}`);
+        setAssistantText(`RDP connection failed: ${message}`);
       }
     },
     [],
@@ -676,18 +743,19 @@ export function Dashboard() {
   const handleSaveSshConnection = useCallback(
     async (connection: SshConnection) => {
       try {
-        let nextList = [...sshConnections];
-        const idx = nextList.findIndex((c) => c.id === connection.id);
-        if (idx >= 0) {
-          nextList[idx] = connection;
+        let nextList: SshConnection[];
+        const existingIndex = sshConnections.findIndex((c) => c.id === connection.id);
+        if (existingIndex >= 0) {
+          nextList = [...sshConnections];
+          nextList[existingIndex] = connection;
         } else {
-          nextList.push(connection);
+          nextList = [...sshConnections, connection];
         }
-
         await saveSshConnections(nextList);
         setSshConnections(nextList);
+        setSshModalOpen(false);
         setAssistantState('Done');
-        setAssistantText(`SSH Connection "${connection.name}" saved.`);
+        setAssistantText(`Connection "${connection.name}" saved.`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setAssistantState('Error');
@@ -775,7 +843,14 @@ export function Dashboard() {
   );
 
   return (
-    <main className="flex h-screen bg-cyber-base bg-grid text-slate-100">
+    <main
+      className="flex h-screen bg-cyber-base bg-grid text-slate-100"
+      onContextMenu={(e) => {
+        // Find workingDir from active session for context menu
+        const activeSess = sessions.find((s) => s.id === activeSessionId);
+        handleContextMenu(e, activeSessionId, activeSess?.workingDir ?? null);
+      }}
+    >
       <CliSidebar
         clis={clis}
         sessions={displaySessions}
@@ -813,6 +888,8 @@ export function Dashboard() {
 
         onQuickAppsTabChange={(isActive) => setActiveMainView(isActive ? 'quickapps' : 'terminal')}
         onApiClientTabChange={(isActive) => setActiveMainView(isActive ? 'apiclient' : 'terminal')}
+        onProxyTabChange={(isActive) => { /* Proxy renders in sidebar, keep main area as-is */ }}
+        onLogsTabChange={(isActive) => setActiveMainView(isActive ? 'logs' : 'terminal')}
       />
 
       <section className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
@@ -821,6 +898,10 @@ export function Dashboard() {
             <QuickAppsPanel />
           ) : activeMainView === 'apiclient' ? (
             <ApiClientPanel />
+          ) : activeMainView === 'proxy' ? (
+            <ProxyPanel />
+          ) : activeMainView === 'logs' ? (
+            <SystemLogPanel />
           ) : (
             <TerminalPanel
               sessions={sessions}
@@ -854,6 +935,8 @@ export function Dashboard() {
               onReorderSessions={handleReorderSessions}
               onMoveSessionToPanel={handleMoveSessionToPanel}
               theme={theme}
+              contextMenu={contextMenu}
+              setContextMenu={setContextMenu}
             />
           )}
         </div>
@@ -886,6 +969,9 @@ export function Dashboard() {
         window.dispatchEvent(new CustomEvent('mythical-pet-click'));
       }} />
 
+      {/* Notepad modal */}
+      {showNotepad && <Notepad onClose={() => setShowNotepad(false)} />}
+
       <CommandPalette
         isOpen={paletteOpen}
         onClose={() => setPaletteOpen(false)}
@@ -908,6 +994,155 @@ export function Dashboard() {
         onSwitchTheme={(t) => setTheme(t)}
         activeMainView={activeMainView}
       />
+
+      {/* ── Global Right-click Context Menu ── */}
+      {contextMenu && (
+        <div
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          className="fixed z-[100] w-52 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* New submenu */}
+          <div className="relative group">
+            <div className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon transition cursor-pointer">
+              ✨ New
+              <span className="ml-auto text-[9px] text-slate-500">▶</span>
+            </div>
+            <div className="absolute left-full top-0 ml-1 hidden group-hover:block w-44 rounded-lg border border-cyber-neon/30 bg-cyber-panel/95 p-1 shadow-2xl backdrop-blur-md z-[101]">
+              <button
+                type="button"
+                onClick={handleNewFile}
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/25 hover:text-cyber-electric transition"
+              >
+                📄 File...
+              </button>
+              <button
+                type="button"
+                onClick={handleNewDirectory}
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/25 hover:text-cyber-electric transition"
+              >
+                📁 Directory...
+              </button>
+            </div>
+          </div>
+
+          <div className="my-1 border-t border-cyber-line/50" />
+
+          {contextMenu.workingDir && (
+            <button
+              type="button"
+              onClick={() => {
+                void invoke('open_workspace_folder', { path: contextMenu.workingDir! });
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/25 hover:text-cyber-electric transition"
+            >
+              📁 Reveal in Explorer
+            </button>
+          )}
+
+          {contextMenu.sessionId && (
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(contextMenu.sessionId!);
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
+            >
+              📋 Copy Session ID
+            </button>
+          )}
+
+          {contextMenu.workingDir && (
+            <>
+              <div className="my-1 border-t border-cyber-line/50" />
+              <button
+                type="button"
+                onClick={() => {
+                  handleQuickSession('right');
+                }}
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition"
+              >
+                ⚡ Quick Terminal Here
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── New File / Directory Modal ── */}
+      {newFileModal?.open && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-[420px] rounded-xl border border-cyber-neon/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none">
+            <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-neon font-bold mb-4">
+              {newFileModal.type === 'directory' ? '📁 New Directory' : '📄 New File'}
+            </h2>
+
+            <div className="mb-4">
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Location</label>
+              <div className="rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[11px] text-slate-300 font-mono truncate">
+                {newFileModal.basePath}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">
+                {newFileModal.type === 'directory' ? 'Directory Name' : 'File Name'}
+              </label>
+              <input
+                type="text"
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateFileOrDir();
+                  if (e.key === 'Escape') setNewFileModal(null);
+                }}
+                placeholder={newFileModal.type === 'directory' ? 'e.g. my-folder' : 'e.g. config.json'}
+                className="w-full rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[12px] font-mono text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyber-electric transition"
+                autoFocus
+              />
+            </div>
+
+            {newFileModal.type === 'file' && (
+              <div className="mb-4">
+                <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">
+                  Content <span className="text-slate-600">(optional)</span>
+                </label>
+                <textarea
+                  value={newFileContent}
+                  onChange={(e) => setNewFileContent(e.target.value)}
+                  placeholder="File content..."
+                  rows={5}
+                  className="w-full rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[12px] font-mono text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyber-electric transition resize-none"
+                />
+              </div>
+            )}
+
+            {newFileError && (
+              <div className="mb-4 rounded border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-400 font-mono">
+                {newFileError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setNewFileModal(null)}
+                className="rounded-lg border border-cyber-line px-4 py-2 text-[11px] font-semibold text-slate-400 hover:text-white hover:border-slate-500 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateFileOrDir}
+                disabled={!newFileName.trim()}
+                className="rounded-lg bg-cyber-neon/20 border border-cyber-neon/50 px-5 py-2 text-[11px] font-bold text-cyber-neon hover:bg-cyber-neon/30 transition disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

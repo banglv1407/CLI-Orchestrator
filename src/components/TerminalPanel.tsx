@@ -101,6 +101,19 @@ interface TerminalHandle {
 
 const INPUT_FLUSH_MS = 16;
 const MOUNT_DELAY_MS = 50;
+const TERMINAL_FONT_FAMILY = 'Cascadia Mono, CaskaydiaCove Nerd Font, Fira Code, Consolas, "Segoe UI Symbol", monospace';
+const TUI_CLI_NAME_PATTERNS = ['codex', 'opencode', 'claude', 'gemini', 'aider'];
+const ALT_SCREEN_PATTERN = /\x1b\[\?(?:47|1047|1048|1049)h/;
+
+function isNestedTuiCli(session?: SessionInfo | null) {
+  if (!session) return false;
+  const name = session.cliName.toLowerCase();
+  return TUI_CLI_NAME_PATTERNS.some((pattern) => name.includes(pattern));
+}
+
+function hasAlternateScreenOutput(chunks?: string[]) {
+  return chunks?.some((chunk) => ALT_SCREEN_PATTERN.test(chunk)) ?? false;
+}
 
 export function TerminalPanel({
   sessions,
@@ -665,9 +678,9 @@ export function TerminalPanel({
 
     const newMiniTerm = new Terminal({
       cursorBlink: false,
-      convertEol: true,
+      convertEol: false,
       scrollback: 2000,
-      fontFamily: 'Fira Code, monospace',
+      fontFamily: TERMINAL_FONT_FAMILY,
       fontSize: 7,
       disableStdin: true,
       scrollOnUserInput: false,
@@ -686,6 +699,7 @@ export function TerminalPanel({
   const replayHistoryIntoMiniTerm = useCallback((sessionId: string, miniTerm: Terminal, miniFit: FitAddon) => {
     const history = mainOutputHistory.current[sessionId];
     if (!history || history.length === 0) return;
+    if (hasAlternateScreenOutput(history)) return;
     try {
       for (const chunk of history) {
         miniTerm.write(chunk);
@@ -729,16 +743,8 @@ export function TerminalPanel({
     const mountNode = containerRefs.current[sessionId];
     if (!mountNode) return;
 
-    // Clear and replay all history for a clean re-render
-    handle.term.clear();
-    const history = mainOutputHistory.current[sessionId];
-    if (history && history.length > 0) {
-      for (const chunk of history) {
-        handle.term.write(chunk);
-      }
-    }
-
-    // Multiple timed fit+refresh passes to ensure proper layout
+    // Multiple timed fit+refresh passes to ensure proper layout without
+    // replaying raw ANSI/TUI history into the active terminal buffer.
     const doRefresh = () => {
       try {
         handle.fit.fit();
@@ -855,9 +861,9 @@ export function TerminalPanel({
 
       const term = new Terminal({
         cursorBlink: true,
-        convertEol: true,
+        convertEol: false,
         scrollback: 5000,
-        fontFamily: 'Fira Code, monospace',
+        fontFamily: TERMINAL_FONT_FAMILY,
         fontSize: 13,
         disableStdin: false,
         // Disable auto-scroll on user input so we respect manual scroll position
@@ -867,9 +873,9 @@ export function TerminalPanel({
 
       const miniTerm = new Terminal({
         cursorBlink: false,
-        convertEol: true,
+        convertEol: false,
         scrollback: 2000,
-        fontFamily: 'Fira Code, monospace',
+        fontFamily: TERMINAL_FONT_FAMILY,
         fontSize: 7,
         disableStdin: true,
         scrollOnUserInput: false,
@@ -1047,21 +1053,12 @@ export function TerminalPanel({
         }).catch(console.error);
       });
 
-      const initMsg = `Connected to session: ${session.id}`;
-      term.writeln(initMsg);
-      miniTerm.writeln(initMsg);
-      mainOutputHistory.current[session.id].push(initMsg + '\r\n');
-      if (session.projectTag || session.workingDir) {
-        const projectLine = [session.projectTag, session.workingDir].filter(Boolean).join(' | ');
-        term.writeln(projectLine);
-        miniTerm.writeln(projectLine);
-        mainOutputHistory.current[session.id].push(projectLine + '\r\n');
-      }
-
       term.onData((data) => {
+        const activeSession = sessions.find(s => s.id === session.id);
+        const allowInlineAssist = !isNestedTuiCli(activeSession);
+
         // Detect '@' trigger for file mention
-        if (data === '@' && !mentionActiveRef.current && !rgActiveRef.current) {
-          const activeSession = sessions.find(s => s.id === session.id);
+        if (allowInlineAssist && data === '@' && !mentionActiveRef.current && !rgActiveRef.current) {
           const wd = activeSession?.workingDir;
           if (wd) {
             const isSsh = !!activeSession?.cliName.startsWith('SSH: ');
@@ -1078,8 +1075,7 @@ export function TerminalPanel({
         }
 
         // Detect '!' trigger for ripgrep search
-        if (data === '!' && !rgActiveRef.current && !mentionActiveRef.current) {
-          const activeSession = sessions.find(s => s.id === session.id);
+        if (allowInlineAssist && data === '!' && !rgActiveRef.current && !mentionActiveRef.current) {
           const wd = activeSession?.workingDir;
           // Only support local sessions for ripgrep for now
           const isSsh = !!activeSession?.cliName.startsWith('SSH: ');
@@ -1305,17 +1301,8 @@ export function TerminalPanel({
         if (!payload.sessionId) {
           return;
         }
-        const handle = terminalRefs.current[payload.sessionId];
-        const statusText = payload.message ? ` ${payload.message}` : '';
-        if (!handle) {
-          if (!pendingTerminalWrites.current[payload.sessionId]) {
-            pendingTerminalWrites.current[payload.sessionId] = [];
-          }
-          pendingTerminalWrites.current[payload.sessionId].push(`\r\n[${payload.status}]${statusText}`);
-          return;
-        }
-        handle.writeQueue.push(`\r\n[${payload.status}]${statusText}`);
-        void processWriteQueue(payload.sessionId);
+        // Keep status UI outside the emulated terminal. Writing app-owned
+        // status lines into xterm corrupts full-screen TUIs that own the buffer.
       });
 
       if (isCancelled) {
@@ -1465,6 +1452,7 @@ export function TerminalPanel({
   );
 
   const activeSession = sessions.find((s) => s.id === visibleSessionId);
+  const activeSessionUsesNestedTui = isNestedTuiCli(activeSession);
 
   const [miniTerminalScale, setMiniTerminalScale] = useState<number>(() => {
     const saved = localStorage.getItem('clx-mini-terminal-scale');
@@ -1571,7 +1559,7 @@ export function TerminalPanel({
               )}
 
               {/* Active Session Info Header */}
-              {activeSession && !openedFile && (
+              {activeSession && !openedFile && !activeSessionUsesNestedTui && (
                 <div className="absolute top-3 left-4 z-20 flex items-center gap-2 select-none">
                   <div className="px-3 py-1 rounded bg-[#0a0f1f]/85 border border-cyber-line/50 text-[10px] font-mono font-bold text-cyber-electric shadow-neon-blue-sm">
                     🟢 {activeSession.cliName} - {activeSession.workingDir || ''}
@@ -1584,7 +1572,9 @@ export function TerminalPanel({
                 <button
                   type="button"
                   onClick={() => setRightPanelVisible(prev => !prev)}
-                  className="absolute top-3 right-12 z-20 flex h-6 w-8 items-center justify-center rounded-lg border border-cyber-neon/60 bg-[#0a0f1f]/90 text-cyber-neon hover:bg-cyber-neon hover:text-black transition cursor-pointer select-none font-bold text-xs shadow-neon-sm"
+                  className={`absolute top-3 right-12 z-20 flex h-6 w-8 items-center justify-center rounded-lg border border-cyber-neon/60 bg-[#0a0f1f]/90 text-cyber-neon hover:bg-cyber-neon hover:text-black transition cursor-pointer select-none font-bold text-xs shadow-neon-sm ${
+                    activeSessionUsesNestedTui ? 'opacity-0 hover:opacity-100 focus:opacity-100' : 'opacity-100'
+                  }`}
                   title={rightPanelVisible ? "Hide Right Panel" : "Show Right Panel"}
                 >
                   {rightPanelVisible ? '▶' : '◀'}
@@ -1596,7 +1586,9 @@ export function TerminalPanel({
                 <button
                   type="button"
                   onClick={() => onStopSession(visibleSessionId)}
-                  className="absolute top-3 right-4 z-20 flex h-6 w-6 items-center justify-center rounded-lg border border-cyber-warn/60 bg-[#0a0f1f]/90 text-cyber-warn hover:bg-cyber-warn hover:text-white transition cursor-pointer select-none font-bold text-xs shadow-neon-sm"
+                  className={`absolute top-3 right-4 z-20 flex h-6 w-6 items-center justify-center rounded-lg border border-cyber-warn/60 bg-[#0a0f1f]/90 text-cyber-warn hover:bg-cyber-warn hover:text-white transition cursor-pointer select-none font-bold text-xs shadow-neon-sm ${
+                    activeSessionUsesNestedTui ? 'opacity-0 hover:opacity-100 focus:opacity-100' : 'opacity-100'
+                  }`}
                   title="Stop / Close Session"
                 >
                   ✕

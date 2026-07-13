@@ -88,7 +88,7 @@ macro_rules! system_log {
     ($logger:expr, $level:expr, $source:expr, $($arg:tt)*) => {{
         let msg = format!($($arg)*);
         eprintln!("[{}][{}] {}", $level, $source, msg);
-        let logger: &Arc<$crate::core::system_log::SystemLogger> = &$logger;
+        let logger: &std::sync::Arc<$crate::core::system_log::SystemLogger> = &$logger;
         let lvl: &str = $level;
         let src: &str = $source;
         tokio::spawn({

@@ -32,8 +32,13 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<SubTab>('config');
   const [showAdd, setShowAdd] = useState(false);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [nName, setNName] = useState(''); const [nUrl, setNUrl] = useState('');
   const [nKey, setNKey] = useState(''); const [nModel, setNModel] = useState('');
+  const [nUa, setNUa] = useState('');
+
+  const resetForm = () => { setNName('');setNUrl('');setNKey('');setNModel('');setNUa('');setShowAdd(false);setEditingIdx(null); };
+  const loadBackend = (b: ProxyBackend, idx: number) => { setNName(b.name);setNUrl(b.url);setNKey(b.apiKey);setNModel(b.model);setNUa(b.customUserAgent||'');setShowAdd(false);setEditingIdx(idx); };
 
   const refresh = useCallback(async () => {
     const errs: string[] = [];
@@ -45,10 +50,14 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => {
-    if(subTab !== 'logs') return;
+    if (isInSidebar) {
+      const iv = setInterval(async () => { try { setLogs(await proxyGetLogs()); } catch{} }, 3000);
+      return () => clearInterval(iv);
+    }
+    if (subTab !== 'logs') return;
     const iv = setInterval(async () => { try { setLogs(await proxyGetLogs()); } catch{} }, 2000);
     return () => clearInterval(iv);
-  }, [subTab]);
+  }, [subTab, isInSidebar]);
 
   const toggle = useCallback(async () => {
     try { if(status?.running) await proxyStop(); else await proxyStart(); await refresh(); }
@@ -56,49 +65,253 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
   }, [status, refresh]);
 
   const portCh = useCallback(async (p: number) => { if(!config) return; try { setConfig(await proxySaveConfig({...config, port: p})); } catch(e: any) { setError(String(e)); } }, [config]);
-  const uaCh = useCallback(async (ua: string) => { if(!config) return; try { setConfig(await proxySaveConfig({...config, customUserAgent: ua||undefined})); } catch(e: any) { setError(String(e)); } }, [config]);
 
   const addBackend = useCallback(async () => {
     if(!nName||!nUrl||!nKey||!nModel) return;
-    try { await proxyAddBackend({name:nName,url:nUrl,apiKey:nKey,model:nModel,weight:1,maxRetries:2,headers:{}}); setNName('');setNUrl('');setNKey('');setNModel('');setShowAdd(false); await refresh(); }
+    try {
+      if (editingIdx !== null && config) {
+        const backends = [...config.backends];
+        backends[editingIdx] = {
+          ...backends[editingIdx],
+          name:nName, url:nUrl, apiKey:nKey, model:nModel,
+          customUserAgent: nUa || undefined,
+        };
+        await proxySaveConfig({...config, backends});
+      } else {
+        await proxyAddBackend({name:nName,url:nUrl,apiKey:nKey,model:nModel,weight:1,maxRetries:2,headers:{},customUserAgent:nUa||undefined});
+      }
+      resetForm(); await refresh();
+    }
     catch(e: any) { setError(String(e)); }
-  }, [nName,nUrl,nKey,nModel,refresh]);
+  }, [nName,nUrl,nKey,nModel,nUa,editingIdx,config,refresh]);
 
   const rmBackend = useCallback(async (name: string) => { try { await proxyRemoveBackend(name); await refresh(); } catch(e: any) { setError(String(e)); } }, [refresh]);
 
   if(!config) return <div className="flex h-full items-center justify-center text-slate-500">Loading...</div>;
 
+  if (isInSidebar) {
+    return (
+      <div className="h-full flex flex-col p-4 space-y-4 overflow-y-auto">
+        <div className="border-b border-cyber-line pb-2">
+          <h2 className="font-display text-sm uppercase tracking-widest text-cyber-neon font-bold">CliProxyAI</h2>
+          <p className="text-[10px] text-slate-400 mt-0.5">API proxy configurations</p>
+        </div>
+        
+        {/* Toggle Status */}
+        <div className="flex items-center justify-between rounded-lg border border-cyber-line bg-cyber-base/40 p-3 text-xs">
+          <div>
+            <span className="font-semibold text-slate-200 block">Status</span>
+            {status && (
+              <span className={`text-[10px] uppercase font-mono font-bold ${status.running ? 'text-green-400' : 'text-slate-400'}`}>
+                {status.running ? 'Running' : 'Stopped'}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={toggle}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition ${
+              status?.running
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
+                : 'bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 hover:bg-cyber-neon/30'
+            }`}
+          >
+            {status?.running ? <StopIcon /> : <PlayIcon />}
+            {status?.running ? 'Stop' : 'Start'}
+          </button>
+        </div>
+
+        {/* Port */}
+        <div className="space-y-3 rounded-lg border border-cyber-line bg-cyber-base/40 p-3 text-xs">
+          <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Server Settings</h3>
+          <div className="space-y-3">
+            <label className="block space-y-1">
+              <span className="text-[9px] uppercase tracking-wider text-slate-500">Port</span>
+              <input
+                type="number"
+                value={config.port}
+                onChange={e => portCh(Number(e.target.value))}
+                className="w-full bg-cyber-base border border-cyber-line rounded px-2.5 py-1.5 text-xs text-slate-200 focus:border-cyber-neon outline-none"
+                min={1024}
+                max={65535}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Small Logs Summary */}
+        <div className="flex-1 flex flex-col min-h-[220px] border border-cyber-line/50 rounded-lg p-3 bg-cyber-base/20 overflow-hidden">
+          <div className="flex justify-between items-center border-b border-cyber-line/30 pb-2 mb-2">
+            <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Request Logs</h3>
+            <button onClick={refresh} className="text-slate-500 hover:text-slate-300"><RefreshIcon /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-thin text-[10px] font-mono leading-tight">
+            {logs.length === 0 ? (
+              <div className="text-slate-500 italic text-center py-4">No requests yet.</div>
+            ) : (
+              logs.slice().reverse().map(l => (
+                <div key={l.id} className="flex justify-between items-start gap-1 p-1 rounded hover:bg-cyber-line/10">
+                  <span className="text-slate-500 shrink-0">{l.timestamp.split(' ')[1] || l.timestamp}</span>
+                  <span className="text-slate-300 truncate max-w-[80px]">{l.backend}</span>
+                  <span className={l.success ? 'text-green-400' : 'text-red-400'}>{l.status || 'ERR'}</span>
+                  <span className="text-slate-500 text-[9px]">{l.durationMs}ms</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MAIN VIEW RENDER ---
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between p-6 pb-4">
-        <div><h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">CliProxyAI</h2><p className="text-xs text-slate-400 mt-1">OpenAI-compatible API proxy</p></div>
+        <div>
+          <h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">CliProxyAI Backend Configuration</h2>
+          <p className="text-xs text-slate-400 mt-1">Manage upstream AI backend servers and monitor logs</p>
+        </div>
         <div className="flex items-center gap-3">
           {status && (<span className={'px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider '+(status.running?'bg-green-500/20 text-green-400 border border-green-500/30':'bg-slate-500/20 text-slate-400 border border-slate-500/30')}>{status.running?'Running':'Stopped'}</span>)}
           <button onClick={toggle} className={'flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold uppercase tracking-wider transition '+(status?.running?'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30':'bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 hover:bg-cyber-neon/30')}>{status?.running?<><StopIcon/>Stop</>:<><PlayIcon/>Start</>}</button>
         </div>
       </div>
-      {status?.running && (<div className="flex gap-4 text-xs text-slate-400 bg-cyber-line/20 border-y border-cyber-line/30 px-6 py-2"><span>Port: <b className="text-cyber-electric">{status.port}</b></span><span>Backends: <b className="text-cyber-electric">{status.activeBackends}</b></span><span>Requests: <b className="text-cyber-electric">{status.totalRequests}</b></span></div>)}
-      {error && (<div className="mx-6 mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">{error}<button onClick={()=>setError(null)} className="ml-2 underline text-xs">Dismiss</button></div>)}
+
+      {status?.running && (
+        <div className="flex gap-4 text-xs text-slate-400 bg-cyber-line/20 border-y border-cyber-line/30 px-6 py-2">
+          <span>Port: <b className="text-cyber-electric">{status.port}</b></span>
+          <span>Active Backends: <b className="text-cyber-electric">{status.activeBackends}</b></span>
+          <span>Total Requests: <b className="text-cyber-electric">{status.totalRequests}</b></span>
+        </div>
+      )}
+
+      {error && (
+        <div className="mx-6 mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
+          {error}
+          <button onClick={()=>setError(null)} className="ml-2 underline text-xs">Dismiss</button>
+        </div>
+      )}
+
       <div className="flex gap-1 px-6 pt-4 border-b border-cyber-line">
-        {(['config','logs'] as SubTab[]).map(t=>(<button key={t} onClick={()=>setSubTab(t)} className={'px-4 py-2 text-xs font-semibold uppercase tracking-wider transition border-b-2 -mb-[1px] '+(subTab===t?'text-cyber-neon border-cyber-neon':'text-slate-500 border-transparent hover:text-slate-300')}>{t==='config'?'Config':'Logs'}{t==='logs'&&logs.length>0&&(<span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-cyber-line/40 text-slate-400">{logs.length}</span>)}</button>))}
+        {(['config','logs'] as SubTab[]).map(t=>(<button key={t} onClick={()=>setSubTab(t)} className={'px-4 py-2 text-xs font-semibold uppercase tracking-wider transition border-b-2 -mb-[1px] '+(subTab===t?'text-cyber-neon border-cyber-neon':'text-slate-500 border-transparent hover:text-slate-300')}>{t==='config'?'Backend Configurations':'Detailed Logs & Inspector'}{t==='logs'&&logs.length>0&&(<span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-cyber-line/40 text-slate-400">{logs.length}</span>)}</button>))}
         <div className="flex-1"/><button onClick={refresh} className="px-3 py-2 text-slate-500 hover:text-slate-300 transition"><RefreshIcon/></button>
       </div>
+
       <div className="flex-1 overflow-y-auto">
         {subTab==='config'?(
           <div className="p-6 space-y-6">
-            <div className="space-y-4">
-              <h3 className="font-display text-sm uppercase tracking-widest text-slate-300 border-b border-cyber-line pb-2">Settings</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Port</label><input type="number" value={config.port} onChange={e=>portCh(Number(e.target.value))} className="w-full bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none" min={1024} max={65535}/></div>
-                <div><label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">User-Agent</label><input type="text" value={config.customUserAgent??''} onChange={e=>uaCh(e.target.value)} className="w-full bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none" placeholder="CliProxyAI/1.0"/></div>
+            <div className="grid grid-cols-3 gap-6">
+              {/* Left Column: Backend servers configurations */}
+              <div className="col-span-2 space-y-4">
+                <div className="flex items-center justify-between border-b border-cyber-line pb-2">
+                  <h3 className="font-display text-sm uppercase tracking-widest text-slate-300">Upstream Backend Servers ({config.backends.length})</h3>
+                  <button onClick={()=>{resetForm();setShowAdd(true);}} className="flex items-center gap-1 text-xs text-cyber-neon hover:text-cyber-electric transition uppercase tracking-wider"><PlusIcon/>Add Backend</button>
+                </div>
+
+                {(showAdd || editingIdx !== null) && (
+                  <div className="bg-cyber-line/10 border border-cyber-neon/30 rounded-lg p-4 space-y-3">
+                    <h4 className="text-xs uppercase tracking-widest text-cyber-neon">{editingIdx !== null ? 'Edit Upstream Server' : 'New Upstream Server'}</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input value={nName} onChange={e=>setNName(e.target.value)} placeholder="Name (e.g. OpenAI)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nUrl} onChange={e=>setNUrl(e.target.value)} placeholder="Endpoint URL (e.g. https://api.openai.com/v1)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nKey} onChange={e=>setNKey(e.target.value)} placeholder="API Key" type="password" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nModel} onChange={e=>setNModel(e.target.value)} placeholder="Model identifier (e.g. gpt-4o)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nUa} onChange={e=>setNUa(e.target.value)} placeholder="User-Agent (optional, e.g. CliProxyAI/1.0)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={resetForm} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">Cancel</button>
+                      <button onClick={addBackend} disabled={!nName||!nUrl||!nKey||!nModel} className="px-3 py-1.5 text-xs bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 rounded hover:bg-cyber-neon/30 uppercase tracking-wider disabled:opacity-40">{editingIdx !== null ? 'Update' : 'Save Backend'}</button>
+                    </div>
+                  </div>
+                )}
+
+                {config.backends.length===0 ? (
+                  <div className="text-center py-8 text-slate-500 text-sm">No backend servers configured. Requests will return error.</div>
+                ) : (
+                  config.backends.map((b,i)=>(
+                    <div
+                      key={b.name}
+                      draggable
+                      onDragStart={e=>{e.dataTransfer.setData('text/plain',b.name)}}
+                      onDragOver={e=>e.preventDefault()}
+                      onDrop={async e=>{
+                        e.preventDefault();
+                        const from=e.dataTransfer.getData('text/plain');
+                        if(from!==b.name){
+                          const idx=config.backends.findIndex(x=>x.name===from);
+                          const newOrder=[...config.backends];
+                          const[item]=newOrder.splice(idx,1);
+                          const insIdx=newOrder.findIndex(x=>x.name===b.name);
+                          newOrder.splice(insIdx,0,item);
+                          try{setConfig(await proxySaveConfig({...config,backends:newOrder}));}catch{}
+                        }
+                      }}
+                      className="flex items-center gap-3 bg-cyber-line/10 border border-cyber-line/30 rounded-lg px-4 py-3 group hover:border-cyber-line/60 cursor-grab active:cursor-grabbing"
+                    >
+                      <span className="text-[10px] text-slate-600 font-mono w-5">{i+1}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-slate-200 font-semibold truncate">{b.name}</div>
+                        <div className="text-xs text-slate-500 truncate">{b.model} @ {b.url}</div>
+                        {b.customUserAgent && <div className="text-[10px] text-cyber-neon/60 truncate">UA: {b.customUserAgent}</div>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-500 font-semibold">Max Retries:</span>
+                        <input
+                          type="number"
+                          value={b.maxRetries||2}
+                          onChange={async e=>{
+                            const backends=[...config.backends];
+                            backends[i]={...b,maxRetries:Number(e.target.value)};
+                            try{setConfig(await proxySaveConfig({...config,backends}));}catch{}
+                          }}
+                          className="w-12 bg-cyber-base border border-cyber-line rounded px-1 py-0.5 text-[10px] text-slate-300 text-center focus:border-cyber-neon outline-none"
+                          min={1}
+                          max={10}
+                        />
+                        <button onClick={()=>loadBackend(b,i)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyber-neon transition p-1" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.86 3.49a2.2 2.2 0 1 1 3.11 3.11L8 18.57l-4 1 1-4 11.86-12.08Z"/></svg></button>
+                        <button onClick={()=>rmBackend(b.name)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition p-1"><TrashIcon/></button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Right Column: Server settings and Usage */}
+              <div className="col-span-1 space-y-6">
+                <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4 space-y-4">
+                  <h3 className="text-xs uppercase font-bold tracking-wider text-slate-400">Server Settings</h3>
+                  <div className="space-y-4">
+                    <label className="block space-y-1">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400">Port</span>
+                      <input
+                        type="number"
+                        value={config.port}
+                        onChange={e => portCh(Number(e.target.value))}
+                        className="w-full bg-cyber-base border border-cyber-line rounded px-3 py-2 text-xs text-slate-200 focus:border-cyber-neon outline-none font-mono"
+                        min={1024}
+                        max={65535}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="bg-cyber-line/5 border border-cyber-line/20 rounded-lg p-4 space-y-2">
+                  <h4 className="text-xs uppercase tracking-widest text-slate-400">Usage Example</h4>
+                  <code className="text-[10px] text-cyber-neon block bg-cyber-base rounded p-2 overflow-x-auto scrollbar-none font-mono select-all">
+                    curl http://127.0.0.1:{config.port}/v1/chat/completions
+                  </code>
+                </div>
+
+                <div className="rounded-xl border border-cyber-line/30 bg-cyber-base/20 p-4 text-xs leading-relaxed text-slate-400 space-y-2">
+                  <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                    <span>💡</span> API Proxy Server
+                  </div>
+                  <p>
+                    All API requests sent to port <span className="text-cyber-neon font-mono font-bold">{config.port}</span> will be load-balanced and proxy-passed to the active backends.
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-cyber-line pb-2"><h3 className="font-display text-sm uppercase tracking-widest text-slate-300">Backends ({config.backends.length})</h3><button onClick={()=>setShowAdd(true)} className="flex items-center gap-1 text-xs text-cyber-neon hover:text-cyber-electric transition uppercase tracking-wider"><PlusIcon/>Add</button></div>
-              {showAdd && (<div className="bg-cyber-line/10 border border-cyber-neon/30 rounded-lg p-4 space-y-3"><h4 className="text-xs uppercase tracking-widest text-cyber-neon">New Backend</h4><div className="grid grid-cols-2 gap-3"><input value={nName} onChange={e=>setNName(e.target.value)} placeholder="Name" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/><input value={nUrl} onChange={e=>setNUrl(e.target.value)} placeholder="URL" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/><input value={nKey} onChange={e=>setNKey(e.target.value)} placeholder="API Key" type="password" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/><input value={nModel} onChange={e=>setNModel(e.target.value)} placeholder="Model" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/></div><div className="flex gap-2 justify-end"><button onClick={()=>setShowAdd(false)} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">Cancel</button><button onClick={addBackend} disabled={!nName||!nUrl||!nKey||!nModel} className="px-3 py-1.5 text-xs bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 rounded hover:bg-cyber-neon/30 uppercase tracking-wider disabled:opacity-40">Save</button></div></div>)}
-              {config.backends.length===0?<div className="text-center py-8 text-slate-500 text-sm">No backends.</div>:config.backends.map((b,i)=>(<div key={b.name} draggable onDragStart={e=>{e.dataTransfer.setData('text/plain',b.name)}} onDragOver={e=>e.preventDefault()} onDrop={async e=>{e.preventDefault();const from=e.dataTransfer.getData('text/plain');if(from!==b.name){const idx=config.backends.findIndex(x=>x.name===from);const newOrder=[...config.backends];const[item]=newOrder.splice(idx,1);const insIdx=newOrder.findIndex(x=>x.name===b.name);newOrder.splice(insIdx,0,item);try{setConfig(await proxySaveConfig({...config,backends:newOrder}));}catch{}}} } className="flex items-center gap-3 bg-cyber-line/10 border border-cyber-line/30 rounded-lg px-4 py-3 group hover:border-cyber-line/60 cursor-grab active:cursor-grabbing"><span className="text-[10px] text-slate-600 font-mono w-5">{i+1}</span><div className="flex-1 min-w-0"><div className="text-sm text-slate-200 font-semibold truncate">{b.name}</div><div className="text-xs text-slate-500 truncate">{b.model} @ {b.url}</div></div><div className="flex items-center gap-2"><input type="number" value={b.maxRetries||2} onChange={async e=>{const backends=[...config.backends];backends[i]={...b,maxRetries:Number(e.target.value)};try{setConfig(await proxySaveConfig({...config,backends}));}catch{}}} className="w-12 bg-cyber-base border border-cyber-line rounded px-1 py-0.5 text-[10px] text-slate-300 text-center focus:border-cyber-neon outline-none" title="Max retries" min={1} max={10}/><button onClick={()=>rmBackend(b.name)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition p-1"><TrashIcon/></button></div></div>))}
-            </div>
-            <div className="bg-cyber-line/5 border border-cyber-line/20 rounded-lg p-4"><h4 className="text-xs uppercase tracking-widest text-slate-400 mb-2">Usage</h4><code className="text-xs text-slate-500 block bg-cyber-base rounded p-2">curl http://127.0.0.1:{config.port}/v1/chat/completions</code></div>
           </div>
         ):(
           <LogsTab logs={logs}/>

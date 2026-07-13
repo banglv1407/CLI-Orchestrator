@@ -7,6 +7,12 @@ import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import type { CliOutputEvent, CliStatusEvent, SessionInfo, SshConnection, AppTheme, FileEntry, RipgrepMatch } from '../types';
 import { listAllFilesRecursive, listSshFilesRecursive, ripgrepSearch } from '../lib/tauri';
+import { QuickAppsPanel } from './QuickAppsPanel';
+import { ApiClientPanel } from './ApiClientPanel';
+import { ProxyPanel } from './ProxyPanel';
+import { SystemLogPanel } from './SystemLogPanel';
+import { SettingsPanel } from './SettingsPanel';
+import { RemoteSshPanel } from './RemoteSshPanel';
 
 function FileIcon() {
   return (
@@ -71,7 +77,9 @@ interface TerminalPanelProps {
 
   onReorderSessions: (draggedId: string, targetId: string) => void;
   onMoveSessionToPanel: (sessionId: string, panel: 'bottom' | 'right') => void;
+  activeMainView: string;
   theme?: AppTheme;
+  setTheme?: (theme: AppTheme) => void;
 
   // Global context menu state lifted to Dashboard
   contextMenu: { x: number; y: number; sessionId: string | null; workingDir: string | null } | null;
@@ -122,7 +130,9 @@ export function TerminalPanel({
 
   onReorderSessions,
   onMoveSessionToPanel,
+  activeMainView,
   theme,
+  setTheme,
   contextMenu,
   setContextMenu,
 }: TerminalPanelProps) {
@@ -981,6 +991,13 @@ export function TerminalPanel({
           event.preventDefault();
           return false;
         }
+        if (event.ctrlKey && event.key === 'p') {
+          if (event.type === 'keydown') {
+            const evt = new CustomEvent('trigger-command-palette');
+            window.dispatchEvent(evt);
+          }
+          return false;
+        }
         if (event.ctrlKey && event.key === 'f') {
           if (event.type === 'keydown') {
             openSearch();
@@ -1350,9 +1367,11 @@ export function TerminalPanel({
     };
   }, [visibleSessionId]);
 
-  // Re-fit terminal when file overlay is closed so xterm recalculates its dimensions
+  // Re-fit terminal when file overlay is closed or main view switches back to terminal,
+  // so xterm recalculates its dimensions after its container becomes visible again.
   useEffect(() => {
     if (openedFile !== null) return; // file is open, terminals are hidden
+    if (activeMainView !== 'terminal') return; // a different panel is showing, terminal hidden
     if (!visibleSessionId) return;
 
     const handle = terminalRefs.current[visibleSessionId];
@@ -1380,7 +1399,7 @@ export function TerminalPanel({
       window.clearTimeout(t3);
       window.clearTimeout(t4);
     };
-  }, [openedFile, visibleSessionId]);
+  }, [activeMainView, openedFile, visibleSessionId]);
   const fitTerminalRef = useRef(fitTerminal);
   useEffect(() => {
     fitTerminalRef.current = fitTerminal;
@@ -1447,15 +1466,32 @@ export function TerminalPanel({
 
   const activeSession = sessions.find((s) => s.id === visibleSessionId);
 
+  const [miniTerminalScale, setMiniTerminalScale] = useState<number>(() => {
+    const saved = localStorage.getItem('clx-mini-terminal-scale');
+    return saved ? parseFloat(saved) : 1.0;
+  });
+
+  const handleAdjustScale = useCallback((delta: number) => {
+    setMiniTerminalScale((prev) => {
+      const next = Math.min(2.0, Math.max(0.5, prev + delta));
+      localStorage.setItem('clx-mini-terminal-scale', next.toFixed(1));
+      return next;
+    });
+  }, []);
+
   // Dynamic height and scale calculation to ensure up to 10 sessions fit on a single screen without scrolling!
   const thumbSizes = useMemo(() => {
+    const baseHeight = 110;
+    const baseWidth = 176;
+    const baseScale = 0.275;
+    const baseContainer = 204;
     return {
-      cardHeight: 110,
-      cardWidth: 176,
-      scale: 0.275,
-      containerWidth: 204
+      cardHeight: Math.round(baseHeight * miniTerminalScale),
+      cardWidth: Math.round(baseWidth * miniTerminalScale),
+      scale: baseScale * miniTerminalScale,
+      containerWidth: Math.round(baseContainer * miniTerminalScale)
     };
-  }, []);
+  }, [miniTerminalScale]);
 
   const fileDirty = openedFile !== null && fileContent !== fileOriginalContent;
   const relPath = openedFileRootPath && openedFile ? getRelativePath(openedFile.path, openedFileRootPath) : '';
@@ -1463,7 +1499,7 @@ export function TerminalPanel({
 
   return (
     <section className="flex h-full w-full rounded-xl border border-cyber-line bg-cyber-panel/70 overflow-hidden relative">
-      {sessions.length === 0 && !openedFile ? (
+      {sessions.length === 0 && !openedFile && activeMainView === 'terminal' ? (
         <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
           No interactive sessions. Create one from the sidebar.
         </div>
@@ -1752,19 +1788,19 @@ export function TerminalPanel({
                 </div>
               )}
 
-              {/* Active terminal canvas viewport — always mounted to preserve xterm state */}
+              {/* Active terminal canvas viewport — terminals always mounted, sub-views overlay */}
               <div className="flex-1 w-full h-full min-h-0 relative">
-                {/* Terminals: always rendered, never unmounted, just hidden when file is open */}
+                {/* Terminals: always in DOM, hidden by visibility */}
                 {sessions.map((session) => (
                   <div
                     key={`main-${session.id}`}
                     style={{
                       position: 'absolute',
-                      left: !openedFile && visibleSessionId === session.id ? 0 : '-9999px',
+                      left: (!openedFile && activeMainView === 'terminal' && visibleSessionId === session.id) ? 0 : '-9999px',
                       top: 0,
                       width: '100%',
                       height: '100%',
-                      visibility: !openedFile && visibleSessionId === session.id ? 'visible' : 'hidden',
+                      visibility: (!openedFile && activeMainView === 'terminal' && visibleSessionId === session.id) ? 'visible' : 'hidden',
                     }}
                   >
                     <div
@@ -1780,6 +1816,13 @@ export function TerminalPanel({
                     />
                   </div>
                 ))}
+                {/* Sub-view overlays */}
+                {activeMainView === 'quickapps' && <QuickAppsPanel />}
+                {activeMainView === 'apiclient' && <ApiClientPanel />}
+                {activeMainView === 'proxy' && <ProxyPanel />}
+                {activeMainView === 'logs' && <SystemLogPanel />}
+                {activeMainView === 'settings' && <SettingsPanel theme={theme!} setTheme={setTheme!} />}
+                {activeMainView === 'remote' && <RemoteSshPanel />}
 
                 {/* File viewer overlay — rendered on top of terminals when a file is open */}
                 {openedFile && (
@@ -1952,12 +1995,34 @@ export function TerminalPanel({
                     }
                   }
                 }}
-                className={`${sshSessions.length === 0 ? 'h-[110px]' : 'h-[170px]'} shrink-0 border-t border-cyber-line/50 bg-[#070b16] p-3 flex flex-col gap-2 overflow-hidden select-none transition-all duration-300`}
+                style={{ height: sshSessions.length === 0 ? `${Math.round(110 * miniTerminalScale)}px` : `${thumbSizes.cardHeight + 60}px` }}
+                className="shrink-0 border-t border-cyber-line/50 bg-[#070b16] p-3 flex flex-col gap-2 overflow-hidden select-none transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="font-display text-[9px] uppercase tracking-[0.15em] text-cyber-electric font-bold">
-                    ⚡ CMD ({sshSessions.length})
-                  </h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-display text-[9px] uppercase tracking-[0.15em] text-cyber-electric font-bold">
+                      ⚡ CMD ({sshSessions.length})
+                    </h3>
+                    <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-0.5 scale-90 select-none">
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustScale(-0.1)}
+                        title="Smaller mini terminals"
+                        className="text-[9px] text-slate-400 hover:text-cyber-electric transition px-0.5"
+                      >
+                        ➖
+                      </button>
+                      <span className="text-[8px] font-mono text-slate-500 font-semibold">{Math.round(miniTerminalScale * 100)}%</span>
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustScale(0.1)}
+                        title="Larger mini terminals"
+                        className="text-[9px] text-slate-400 hover:text-cyber-electric transition px-0.5"
+                      >
+                        ➕
+                      </button>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => onQuickSession?.('bottom')}
@@ -2082,9 +2147,30 @@ export function TerminalPanel({
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">
-                  AI AGENT ({cliSessions.length})
-                </h3>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">
+                    AI AGENT ({cliSessions.length})
+                  </h3>
+                  <div className="flex items-center gap-0.5 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-0.5 scale-75 select-none shrink-0 origin-left">
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustScale(-0.1)}
+                      title="Smaller mini terminals"
+                      className="text-[9px] text-slate-400 hover:text-cyber-electric transition"
+                    >
+                      ➖
+                    </button>
+                    <span className="text-[8px] font-mono text-slate-500 font-semibold">{Math.round(miniTerminalScale * 100)}%</span>
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustScale(0.1)}
+                      title="Larger mini terminals"
+                      className="text-[9px] text-slate-400 hover:text-cyber-electric transition"
+                    >
+                      ➕
+                    </button>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => onQuickSession?.('right')}

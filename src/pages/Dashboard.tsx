@@ -7,11 +7,7 @@ import { CliStartModal } from '../components/CliStartModal';
 import { CliSidebar } from '../components/CliSidebar';
 import { TerminalPanel } from '../components/TerminalPanel';
 import { SshConnectionModal } from '../components/SshConnectionModal';
-import { QuickAppsPanel } from '../components/QuickAppsPanel';
-import { ApiClientPanel } from '../components/ApiClientPanel';
 import { MythicalPet } from '../components/MythicalPet';
-import { ProxyPanel } from '../components/ProxyPanel';
-import { SystemLogPanel } from '../components/SystemLogPanel';
 import { Notepad } from '../components/Notepad';
 import { CommandPalette } from '../components/CommandPalette';
 import {
@@ -42,6 +38,7 @@ import type {
   CliDefinition,
   CliSavedDirectory,
   CliStatusEvent,
+  GitStatusEntry,
   SessionInfo,
   SshConnection,
 } from '../types';
@@ -73,7 +70,7 @@ export function Dashboard() {
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
-  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'apiclient' | 'proxy' | 'logs'>('terminal');
+  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote'>('terminal');
   const [showNotepad, setShowNotepad] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -95,15 +92,125 @@ export function Dashboard() {
   const [newFileContent, setNewFileContent] = useState('');
   const [newFileError, setNewFileError] = useState<string | null>(null);
 
+  const [selectedText, setSelectedText] = useState('');
+  const [rewriteModal, setRewriteModal] = useState<{
+    open: boolean;
+    type: 'rewrite' | 'suggest' | 'summarize' | 'title';
+    originalText: string;
+    resultText: string;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
+
   const handleContextMenu = useCallback((e: React.MouseEvent, sessionId: string | null, workingDir: string | null) => {
     e.preventDefault();
+    const sel = window.getSelection()?.toString() || '';
+    setSelectedText(sel);
     setContextMenu({ x: e.clientX, y: e.clientY, sessionId, workingDir });
   }, []);
+
+  const handleOptimizeSelection = async (type: 'rewrite' | 'suggest' | 'summarize' | 'title') => {
+    const text = selectedText.trim();
+    setContextMenu(null);
+    setRewriteModal({
+      open: true,
+      type,
+      originalText: text,
+      resultText: '',
+      loading: true,
+      error: null,
+    });
+
+    // Default configuration for cloud LLM
+    const DEFAULT_LLM_CONFIG = {
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      apiKey: '',
+      headers: {
+        'User-Agent': 'AI-CLI-Orchestrator'
+      },
+      systemPrompt: 'You are an intelligent terminal companion helping developers with their terminal commands and daily programming tasks. Keep your answers concise, practical and optimized.',
+      stream: false
+    };
+
+    // Load cloud LLM config on-demand from localStorage
+    let llmConfig = DEFAULT_LLM_CONFIG;
+    const saved = localStorage.getItem('ai-cli-llm-config');
+    if (saved) {
+      try {
+        llmConfig = JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Define task-specific system prompts for cloud LLM
+    let systemPrompt = '';
+    if (type === 'rewrite') {
+      systemPrompt = 'You are an expert prompt engineer. Your task is to rewrite the user\'s prompt to make it clear, explicit, structured, and highly effective for LLMs. Improve grammar, clarify intent, and add necessary context if missing. Do NOT answer the prompt itself, just rewrite and optimize it. Output ONLY the optimized prompt content, nothing else (no headers, no markdown blocks, no conversational preamble).';
+    } else if (type === 'suggest') {
+      systemPrompt = 'You are an expert CLI command assistant. The user will provide a command or describe what they want to do. You must analyze it, fix any errors, or suggest the correct, optimized shell commands (like bash, powershell, git, docker, etc.). Output ONLY the suggested command or instruction directly. Do NOT write any explanations, comments, or markdown code block backticks. Just output the command itself.';
+    } else if (type === 'summarize') {
+      systemPrompt = 'Summarize the following terminal output, logs, or text in a concise and clear manner. Focus on errors, warnings, and key events. Keep it short. Output ONLY the summary.';
+    } else if (type === 'title') {
+      systemPrompt = 'Generate a very short, concise title (max 5 words) for the following text. Do not put quotes around the title. Output ONLY the title itself.';
+    }
+
+    try {
+      // Try Cloud/Configured LLM first
+      const reply = await invoke<string>('send_llm_chat', {
+        request: {
+          baseUrl: llmConfig.baseUrl,
+          model: llmConfig.model,
+          apiKey: llmConfig.apiKey,
+          headers: llmConfig.headers,
+          systemPrompt: systemPrompt,
+          messages: [{ role: 'user', content: text }],
+          stream: false,
+        },
+      });
+      setRewriteModal(prev => prev ? { ...prev, resultText: reply.trim(), loading: false } : null);
+    } catch (cloudErr) {
+      console.warn('Cloud LLM failed, falling back to local LLM:', cloudErr);
+      
+      // Local LLM Fallback
+      try {
+        const status = await invoke<any>('builtin_llm_status');
+        if (!status.loaded) {
+          await invoke('builtin_llm_load');
+        }
+        const reply = await invoke<string>('builtin_llm_generate', {
+          prompt: text,
+          task: type,
+        });
+        setRewriteModal(prev => prev ? { ...prev, resultText: `[Local Fallback] ${reply.trim()}`, loading: false } : null);
+      } catch (localErr: any) {
+        console.error('Both Cloud LLM and Local LLM fallback failed:', localErr);
+        setRewriteModal(prev => prev ? { 
+          ...prev, 
+          error: `Cloud LLM Error: ${String(cloudErr)}\nLocal LLM Fallback Error: ${String(localErr)}`, 
+          loading: false 
+        } : null);
+      }
+    }
+  };
 
   useEffect(() => {
     const handleGlobalClick = () => setContextMenu(null);
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  // Listen for custom view switch events from sidebar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvt = e as CustomEvent<string>;
+      if (customEvt.detail) {
+        setActiveMainView(customEvt.detail as any);
+      }
+    };
+    window.addEventListener('switch-main-view', handler);
+    return () => window.removeEventListener('switch-main-view', handler);
   }, []);
 
   const handleNewFile = useCallback(() => {
@@ -168,8 +275,17 @@ export function Dashboard() {
         setShowNotepad((v) => !v);
       }
     };
+    
+    const customPaletteHandler = () => {
+      setPaletteOpen((v) => !v);
+    };
+
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('trigger-command-palette', customPaletteHandler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener('trigger-command-palette', customPaletteHandler);
+    };
   }, []);
 
   const [recentFolders, setRecentFolders] = useState<string[]>(() => {
@@ -206,10 +322,10 @@ export function Dashboard() {
         if (existing?.panel) {
           return { ...s, panel: existing.panel };
         }
-        return {
-          ...s,
-          panel: 'right',
-        };
+        // SSH & Quick shell sessions auto-dock to bottom
+        const isSsh = s.cliName.startsWith('SSH: ');
+        const isQuick = s.cliName === 'Quick - shell';
+        return { ...s, panel: (isSsh || isQuick) ? 'bottom' : 'right' };
       });
     });
 
@@ -361,9 +477,11 @@ export function Dashboard() {
     (session: SessionInfo) => {
       setSessions((current) => {
         const index = current.findIndex((item) => item.id === session.id);
+        const isSshOrQuick = session.cliName.startsWith('SSH: ') || session.cliName === 'Quick - shell';
+        const defaultPanel = isSshOrQuick ? 'bottom' : 'right';
         const sessionWithPanel = {
           ...session,
-          panel: session.panel || 'right',
+          panel: session.panel || defaultPanel,
         };
         if (index >= 0) {
           const next = [...current];
@@ -389,7 +507,7 @@ export function Dashboard() {
   const [viewMode, setViewMode] = useState<'edit' | 'diff'>('edit');
   const [gitDiffContent, setGitDiffContent] = useState<string>('');
   const [isDiffLoading, setIsDiffLoading] = useState(false);
-  const [gitStatusList, setGitStatusList] = useState<{ path: string; status: 'modified' | 'added' | 'deleted' | 'untracked' }[]>([]);
+  const [gitStatusList, setGitStatusList] = useState<GitStatusEntry[]>([]);
 
   const activeSession = useMemo(() => sessions.find((s) => s.id === activeSessionId), [sessions, activeSessionId]);
   const isSshSession = useMemo(() => !!activeSession?.cliName.startsWith('SSH: '), [activeSession]);
@@ -888,58 +1006,49 @@ export function Dashboard() {
 
         onQuickAppsTabChange={(isActive) => setActiveMainView(isActive ? 'quickapps' : 'terminal')}
         onApiClientTabChange={(isActive) => setActiveMainView(isActive ? 'apiclient' : 'terminal')}
-        onProxyTabChange={(isActive) => { /* Proxy renders in sidebar, keep main area as-is */ }}
+        onProxyTabChange={(isActive) => setActiveMainView(isActive ? 'proxy' : 'terminal')}
         onLogsTabChange={(isActive) => setActiveMainView(isActive ? 'logs' : 'terminal')}
       />
 
       <section className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
-        <div className="flex-1 h-full w-full">
-          {activeMainView === 'quickapps' ? (
-            <QuickAppsPanel />
-          ) : activeMainView === 'apiclient' ? (
-            <ApiClientPanel />
-          ) : activeMainView === 'proxy' ? (
-            <ProxyPanel />
-          ) : activeMainView === 'logs' ? (
-            <SystemLogPanel />
-          ) : (
-            <TerminalPanel
-              sessions={sessions}
-              activeSessionId={activeSessionId}
-              onSelectSession={(sessId) => {
-                setActiveSessionId(sessId);
-                handleCloseFile();
-              }}
-              onSendInput={handleSendTerminalInput}
-              onStopSession={handleStopSession}
-              onSaveTag={handleSaveProjectTag}
-              sshConnections={sshConnections}
-              onQuickSession={handleQuickSession}
+        <TerminalPanel
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={(sessId) => {
+            setActiveSessionId(sessId);
+            handleCloseFile();
+            setActiveMainView('terminal');
+          }}
+          onSendInput={handleSendTerminalInput}
+          onStopSession={handleStopSession}
+          onSaveTag={handleSaveProjectTag}
+          sshConnections={sshConnections}
+          onQuickSession={handleQuickSession}
 
-              openedFile={openedFile}
-              openedFileRootPath={openedFileRootPath}
-              fileContent={fileContent}
-              setFileContent={setFileContent}
-              fileOriginalContent={fileOriginalContent}
-              isSavingFile={isSavingFile}
-              fileLoadError={fileLoadError}
-              isFileLoading={isFileLoading}
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-              gitDiffContent={gitDiffContent}
-              isDiffLoading={isDiffLoading}
-              gitStatusList={gitStatusList}
-              onSaveFile={handleSaveFile}
-              onCloseFile={handleCloseFile}
+          openedFile={openedFile}
+          openedFileRootPath={openedFileRootPath}
+          fileContent={fileContent}
+          setFileContent={setFileContent}
+          fileOriginalContent={fileOriginalContent}
+          isSavingFile={isSavingFile}
+          fileLoadError={fileLoadError}
+          isFileLoading={isFileLoading}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          gitDiffContent={gitDiffContent}
+          isDiffLoading={isDiffLoading}
+          gitStatusList={gitStatusList}
+          onSaveFile={handleSaveFile}
+          onCloseFile={handleCloseFile}
 
-              onReorderSessions={handleReorderSessions}
-              onMoveSessionToPanel={handleMoveSessionToPanel}
-              theme={theme}
-              contextMenu={contextMenu}
-              setContextMenu={setContextMenu}
-            />
-          )}
-        </div>
+          onReorderSessions={handleReorderSessions}
+          onMoveSessionToPanel={handleMoveSessionToPanel}
+          activeMainView={activeMainView}
+          theme={theme}
+          setTheme={setTheme}
+          contextMenu={contextMenu}
+          setContextMenu={setContextMenu}
+        />
       </section>
 
       <CliEditorModal
@@ -1008,7 +1117,7 @@ export function Dashboard() {
               ✨ New
               <span className="ml-auto text-[9px] text-slate-500">▶</span>
             </div>
-            <div className="absolute left-full top-0 ml-1 hidden group-hover:block w-44 rounded-lg border border-cyber-neon/30 bg-cyber-panel/95 p-1 shadow-2xl backdrop-blur-md z-[101]">
+            <div className="absolute left-[98%] top-0 hidden group-hover:block w-44 rounded-lg border border-cyber-neon/30 bg-cyber-panel/95 p-1 shadow-2xl backdrop-blur-md z-[101]">
               <button
                 type="button"
                 onClick={handleNewFile}
@@ -1040,29 +1149,35 @@ export function Dashboard() {
             </button>
           )}
 
-          {contextMenu.sessionId && (
-            <button
-              type="button"
-              onClick={() => {
-                void navigator.clipboard.writeText(contextMenu.sessionId!);
-              }}
-              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
-            >
-              📋 Copy Session ID
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={async () => {
+              try { const text = await navigator.clipboard.readText(); if (activeSessionId) handleSendTerminalInput(activeSessionId, text); } catch {}
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
+          >
+            📋 Paste
+          </button>
 
-          {contextMenu.workingDir && (
+          <div className="my-1 border-t border-cyber-line/50" />
+
+          {selectedText.trim() && (
             <>
               <div className="my-1 border-t border-cyber-line/50" />
               <button
                 type="button"
-                onClick={() => {
-                  handleQuickSession('right');
-                }}
+                onClick={() => handleOptimizeSelection('rewrite')}
                 className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition"
               >
-                ⚡ Quick Terminal Here
+                ✨ Optimize Selection
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOptimizeSelection('suggest')}
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition"
+              >
+                💻 Fix/Suggest Command
               </button>
             </>
           )}
@@ -1138,6 +1253,87 @@ export function Dashboard() {
                 className="rounded-lg bg-cyber-neon/20 border border-cyber-neon/50 px-5 py-2 text-[11px] font-bold text-cyber-neon hover:bg-cyber-neon/30 transition disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── AI Selection Optimizer Modal ── */}
+      {rewriteModal?.open && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-[500px] rounded-xl border border-cyber-neon/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none">
+            <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-neon font-bold mb-4">
+              {rewriteModal.type === 'suggest' ? '💻 AI Command Suggester' : '✨ AI Prompt Optimizer'}
+            </h2>
+
+            <div className="mb-4">
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Original Text</label>
+              <div className="max-h-24 overflow-y-auto rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[11px] text-slate-400 font-mono whitespace-pre-wrap break-all">
+                {rewriteModal.originalText}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Optimized Result</label>
+              {rewriteModal.loading ? (
+                <div className="flex flex-col items-center justify-center py-8 rounded border border-cyber-line bg-cyber-base/30 text-cyber-neon/80 text-xs font-mono">
+                  <svg className="animate-spin h-5 w-5 mb-2 text-cyber-neon" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Running built-in local inference...</span>
+                </div>
+              ) : rewriteModal.error ? (
+                <div className="rounded border border-red-500/30 bg-red-950/20 px-3 py-2 text-[11px] text-red-400 font-mono whitespace-pre-wrap break-all">
+                  {rewriteModal.error}
+                </div>
+              ) : (
+                <textarea
+                  value={rewriteModal.resultText}
+                  onChange={(e) => setRewriteModal({ ...rewriteModal, resultText: e.target.value })}
+                  rows={6}
+                  className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-[11px] text-slate-100 font-mono outline-none focus:border-cyber-neon resize-y"
+                />
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 text-xs font-mono mt-6">
+              {!rewriteModal.loading && !rewriteModal.error && rewriteModal.resultText && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(rewriteModal.resultText);
+                      alert('Copied to clipboard!');
+                    }}
+                    className="rounded border border-cyber-line px-4 py-2 hover:bg-cyber-line/20 text-slate-300 transition uppercase"
+                  >
+                    📋 Copy
+                  </button>
+                  {activeSessionId && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await sendCliInput(activeSessionId, rewriteModal.resultText + '\n');
+                          setRewriteModal(null);
+                        } catch (e) {
+                          alert(`Failed to send to terminal: ${e}`);
+                        }
+                      }}
+                      className="rounded border border-cyber-neon/40 bg-cyber-neon/15 px-4 py-2 hover:bg-cyber-neon/25 text-cyber-neon transition uppercase font-bold"
+                    >
+                      ⚡ Run in Terminal
+                    </button>
+                  )}
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setRewriteModal(null)}
+                className="rounded border border-cyber-line px-4 py-2 hover:bg-cyber-line/20 text-slate-300 transition uppercase"
+              >
+                Close
               </button>
             </div>
           </div>

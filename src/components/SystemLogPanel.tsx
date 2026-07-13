@@ -99,7 +99,7 @@ export function SystemLogPanel() {
                 </td>
               </tr>
             ) : (
-              filtered.map((entry, i) => {
+              [...filtered].reverse().map((entry, i) => {
                 const colorClass = LEVEL_COLORS[entry.level] || LEVEL_COLORS.DEBUG;
                 return (
                   <tr key={i} className="hover:bg-cyber-line/10 border-b border-cyber-line/20">

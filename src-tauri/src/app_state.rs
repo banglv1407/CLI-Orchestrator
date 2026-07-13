@@ -21,6 +21,7 @@ pub struct AppState {
     pub proxy_server: Arc<ProxyServer>,
     pub logger: Arc<SystemLogger>,
     pub ssh_server_manager: Arc<std::sync::Mutex<crate::core::ssh_server::SshServerManager>>,
+    pub builtin_llm: Arc<tokio::sync::Mutex<crate::builtin_llm::engine::BuiltinLlmEngine>>,
 }
 
 impl AppState {
@@ -33,6 +34,18 @@ impl AppState {
         let proxy_server = Arc::new(ProxyServer::new(proxy_config));
         let logger = Arc::new(SystemLogger::new(registry.data_dirs().logs_dir));
 
+        let builtin_config = crate::builtin_llm::config::BuiltinLlmConfig::load();
+        let mut builtin_llm_engine = crate::builtin_llm::engine::BuiltinLlmEngine::new(builtin_config.clone());
+        
+        // Auto load if enabled
+        if builtin_config.enabled {
+            if let Err(e) = builtin_llm_engine.load_model() {
+                eprintln!("Failed to auto-load built-in LLM: {}", e);
+            }
+        }
+        
+        let builtin_llm = Arc::new(tokio::sync::Mutex::new(builtin_llm_engine));
+
         Ok(Self {
             registry,
             project_store,
@@ -42,6 +55,7 @@ impl AppState {
             proxy_server,
             logger,
             ssh_server_manager: Arc::new(std::sync::Mutex::new(crate::core::ssh_server::SshServerManager::new())),
+            builtin_llm,
         })
     }
 }

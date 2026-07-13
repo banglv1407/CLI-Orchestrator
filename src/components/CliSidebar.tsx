@@ -18,12 +18,7 @@ import {
   listSshDirectoryFiles,
   listAllFilesRecursive,
   listSshFilesRecursive,
-  startSshServer,
-  stopSshServer,
-  getSshServerStatus,
-  getSshServerConfig,
-  saveSshServerConfig,
-  type SshServerConfig,
+  deleteFileOrDir,
 } from '../lib/tauri';
 
 // --- SVG Icons ---
@@ -328,32 +323,343 @@ export function CliSidebar({
   const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
 
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
-    if (activeTab === tab && !isSidebarCollapsed) {
+    const tabsWithNoLeftArea = new Set(['quickapps', 'proxy', 'logs', 'remote', 'settings']);
+    
+    if (tabsWithNoLeftArea.has(tab)) {
       setIsSidebarCollapsed(true);
       localStorage.setItem('ai-cli-sidebar-collapsed', 'true');
-    } else {
-      setIsSidebarCollapsed(false);
-      localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
-      const trackedTabs = new Set(['quickapps', 'apiclient', 'proxy', 'logs']);
-      const leavingTracked = trackedTabs.has(activeTab);
-      const enteringTracked = trackedTabs.has(tab);
-
       setActiveTab(tab);
 
-      if (!enteringTracked && leavingTracked) {
-        // Leaving a tracked tab for a non-tracked tab → reset to terminal
+      if (tab === 'quickapps' && onQuickAppsTabChange) onQuickAppsTabChange(true);
+      else if (tab === 'proxy' && onProxyTabChange) onProxyTabChange(true);
+      else if (tab === 'logs' && onLogsTabChange) onLogsTabChange(true);
+      else if (tab === 'settings') {
         if (onQuickAppsTabChange) onQuickAppsTabChange(false);
         if (onApiClientTabChange) onApiClientTabChange(false);
         if (onProxyTabChange) onProxyTabChange(false);
-      } else if (enteringTracked) {
-        // Entering a tracked tab (possibly from another tracked tab)
-        if (tab === 'quickapps' && onQuickAppsTabChange) onQuickAppsTabChange(true);
-        else if (tab === 'apiclient' && onApiClientTabChange) onApiClientTabChange(true);
-        else if (tab === 'proxy' && onProxyTabChange) onProxyTabChange(true);
-        else if (tab === 'logs' && onLogsTabChange) onLogsTabChange(true);
+        if (onLogsTabChange) onLogsTabChange(false);
+        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'settings' }));
+      }
+      else if (tab === 'remote') {
+        if (onQuickAppsTabChange) onQuickAppsTabChange(false);
+        if (onApiClientTabChange) onApiClientTabChange(false);
+        if (onProxyTabChange) onProxyTabChange(false);
+        if (onLogsTabChange) onLogsTabChange(false);
+        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'remote' }));
+      }
+    } else {
+      if (activeTab === tab && !isSidebarCollapsed) {
+        setIsSidebarCollapsed(true);
+        localStorage.setItem('ai-cli-sidebar-collapsed', 'true');
+      } else {
+        setIsSidebarCollapsed(false);
+        localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
+        
+        const trackedTabs = new Set(['quickapps', 'apiclient', 'proxy', 'logs']);
+        const leavingTracked = trackedTabs.has(activeTab) || tabsWithNoLeftArea.has(activeTab);
+        const enteringTracked = trackedTabs.has(tab);
+
+        setActiveTab(tab);
+
+        if (!enteringTracked && leavingTracked) {
+          if (onQuickAppsTabChange) onQuickAppsTabChange(false);
+          if (onApiClientTabChange) onApiClientTabChange(false);
+          if (onProxyTabChange) onProxyTabChange(false);
+          if (onLogsTabChange) onLogsTabChange(false);
+          window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'terminal' }));
+        } else if (enteringTracked) {
+          if (tab === 'quickapps' && onQuickAppsTabChange) onQuickAppsTabChange(true);
+          else if (tab === 'apiclient' && onApiClientTabChange) onApiClientTabChange(true);
+          else if (tab === 'proxy' && onProxyTabChange) onProxyTabChange(true);
+          else if (tab === 'logs' && onLogsTabChange) onLogsTabChange(true);
+        } else {
+          // If entering standard tab from standard tab (e.g. explorer -> cli-manager)
+          window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'terminal' }));
+        }
       }
     }
   }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange, onApiClientTabChange, onProxyTabChange, onLogsTabChange]);
+
+  // --- Sidebar Tabs Reordering (Dynamic Icons) ---
+  const [tabsOrder, setTabsOrder] = useState<SidebarTab[]>(() => {
+    const saved = localStorage.getItem('ai-cli-sidebar-tabs-order');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed as SidebarTab[];
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return ['cli-manager', 'explorer', 'quickapps', 'operator', 'apiclient', 'logs', 'remote', 'proxy', 'settings'];
+  });
+
+  const handleTabDragStart = (e: React.DragEvent, tab: SidebarTab) => {
+    e.dataTransfer.setData('text/plain', tab);
+  };
+
+  const handleTabDrop = (e: React.DragEvent, targetTab: SidebarTab) => {
+    e.preventDefault();
+    const sourceTab = e.dataTransfer.getData('text/plain') as SidebarTab;
+    if (sourceTab && sourceTab !== targetTab) {
+      const newOrder = [...tabsOrder];
+      const sourceIdx = newOrder.indexOf(sourceTab);
+      const targetIdx = newOrder.indexOf(targetTab);
+      if (sourceIdx !== -1 && targetIdx !== -1) {
+        newOrder.splice(sourceIdx, 1);
+        newOrder.splice(targetIdx, 0, sourceTab);
+        setTabsOrder(newOrder);
+        localStorage.setItem('ai-cli-sidebar-tabs-order', JSON.stringify(newOrder));
+      }
+    }
+  };
+
+  const renderTabButton = (tab: SidebarTab) => {
+    switch (tab) {
+      case 'cli-manager':
+        return (
+          <div
+            key="cli-manager"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'cli-manager')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'cli-manager')}
+            onClick={() => handleSetActiveTab('cli-manager')}
+            title="CLI Orchestrator"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'cli-manager'
+                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'cli-manager' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
+              )}
+              <TerminalIcon />
+            </div>
+          </div>
+        );
+      case 'explorer':
+        return (
+          <div
+            key="explorer"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'explorer')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'explorer')}
+            onClick={() => handleSetActiveTab('explorer')}
+            title="File Explorer"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'explorer'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'explorer' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+              )}
+              <ExplorerIcon />
+            </div>
+          </div>
+        );
+      case 'quickapps':
+        return (
+          <div
+            key="quickapps"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'quickapps')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'quickapps')}
+            onClick={() => handleSetActiveTab('quickapps')}
+            title="Quick Apps (favorite apps launcher)"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'quickapps'
+                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
+                : 'text-slate-400 hover:text-cyber-electric hover:bg-cyber-electric/10'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'quickapps' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
+              )}
+              <QuickAppsIcon />
+            </div>
+          </div>
+        );
+      case 'operator':
+        return (
+          <div
+            key="operator"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'operator')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'operator')}
+            onClick={() => handleSetActiveTab('operator')}
+            title="Operator (SSH VM Manager)"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'operator'
+                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'operator' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
+              )}
+              <CloudIcon />
+            </div>
+          </div>
+        );
+      case 'apiclient':
+        return (
+          <div
+            key="apiclient"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'apiclient')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'apiclient')}
+            onClick={() => handleSetActiveTab('apiclient')}
+            title="API Client (Postman-like)"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'apiclient'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'apiclient' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+              )}
+              <ApiIcon />
+            </div>
+          </div>
+        );
+      case 'logs':
+        return (
+          <div
+            key="logs"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'logs')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'logs')}
+            onClick={() => handleSetActiveTab('logs')}
+            title="System Logs"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'logs'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'logs' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+              )}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
+              </svg>
+            </div>
+          </div>
+        );
+      case 'remote':
+        return (
+          <div
+            key="remote"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'remote')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'remote')}
+            onClick={() => handleSetActiveTab('remote')}
+            title="Remote SSH Server"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'remote'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'remote' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+              )}
+              <RemoteIcon />
+            </div>
+          </div>
+        );
+      case 'proxy':
+        return (
+          <div
+            key="proxy"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'proxy')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'proxy')}
+            onClick={() => handleSetActiveTab('proxy')}
+            title="CliProxyAI (API Proxy)"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'proxy'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'proxy' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+              )}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+              </svg>
+            </div>
+          </div>
+        );
+      case 'settings':
+        return (
+          <div
+            key="settings"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'settings')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'settings')}
+            onClick={() => handleSetActiveTab('settings')}
+            title="Settings"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'settings'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'settings' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+              )}
+              <SettingsIcon />
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   // Listen for pet click → open AI chat
   useEffect(() => {
@@ -361,6 +667,18 @@ export function CliSidebar({
     window.addEventListener('mythical-pet-click', handler);
     return () => window.removeEventListener('mythical-pet-click', handler);
   }, [handleSetActiveTab]);
+
+  // Listen for sidebar order changes from Settings panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvt = e as CustomEvent<string[]>;
+      if (customEvt.detail && Array.isArray(customEvt.detail)) {
+        setTabsOrder(customEvt.detail as SidebarTab[]);
+      }
+    };
+    window.addEventListener('sidebar-order-changed', handler);
+    return () => window.removeEventListener('sidebar-order-changed', handler);
+  }, []);
 
   // --- Sidebar Resizer Code ---
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -412,84 +730,7 @@ export function CliSidebar({
   const [sshSearchQuery, setSshSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
-  // --- SSH Remote Server States & Actions ---
-  const [sshServerRunning, setSshServerRunning] = useState(false);
-  const [sshServerPort, setSshServerPort] = useState(2222);
-  const [sshServerIp, setSshServerIp] = useState('127.0.0.1');
-  const [sshServerLoading, setSshServerLoading] = useState(false);
-  const [sshServerErr, setSshServerErr] = useState<string | null>(null);
-  const [sshServerLogs, setSshServerLogs] = useState<string[]>([]);
-  const [sshServerConfig, setSshServerConfig] = useState<SshServerConfig>({
-    username: 'admin',
-    password: 'admin',
-    publicKeys: [],
-  });
-  const [newPublicKey, setNewPublicKey] = useState('');
 
-  const fetchSshServerStatus = useCallback(async () => {
-    try {
-      const status = await getSshServerStatus();
-      setSshServerRunning(status.running);
-      setSshServerPort(status.port);
-      setSshServerIp(status.localIp);
-      setSshServerLogs(status.logs);
-    } catch (err) {
-      console.error('Failed to get SSH server status:', err);
-    }
-  }, []);
-
-  const fetchSshServerConfig = useCallback(async () => {
-    try {
-      const config = await getSshServerConfig();
-      setSshServerConfig(config);
-    } catch (err) {
-      console.error('Failed to get SSH server config:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSshServerStatus();
-    if (activeTab === 'remote') {
-      fetchSshServerConfig();
-    }
-    let interval: any = null;
-    if (activeTab === 'remote') {
-      interval = setInterval(fetchSshServerStatus, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [activeTab, fetchSshServerStatus, fetchSshServerConfig]);
-
-  const handleUpdateSshConfig = async (updated: SshServerConfig) => {
-    try {
-      await saveSshServerConfig(updated);
-      setSshServerConfig(updated);
-    } catch (err: any) {
-      console.error('Failed to save SSH server config:', err);
-      setSshServerErr(err?.message || String(err));
-    }
-  };
-
-  const handleToggleSshServer = async () => {
-    setSshServerLoading(true);
-    setSshServerErr(null);
-    try {
-      if (sshServerRunning) {
-        await stopSshServer();
-        setSshServerRunning(false);
-      } else {
-        await startSshServer(sshServerPort);
-        setSshServerRunning(true);
-      }
-      await fetchSshServerStatus();
-    } catch (err: any) {
-      console.error('Failed to toggle SSH server:', err);
-      setSshServerErr(err?.message || String(err));
-    } finally {
-      setSshServerLoading(false);
-    }
-  };
 
   // Auto-switch to Explorer tab when an active session changes and has a workingDir
   useEffect(() => {
@@ -500,6 +741,320 @@ export function CliSidebar({
       }
     }
   }, [activeSessionId, sessions]);
+
+  // --- Local LLM fallback states ---
+  const [builtinLlmConfig, setBuiltinLlmConfig] = useState<any>({
+    enabled: false,
+    modelPath: null,
+    tokenizerPath: null,
+    maxTokens: 256,
+    temperature: 0.7,
+    repeatPenalty: 1.1,
+    seed: 42,
+    runtime: 'candle',
+    serverPath: null,
+    serverPort: 8080,
+  });
+  const [builtinLlmStatus, setBuiltinLlmStatus] = useState<any>({
+    loaded: false,
+    modelPath: null,
+    enabled: false,
+  });
+  const [isBuiltinLlmLoading, setIsBuiltinLlmLoading] = useState(false);
+
+  useEffect(() => {
+    // Load config
+    invoke('builtin_llm_get_config')
+      .then((cfg) => {
+        setBuiltinLlmConfig(cfg);
+      })
+      .catch((err) => console.error('Failed to get built-in config:', err));
+
+    // Load status
+    invoke('builtin_llm_status')
+      .then((stat) => {
+        setBuiltinLlmStatus(stat);
+      })
+      .catch((err) => console.error('Failed to get built-in status:', err));
+  }, []);
+
+  const handleLoadBuiltinLlm = async () => {
+    setIsBuiltinLlmLoading(true);
+    if (setAssistantState && setAssistantText) {
+      setAssistantState('Thinking');
+      setAssistantText('Loading built-in local LLM model... (This may take a moment)');
+    }
+    try {
+      await invoke('builtin_llm_load');
+      const status = await invoke<any>('builtin_llm_status');
+      setBuiltinLlmStatus(status);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText('Built-in local LLM model loaded successfully!');
+        setTimeout(() => setAssistantState('Idle'), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to load built-in LLM:', err);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Error');
+        setAssistantText(`Failed to load model: ${err}`);
+      }
+    } finally {
+      setIsBuiltinLlmLoading(false);
+    }
+  };
+
+  const handleUnloadBuiltinLlm = async () => {
+    try {
+      await invoke('builtin_llm_unload');
+      const status = await invoke<any>('builtin_llm_status');
+      setBuiltinLlmStatus(status);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText('Built-in local LLM model unloaded.');
+        setTimeout(() => setAssistantState('Idle'), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to unload built-in LLM:', err);
+    }
+  };
+
+  const handlePickBuiltinModel = async () => {
+    try {
+      const file = await invoke<string | null>('pick_file');
+      if (file) {
+        const newCfg = { ...builtinLlmConfig, modelPath: file };
+        await invoke('builtin_llm_save_config', { config: newCfg });
+        setBuiltinLlmConfig(newCfg);
+      }
+    } catch (err) {
+      console.error('Failed to pick model file:', err);
+    }
+  };
+
+  const handlePickBuiltinTokenizer = async () => {
+    try {
+      const file = await invoke<string | null>('pick_file');
+      if (file) {
+        const newCfg = { ...builtinLlmConfig, tokenizerPath: file };
+        await invoke('builtin_llm_save_config', { config: newCfg });
+        setBuiltinLlmConfig(newCfg);
+      }
+    } catch (err) {
+      console.error('Failed to pick tokenizer file:', err);
+    }
+  };
+
+  const handlePickBuiltinServer = async () => {
+    try {
+      const file = await invoke<string | null>('pick_file');
+      if (file) {
+        const newCfg = { ...builtinLlmConfig, serverPath: file };
+        await invoke('builtin_llm_save_config', { config: newCfg });
+        setBuiltinLlmConfig(newCfg);
+      }
+    } catch (err) {
+      console.error('Failed to pick server file:', err);
+    }
+  };
+
+  const handleUpdateBuiltinConfig = async (updates: Partial<typeof builtinLlmConfig>) => {
+    const newCfg = { ...builtinLlmConfig, ...updates };
+    try {
+      await invoke('builtin_llm_save_config', { config: newCfg });
+      setBuiltinLlmConfig(newCfg);
+      const status = await invoke<any>('builtin_llm_status');
+      setBuiltinLlmStatus(status);
+    } catch (err) {
+      console.error('Failed to save built-in config:', err);
+    }
+  };
+
+  const handleOptimizeQuery = async () => {
+    if (!chatInput.trim() || isLoadingLlm) return;
+    setIsLoadingLlm(true);
+    if (setAssistantState && setAssistantText) {
+      setAssistantState('Thinking');
+      setAssistantText('Rewriting query for clarity...');
+    }
+    try {
+      if (!builtinLlmStatus.loaded) {
+        await invoke('builtin_llm_load');
+        const stat = await invoke<any>('builtin_llm_status');
+        setBuiltinLlmStatus(stat);
+      }
+      const reply = await invoke<string>('builtin_llm_generate', {
+        prompt: chatInput.trim(),
+        task: 'rewrite',
+      });
+      setChatInput(reply.trim());
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText('Query rewritten!');
+        setTimeout(() => setAssistantState('Idle'), 2000);
+      }
+    } catch (err) {
+      console.error(err);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Error');
+        setAssistantText(`Rewrite failed: ${err}`);
+      }
+    } finally {
+      setIsLoadingLlm(false);
+    }
+  };
+
+  const handleSuggestCommand = async () => {
+    if (!chatInput.trim() || isLoadingLlm) return;
+    setIsLoadingLlm(true);
+    if (setAssistantState && setAssistantText) {
+      setAssistantState('Thinking');
+      setAssistantText('Generating CLI command suggestion...');
+    }
+    try {
+      if (!builtinLlmStatus.loaded) {
+        await invoke('builtin_llm_load');
+        const stat = await invoke<any>('builtin_llm_status');
+        setBuiltinLlmStatus(stat);
+      }
+      const reply = await invoke<string>('builtin_llm_generate', {
+        prompt: chatInput.trim(),
+        task: 'suggest',
+      });
+      
+      const assistantMsg: LlmChatMessage = {
+        role: 'assistant',
+        content: `Suggested CLI Command:\n\`\`\`bash\n${reply.trim()}\n\`\`\`,`,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      
+      const updatedHistory = [
+        ...chatHistory,
+        { role: 'user', content: `Suggest command for: ${chatInput.trim()}`, timestamp: new Date().toLocaleTimeString() } as LlmChatMessage,
+        assistantMsg
+      ];
+      setChatHistory(updatedHistory);
+      localStorage.setItem('ai-cli-llm-history', JSON.stringify(updatedHistory));
+      setChatInput('');
+
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText('Command suggested!');
+        setTimeout(() => setAssistantState('Idle'), 2000);
+      }
+    } catch (err) {
+      console.error(err);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Error');
+        setAssistantText(`Failed: ${err}`);
+      }
+    } finally {
+      setIsLoadingLlm(false);
+    }
+  };
+
+  const handleSummarizeClipboard = async () => {
+    if (isLoadingLlm) return;
+    setIsLoadingLlm(true);
+    if (setAssistantState && setAssistantText) {
+      setAssistantState('Thinking');
+      setAssistantText('Summarizing text...');
+    }
+    try {
+      if (!builtinLlmStatus.loaded) {
+        await invoke('builtin_llm_load');
+        const stat = await invoke<any>('builtin_llm_status');
+        setBuiltinLlmStatus(stat);
+      }
+      const textToSummarize = chatInput.trim();
+      if (!textToSummarize) {
+        setIsLoadingLlm(false);
+        return;
+      }
+      const reply = await invoke<string>('builtin_llm_generate', {
+        prompt: textToSummarize,
+        task: 'summarize',
+      });
+      
+      const assistantMsg: LlmChatMessage = {
+        role: 'assistant',
+        content: `Summary:\n${reply.trim()}`,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      
+      const updatedHistory = [
+        ...chatHistory,
+        { role: 'user', content: `Summarize text...`, timestamp: new Date().toLocaleTimeString() } as LlmChatMessage,
+        assistantMsg
+      ];
+      setChatHistory(updatedHistory);
+      localStorage.setItem('ai-cli-llm-history', JSON.stringify(updatedHistory));
+      setChatInput('');
+
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText('Text summarized!');
+        setTimeout(() => setAssistantState('Idle'), 2000);
+      }
+    } catch (err) {
+      console.error(err);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Error');
+        setAssistantText(`Failed: ${err}`);
+      }
+    } finally {
+      setIsLoadingLlm(false);
+    }
+  };
+
+  const handleGenerateTitle = async () => {
+    if (!chatInput.trim() || isLoadingLlm) return;
+    setIsLoadingLlm(true);
+    if (setAssistantState && setAssistantText) {
+      setAssistantState('Thinking');
+      setAssistantText('Generating title...');
+    }
+    try {
+      if (!builtinLlmStatus.loaded) {
+        await invoke('builtin_llm_load');
+        const stat = await invoke<any>('builtin_llm_status');
+        setBuiltinLlmStatus(stat);
+      }
+      const reply = await invoke<string>('builtin_llm_generate', {
+        prompt: chatInput.trim(),
+        task: 'title',
+      });
+      
+      const assistantMsg: LlmChatMessage = {
+        role: 'assistant',
+        content: `Generated Title: "${reply.trim()}"`,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      
+      const updatedHistory = [
+        ...chatHistory,
+        { role: 'user', content: `Generate title for: ${chatInput.trim().slice(0, 30)}...`, timestamp: new Date().toLocaleTimeString() } as LlmChatMessage,
+        assistantMsg
+      ];
+      setChatHistory(updatedHistory);
+      localStorage.setItem('ai-cli-llm-history', JSON.stringify(updatedHistory));
+      setChatInput('');
+
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText('Title generated!');
+        setTimeout(() => setAssistantState('Idle'), 2000);
+      }
+    } catch (err) {
+      console.error(err);
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Error');
+        setAssistantText(`Failed: ${err}`);
+      }
+    } finally {
+      setIsLoadingLlm(false);
+    }
+  };
 
   // --- LLM Chat States & Handlers ---
   const DEFAULT_LLM_CONFIG: LlmConfig = {
@@ -538,6 +1093,98 @@ export function CliSidebar({
   });
 
   const [chatInput, setChatInput] = useState('');
+  const [inputContextMenu, setInputContextMenu] = useState<{
+    x: number;
+    y: number;
+    open: boolean;
+    text: string;
+  } | null>(null);
+
+  const [rewriteModal, setRewriteModal] = useState<{
+    open: boolean;
+    type: 'rewrite' | 'suggest' | 'summarize' | 'title';
+    originalText: string;
+    resultText: string;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
+
+  const [fileContextMenu, setFileContextMenu] = useState<{
+    x: number; y: number;
+    path: string; isDir: boolean; name: string; rootPath: string | null;
+  } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ path: string; name: string } | null>(null);
+
+  useEffect(() => {
+    const handleGlobalClick = () => { setInputContextMenu(null); setFileContextMenu(null); };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  const handleTriggerRewriteAction = async (type: 'rewrite' | 'suggest' | 'summarize' | 'title', text: string) => {
+    setInputContextMenu(null);
+    setRewriteModal({
+      open: true,
+      type,
+      originalText: text,
+      resultText: '',
+      loading: true,
+      error: null,
+    });
+
+    // Define task-specific system prompts for cloud LLM
+    let systemPrompt = '';
+    if (type === 'rewrite') {
+      systemPrompt = 'You are an expert prompt engineer. Your task is to rewrite the user\'s prompt to make it clear, explicit, structured, and highly effective for LLMs. Improve grammar, clarify intent, and add necessary context if missing. Do NOT answer the prompt itself, just rewrite and optimize it. Output ONLY the optimized prompt content, nothing else (no headers, no markdown blocks, no conversational preamble).';
+    } else if (type === 'suggest') {
+      systemPrompt = 'You are an expert CLI command assistant. The user will provide a command or describe what they want to do. You must analyze it, fix any errors, or suggest the correct, optimized shell commands (like bash, powershell, git, docker, etc.). Output ONLY the suggested command or instruction directly. Do NOT write any explanations, comments, or markdown code block backticks. Just output the command itself.';
+    } else if (type === 'summarize') {
+      systemPrompt = 'Summarize the following terminal output, logs, or text in a concise and clear manner. Focus on errors, warnings, and key events. Keep it short. Output ONLY the summary.';
+    } else if (type === 'title') {
+      systemPrompt = 'Generate a very short, concise title (max 5 words) for the following text. Do not put quotes around the title. Output ONLY the title itself.';
+    }
+
+    try {
+      // Try Cloud/Configured LLM first
+      const reply = await invoke<string>('send_llm_chat', {
+        request: {
+          baseUrl: llmConfig.baseUrl,
+          model: llmConfig.model,
+          apiKey: llmConfig.apiKey,
+          headers: llmConfig.headers,
+          systemPrompt: systemPrompt,
+          messages: [{ role: 'user', content: text.trim() }],
+          stream: false,
+        },
+      });
+      setRewriteModal(prev => prev ? { ...prev, resultText: reply.trim(), loading: false } : null);
+    } catch (cloudErr) {
+      console.warn('Cloud LLM failed, falling back to local LLM:', cloudErr);
+      
+      // Local LLM Fallback
+      try {
+        const status = await invoke<any>('builtin_llm_status');
+        if (!status.loaded) {
+          await invoke('builtin_llm_load');
+          const stat = await invoke<any>('builtin_llm_status');
+          setBuiltinLlmStatus(stat);
+        }
+        const reply = await invoke<string>('builtin_llm_generate', {
+          prompt: text.trim(),
+          task: type,
+        });
+        setRewriteModal(prev => prev ? { ...prev, resultText: `[Local Fallback] ${reply.trim()}`, loading: false } : null);
+      } catch (localErr: any) {
+        console.error('Both Cloud LLM and Local LLM fallback failed:', localErr);
+        setRewriteModal(prev => prev ? { 
+          ...prev, 
+          error: `Cloud LLM Error: ${String(cloudErr)}\nLocal LLM Fallback Error: ${String(localErr)}`, 
+          loading: false 
+        } : null);
+      }
+    }
+  };
+
   const [isLoadingLlm, setIsLoadingLlm] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   // Auto-scroll toggle for the AI chat list. Persisted so the choice survives reloads.
@@ -673,6 +1320,49 @@ export function CliSidebar({
       console.error('LLM request failed:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
       
+      if (builtinLlmConfig.enabled) {
+        setIsLoadingLlm(true);
+        if (setAssistantState && setAssistantText) {
+          setAssistantState('Thinking');
+          setAssistantText('Cloud LLM failed. Falling back to local built-in LLM...');
+        }
+        try {
+          if (!builtinLlmStatus.loaded) {
+            await invoke('builtin_llm_load');
+            const stat = await invoke<any>('builtin_llm_status');
+            setBuiltinLlmStatus(stat);
+          }
+          
+          const reply = await invoke<string>('builtin_llm_generate', {
+            prompt: userMessageContent,
+            task: 'chat',
+            maxTokens: builtinLlmConfig.maxTokens,
+          });
+
+          const assistantMsg: LlmChatMessage = {
+            role: 'assistant',
+            content: `[Local Fallback] ${reply}`,
+            timestamp: new Date().toLocaleTimeString(),
+          };
+
+          const updatedHistory = [...newHistory, assistantMsg];
+          setChatHistory(updatedHistory);
+          localStorage.setItem('ai-cli-llm-history', JSON.stringify(updatedHistory));
+
+          setIsLoadingLlm(false);
+          if (setAssistantState && setAssistantText) {
+            setAssistantState('Done');
+            setAssistantText(reply.length > 50 ? `${reply.slice(0, 50)}...` : reply);
+            setTimeout(() => {
+              setAssistantState('Idle');
+            }, 4000);
+          }
+          return; // Success, don't show the error
+        } catch (fallbackErr) {
+          console.error('Local LLM fallback failed:', fallbackErr);
+        }
+      }
+      
       const assistantMsg: LlmChatMessage = {
         role: 'assistant',
         content: `Error: ${errorMsg}\n\nPlease check your LLM configuration, custom API endpoint URL, network connections, or headers (User-Agent).`,
@@ -741,17 +1431,6 @@ export function CliSidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Ctrl+P global keyboard shortcut
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeTab === 'explorer' && e.ctrlKey && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        setIsSearchModalOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab]);
 
   // Load recursive files when search opens
   useEffect(() => {
@@ -1004,6 +1683,10 @@ export function CliSidebar({
         <button
           type="button"
           onClick={() => (entry.isDir ? handleToggleExpand(entry.path) : void onFileClick(entry, rootPath))}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setFileContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, isDir: entry.isDir, name: entry.name, rootPath });
+          }}
           style={{ paddingLeft: `${depth * 14 + 10}px` }}
           className={`flex w-full items-center gap-2 py-1 pr-3 text-left transition hover:bg-cyber-neon/5 ${
             !entry.isDir
@@ -1093,162 +1776,9 @@ export function CliSidebar({
         />
       )}
       {/* 1. Left-most Activity Bar (VSCode Style) */}
-      <nav className="flex h-full w-14 flex-col items-center justify-between border-r border-cyber-line/50 bg-cyber-base/70 py-4 shrink-0">
-        <div className="flex flex-col gap-5">
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('cli-manager')}
-            title="CLI Orchestrator"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'cli-manager' && !isSidebarCollapsed
-                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {activeTab === 'cli-manager' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
-            )}
-            <TerminalIcon />
-          </button>
- 
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('explorer')}
-            title="File Explorer"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'explorer' && !isSidebarCollapsed
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {activeTab === 'explorer' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-            )}
-            <ExplorerIcon />
-          </button>
- 
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('quickapps')}
-            title="Quick Apps (favorite apps launcher)"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'quickapps' && !isSidebarCollapsed
-                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
-                : 'text-slate-400 hover:text-cyber-electric hover:bg-cyber-electric/10'
-            }`}
-          >
-            {activeTab === 'quickapps' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
-            )}
-            <QuickAppsIcon />
-          </button>
- 
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('operator')}
-            title="Operator (SSH VM Manager)"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'operator' && !isSidebarCollapsed
-                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {activeTab === 'operator' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
-            )}
-            <CloudIcon />
-          </button>
-
-
-
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('apiclient')}
-            title="API Client (Postman-like)"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'apiclient' && !isSidebarCollapsed
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
-            }`}
-          >
-            {activeTab === 'apiclient' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-            )}
-            <ApiIcon />
-          </button>
-
-
-        </div>
- 
-        <div className="flex flex-col gap-4 items-center">
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('logs')}
-            title="System Logs"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'logs' && !isSidebarCollapsed
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
-            }`}
-          >
-            {activeTab === 'logs' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-            )}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
-            </svg>
-          </button>
-
-
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('remote')}
-            title="Remote SSH Server"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'remote' && !isSidebarCollapsed
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {activeTab === 'remote' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-            )}
-            <RemoteIcon />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('proxy')}
-            title="CliProxyAI (API Proxy)"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'proxy' && !isSidebarCollapsed
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
-            }`}
-          >
-            {activeTab === 'proxy' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-            )}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-            </svg>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSetActiveTab('settings')}
-            title="Settings"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-              activeTab === 'settings' && !isSidebarCollapsed
-                ? 'text-cyber-neon bg-cyber-neon/10'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {activeTab === 'settings' && !isSidebarCollapsed && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-            )}
-            <SettingsIcon />
-          </button>
+      <nav className="flex h-full w-14 flex-col items-center border-r border-cyber-line/50 bg-cyber-base/70 py-4 shrink-0 select-none">
+        <div className="flex flex-col gap-4 items-center flex-1 w-full overflow-y-auto scrollbar-none py-1">
+          {tabsOrder.map(renderTabButton)}
         </div>
       </nav>
  
@@ -1317,57 +1847,61 @@ export function CliSidebar({
                         {gitStatusList.length === 0 ? (
                           <p className="px-4 py-3 text-xs italic text-slate-500 font-mono">No changed files in workspace.</p>
                         ) : (
-                          <div className="space-y-0.5">
-                            {gitStatusList.map((gitItem) => {
-                              const entry: FileEntry = {
-                                name: gitItem.path.split('/').pop() || gitItem.path,
-                                path: rootPath + '/' + gitItem.path,
-                                isDir: false
+                          <div className="space-y-1">
+                            {(() => {
+                              const staged = gitStatusList.filter(g => g.staged);
+                              const unstaged = gitStatusList.filter(g => !g.staged);
+
+                              const renderItem = (gitItem: typeof gitStatusList[0]) => {
+                                const entry: FileEntry = {
+                                  name: gitItem.path.split('/').pop() || gitItem.path,
+                                  path: rootPath + '/' + gitItem.path,
+                                  isDir: false
+                                };
+                                const isActive = selectedFilePath === entry.path;
+                                let statusBadge = '';
+                                let textClass = 'text-slate-300 hover:text-white';
+                                if (gitItem.status === 'modified') { statusBadge = 'M'; textClass = 'text-amber-300 hover:text-amber-200 hover:bg-amber-400/5'; }
+                                else if (gitItem.status === 'added') { statusBadge = 'A'; textClass = 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-400/5'; }
+                                else if (gitItem.status === 'untracked') { statusBadge = 'U'; textClass = 'text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/5'; }
+                                else if (gitItem.status === 'deleted') { statusBadge = 'D'; textClass = 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 line-through'; }
+
+                                return (
+                                  <button key={gitItem.path} type="button" onClick={() => void onFileClick(entry, rootPath)}
+                                    className={`flex w-full items-center justify-between px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 ${
+                                      isActive ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' : `${textClass}`
+                                    }`}>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="truncate font-semibold text-slate-200">{entry.name}</span>
+                                      <span className="truncate text-[8px] text-slate-500 font-mono mt-0.5" title={gitItem.path}>{gitItem.path}</span>
+                                    </div>
+                                    <span className={`text-[9px] font-bold px-1 py-0.2 rounded border font-mono scale-90 ${
+                                      gitItem.status === 'modified' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
+                                      gitItem.status === 'added' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
+                                      gitItem.status === 'untracked' ? 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20' :
+                                      'text-rose-500 bg-rose-500/10 border-rose-500/20 line-through'
+                                    }`}>{statusBadge}</span>
+                                  </button>
+                                );
                               };
-                              const isActive = selectedFilePath === entry.path;
-                              
-                              let statusBadge = '';
-                              let textClass = 'text-slate-300 hover:text-white';
-                              if (gitItem.status === 'modified') {
-                                statusBadge = 'M';
-                                textClass = 'text-amber-300 hover:text-amber-200 hover:bg-amber-400/5';
-                              } else if (gitItem.status === 'added') {
-                                statusBadge = 'A';
-                                textClass = 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-400/5';
-                              } else if (gitItem.status === 'untracked') {
-                                statusBadge = 'U';
-                                textClass = 'text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/5';
-                              } else if (gitItem.status === 'deleted') {
-                                statusBadge = 'D';
-                                textClass = 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 line-through';
-                              }
 
                               return (
-                                <button
-                                  key={gitItem.path}
-                                  type="button"
-                                  onClick={() => void onFileClick(entry, rootPath)}
-                                  className={`flex w-full items-center justify-between px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 ${
-                                    isActive 
-                                      ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' 
-                                      : `${textClass}`
-                                  }`}
-                                >
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="truncate font-semibold text-slate-200">{entry.name}</span>
-                                    <span className="truncate text-[8px] text-slate-500 font-mono mt-0.5" title={gitItem.path}>{gitItem.path}</span>
-                                  </div>
-                                  <span className={`text-[9px] font-bold px-1 py-0.2 rounded border font-mono scale-90 ${
-                                    gitItem.status === 'modified' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
-                                    gitItem.status === 'added' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
-                                    gitItem.status === 'untracked' ? 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20' :
-                                    'text-rose-500 bg-rose-500/10 border-rose-500/20 line-through'
-                                  }`}>
-                                    {statusBadge}
-                                  </span>
-                                </button>
+                                <>
+                                  {staged.length > 0 && (
+                                    <div>
+                                      <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-emerald-400 border-b border-cyber-line/20">Changes to be committed</div>
+                                      {staged.map(renderItem)}
+                                    </div>
+                                  )}
+                                  {unstaged.length > 0 && (
+                                    <div>
+                                      <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-rose-400 border-b border-cyber-line/20">Changes not staged for commit</div>
+                                      {unstaged.map(renderItem)}
+                                    </div>
+                                  )}
+                                </>
                               );
-                            })}
+                            })()}
                           </div>
                         )}
                       </div>
@@ -1480,12 +2014,63 @@ export function CliSidebar({
 
             {/* Chat input — Shift+Enter = newline, Enter = send */}
             <form onSubmit={handleSendChatMessage} className="shrink-0 border-t border-cyber-line p-3">
+              {builtinLlmConfig.enabled && (
+                <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1 select-none scrollbar-none">
+                  <button
+                    type="button"
+                    title="Optimize/Rewrite the current prompt for better clarity"
+                    onClick={handleOptimizeQuery}
+                    disabled={isLoadingLlm || !chatInput.trim()}
+                    className="rounded border border-cyber-electric/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-cyber-electric hover:bg-cyber-electric/10 disabled:opacity-40 transition"
+                  >
+                    ✨ Rewrite
+                  </button>
+                  <button
+                    type="button"
+                    title="Generate CLI command suggestion from prompt"
+                    onClick={handleSuggestCommand}
+                    disabled={isLoadingLlm || !chatInput.trim()}
+                    className="rounded border border-cyber-neon/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-cyber-neon hover:bg-cyber-neon/10 disabled:opacity-40 transition"
+                  >
+                    💻 Command
+                  </button>
+                  <button
+                    type="button"
+                    title="Summarize the input text"
+                    onClick={handleSummarizeClipboard}
+                    disabled={isLoadingLlm || !chatInput.trim()}
+                    className="rounded border border-cyber-glow/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-cyber-glow hover:bg-cyber-glow/10 disabled:opacity-40 transition"
+                  >
+                    📝 Summary
+                  </button>
+                  <button
+                    type="button"
+                    title="Generate a title from input text"
+                    onClick={handleGenerateTitle}
+                    disabled={isLoadingLlm || !chatInput.trim()}
+                    className="rounded border border-cyber-warn/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-cyber-warn hover:bg-cyber-warn/10 disabled:opacity-40 transition"
+                  >
+                    💡 Title
+                  </button>
+                </div>
+              )}
               <div className="flex gap-2 items-end">
                 <textarea
                   placeholder="Type a message..."
                   value={chatInput}
                   disabled={isLoadingLlm}
                   rows={1}
+                  onContextMenu={(e) => {
+                    const text = chatInput.trim();
+                    if (!text) return;
+                    e.preventDefault();
+                    setInputContextMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      open: true,
+                      text,
+                    });
+                  }}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1776,317 +2361,6 @@ export function CliSidebar({
             </div>
           </div>
         )}
-
-        {/* Active Tab: Remote SSH Server */}
-        {activeTab === 'remote' && (
-          <div className="flex h-full flex-col overflow-hidden animate-slide-up">
-            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
-              <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">Remote Access</h2>
-              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold font-mono tracking-wider uppercase ${
-                sshServerRunning ? 'bg-cyber-neon/10 text-cyber-neon border border-cyber-neon/30 animate-pulse' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
-              }`}>
-                {sshServerRunning ? '🟢 Active' : '🔴 Inactive'}
-              </span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {/* Server Control Card */}
-              <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200">SSH Server</span>
-                  <button
-                    onClick={handleToggleSshServer}
-                    disabled={sshServerLoading}
-                    className={`px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider transition ${
-                      sshServerRunning
-                        ? 'bg-red-500/20 hover:bg-red-500/35 text-red-400 border border-red-500/40 shadow-neon-red-sm'
-                        : 'bg-cyber-neon/20 hover:bg-cyber-neon/35 text-cyber-neon border border-cyber-neon/40 shadow-neon-sm'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {sshServerLoading ? 'Processing...' : sshServerRunning ? 'Stop Server' : 'Start Server'}
-                  </button>
-                </div>
-
-                {sshServerErr && (
-                  <div className="text-[10px] text-red-400 bg-red-950/20 border border-red-500/30 p-2.5 rounded-lg font-mono leading-relaxed">
-                    ⚠ {sshServerErr}
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <label className="block space-y-1">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Server Port</span>
-                    <input
-                      type="number"
-                      value={sshServerPort}
-                      disabled={sshServerRunning}
-                      onChange={(e) => setSshServerPort(parseInt(e.target.value, 10) || 2222)}
-                      className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition disabled:opacity-50"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Server Configuration Card */}
-              <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4 space-y-4">
-                <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Server Authentication</h3>
-                
-                <div className="space-y-3">
-                  <label className="block space-y-1">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Username</span>
-                    <input
-                      type="text"
-                      value={sshServerConfig.username}
-                      onChange={(e) => handleUpdateSshConfig({ ...sshServerConfig, username: e.target.value })}
-                      placeholder="e.g. admin"
-                      className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition"
-                    />
-                  </label>
-
-                  <label className="block space-y-1">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Password Auth</span>
-                    <div className="flex gap-2">
-                      <input
-                        type="password"
-                        value={sshServerConfig.password || ''}
-                        onChange={(e) => handleUpdateSshConfig({ ...sshServerConfig, password: e.target.value || undefined })}
-                        placeholder="Leave empty to disable password login"
-                        className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-2 text-xs font-mono font-semibold text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition"
-                      />
-                      {sshServerConfig.password && (
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateSshConfig({ ...sshServerConfig, password: undefined })}
-                          className="px-2.5 py-2 text-xs border border-red-500/30 bg-red-500/10 text-red-400 rounded hover:bg-red-500/20 font-bold"
-                          title="Disable Password Auth"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </label>
-
-                  {/* Public Keys Section */}
-                  <div className="space-y-2 pt-2 border-t border-cyber-line/30">
-                    <span className="block text-[10px] uppercase font-bold tracking-wider text-slate-400">Authorized Public Keys ({sshServerConfig.publicKeys.length})</span>
-                    
-                    {sshServerConfig.publicKeys.length > 0 && (
-                      <div className="max-h-24 overflow-y-auto space-y-1.5 scrollbar-thin border border-cyber-line bg-cyber-base/40 p-2 rounded">
-                        {sshServerConfig.publicKeys.map((key, index) => (
-                          <div key={index} className="flex items-center justify-between text-[9px] font-mono bg-cyber-panel/50 p-1.5 rounded border border-cyber-line/20 text-slate-300">
-                            <span className="truncate flex-1 pr-2" title={key}>
-                              {key.substring(0, 20)}...{key.substring(key.length - 15)}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updatedKeys = [...sshServerConfig.publicKeys];
-                                updatedKeys.splice(index, 1);
-                                handleUpdateSshConfig({ ...sshServerConfig, publicKeys: updatedKeys });
-                              }}
-                              className="text-red-400 hover:text-red-300 px-1 font-bold text-[10px]"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex gap-1">
-                      <input
-                        type="text"
-                        value={newPublicKey}
-                        onChange={(e) => setNewPublicKey(e.target.value)}
-                        placeholder="Paste ssh-rsa/ssh-ed25519 public key"
-                        className="flex-1 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-[10px] font-mono text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!newPublicKey.trim()) return;
-                          const updatedKeys = [...sshServerConfig.publicKeys, newPublicKey.trim()];
-                          handleUpdateSshConfig({ ...sshServerConfig, publicKeys: updatedKeys });
-                          setNewPublicKey('');
-                        }}
-                        className="px-2.5 py-1.5 text-[10px] bg-cyber-neon/20 hover:bg-cyber-neon/35 text-cyber-neon border border-cyber-neon/40 rounded font-bold uppercase tracking-wider"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-[9px] text-slate-500 font-medium leading-relaxed italic">
-                  💡 Note: Restart the SSH Server to apply authentication changes.
-                </div>
-              </div>
-
-              {/* Instruction Panel */}
-              <div className="rounded-xl border border-cyber-electric/40 bg-cyber-electric/5 p-4 space-y-3">
-                <h3 className="text-[10px] uppercase font-bold tracking-wider text-cyber-electric">Connection Instruction</h3>
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  Other machines on your network can connect directly to your CLX sessions.
-                </p>
-
-                <div className="space-y-1.5 font-mono text-[10px]">
-                  <div className="text-slate-400 font-semibold">Command:</div>
-                  <div className="relative flex items-center justify-between rounded border border-cyber-line/65 bg-[#0d162a] p-2 pr-10 text-cyber-electric select-all">
-                    <span>ssh {sshServerConfig.username}@{sshServerIp} -p {sshServerPort}</span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`ssh ${sshServerConfig.username}@${sshServerIp} -p ${sshServerPort}`);
-                        alert('Copied connection command to clipboard!');
-                      }}
-                      className="absolute right-2 text-slate-500 hover:text-cyber-electric transition"
-                      title="Copy command"
-                    >
-                      <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                        <path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12a1.5 1.5 0 0 1 .439 1.061V16.5A1.5 1.5 0 0 1 15.5 18h-7A1.5 1.5 0 0 1 7 16.5v-13Zm1.5-.5a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V7h-3a1 1 0 0 1-1-1V3H8.5Z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-[9px] font-mono leading-relaxed space-y-1 text-slate-500">
-                  <div>🔐 Active Credentials:</div>
-                  <div>• Username: <span className="text-slate-300 font-bold">{sshServerConfig.username}</span></div>
-                  {sshServerConfig.password ? (
-                    <div>• Password: <span className="text-slate-300 font-bold">{sshServerConfig.password}</span></div>
-                  ) : (
-                    <div className="text-red-400">• Password authentication is disabled</div>
-                  )}
-                  {sshServerConfig.publicKeys.length > 0 && (
-                    <div className="text-cyber-neon/80">• Public Key Authentication is active ({sshServerConfig.publicKeys.length} key(s))</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Collaborative details */}
-              <div className="rounded-xl border border-cyber-line/30 bg-cyber-base/20 p-3 text-[10px] leading-relaxed text-slate-400 space-y-2">
-                <div className="font-bold text-slate-300 flex items-center gap-1.5">
-                  <span>💡</span> Collaborative REPL Shell
-                </div>
-                <p>
-                  Connected users enter a custom shell displaying all active sessions. Pressing <span className="text-cyber-neon font-mono font-bold">Ctrl+X</span> or <span className="text-cyber-neon font-mono font-bold">Ctrl+Q</span> detaches from a session.
-                </p>
-              </div>
-
-              {/* Server Logs */}
-              <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4 space-y-3">
-                <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Server Logs</h3>
-                <div className="h-32 overflow-y-auto scrollbar-thin bg-black/60 rounded border border-cyber-line/30 p-2.5 font-mono text-[9px] text-slate-300 space-y-1 select-text">
-                  {sshServerLogs.length === 0 ? (
-                    <div className="text-slate-500 italic">No logs yet.</div>
-                  ) : (
-                    sshServerLogs.map((log, idx) => (
-                      <div key={idx} className="leading-relaxed break-all">
-                        {log}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Active Tab: Settings */}
-        {activeTab === 'settings' && (
-          <div className="flex h-full flex-col overflow-hidden">
-            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
-              <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">Settings</h2>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              <div>
-                <h3 className="font-display text-xs uppercase tracking-wider text-slate-400 mb-2 font-bold">Theme Settings</h3>
-                <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-3 text-xs text-slate-200 transition hover:border-cyber-neon/80">
-                  <span className="font-semibold">App Theme</span>
-                  <select
-                    value={theme}
-                    onChange={(event) => setTheme(event.target.value as AppTheme)}
-                    className="rounded border border-cyber-line bg-cyber-base px-3 py-1 font-semibold text-cyber-neon outline-none transition focus:border-cyber-neon"
-                  >
-                    <option value="cyberpunk">Cyberpunk</option>
-                    <option value="kawaii">Kawaii</option>
-                    <option value="light">Light</option>
-                  </select>
-                </label>
-              </div>
-
-              {/* Mythical Pet Settings */}
-              <div>
-                <h3 className="font-display text-xs uppercase tracking-wider text-slate-400 mb-2 font-bold">Mythical Pet</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-3 text-xs text-slate-200 transition hover:border-cyber-neon/80 cursor-pointer">
-                    <div>
-                      <span className="font-semibold">Enable Pet</span>
-                      <p className="text-[9px] text-slate-500 mt-0.5">Show pet overlay on screen</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = !petEnabled;
-                        setPetEnabledLocal(next);
-                        setPetEnabled(next);
-                        window.dispatchEvent(new CustomEvent('mythical-pet-change', { detail: { enabled: next } }));
-                      }}
-                      className={`w-10 h-5 rounded-full transition relative ${petEnabled ? 'bg-cyber-neon' : 'bg-slate-600'}`}
-                    >
-                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition ${petEnabled ? 'left-5' : 'left-0.5'}`} />
-                    </button>
-                  </label>
-                  {petEnabled && (
-                    <div className="rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-3">
-                      <p className="text-[10px] text-slate-400 mb-2 font-semibold uppercase tracking-wider">Select Pet</p>
-                      <div className="space-y-1.5">
-                        {ALL_PETS.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => {
-                              setPetIdLocal(p.id);
-                              setActivePetId(p.id);
-                              window.dispatchEvent(new CustomEvent('mythical-pet-change', { detail: { id: p.id } }));
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded-lg border transition text-xs ${
-                              p.id === petId
-                                ? 'border-cyber-neon bg-cyber-neon/10 text-cyber-neon'
-                                : 'border-cyber-line/40 bg-cyber-base/30 text-slate-300 hover:border-cyber-electric/60 hover:bg-cyber-electric/5'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-base">{p.id === 'dragon' ? '🐉' : p.id === 'phoenix' ? '🔥' : p.id === 'qilin' ? '🦄' : '🪽'}</span>
-                              <div>
-                                <div className="font-semibold">{p.name}</div>
-                                <div className="text-[9px] text-slate-500">{p.nameVn}</div>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-display text-xs uppercase tracking-wider text-slate-400 mb-2 font-bold">System Status</h3>
-                <div className="rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-3 space-y-2 text-[11px] leading-relaxed text-slate-400 font-mono">
-                  <div className="flex justify-between">
-                    <span>Active CLI:</span>
-                    <span className="text-cyber-electric font-semibold">{activeCli || 'None'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Total CLIs:</span>
-                    <span className="text-slate-300 font-semibold">{clis.length}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </aside>
       )}
 
@@ -2164,6 +2438,166 @@ export function CliSidebar({
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Chat Input Right Click Context Menu ── */}
+      {inputContextMenu?.open && (
+        <div
+          style={{ top: `${inputContextMenu.y}px`, left: `${inputContextMenu.x}px` }}
+          className="fixed z-[300] w-52 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => handleTriggerRewriteAction('rewrite', inputContextMenu.text)}
+            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon transition cursor-pointer w-full"
+          >
+            ✨ Optimize Prompt
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTriggerRewriteAction('suggest', inputContextMenu.text)}
+            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon transition cursor-pointer w-full"
+          >
+            💻 Fix/Suggest Command
+          </button>
+        </div>
+      )}
+
+      {/* ── File Explorer Right-click Context Menu ── */}
+      {fileContextMenu && (
+        <div
+          style={{ top: `${fileContextMenu.y}px`, left: `${fileContextMenu.x}px` }}
+          className="fixed z-[150] w-48 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
+          onClick={(e) => { e.stopPropagation(); setFileContextMenu(null); }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(fileContextMenu.path);
+            }}
+            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
+          >
+            📋 Copy Path
+          </button>
+          <div className="my-1 border-t border-cyber-line/50" />
+          <button
+            type="button"
+            onClick={() => setDeleteConfirm({ path: fileContextMenu.path, name: fileContextMenu.name })}
+            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-500/20 hover:text-rose-400 transition"
+          >
+            🗑️ Delete
+          </button>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-96 rounded-xl border border-rose-500/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none">
+            <h2 className="font-display text-sm uppercase tracking-[0.2em] text-rose-400 font-bold mb-4">Delete Confirmation</h2>
+            <p className="text-sm text-slate-300 mb-2">
+              Are you sure you want to delete:
+            </p>
+            <p className="text-sm text-rose-300 font-mono bg-cyber-base/50 p-2 rounded border border-cyber-line mb-6 break-all">
+              {deleteConfirm.name}
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await deleteFileOrDir(deleteConfirm.path);
+                    // Refresh file tree
+                    if (rootPath) {
+                      if (isSshSession && sshConnection) {
+                        const files = await listSshDirectoryFiles(sshConnection, rootPath);
+                        setCachedFiles((prev) => ({ ...prev, [rootPath]: files }));
+                      } else {
+                        const files = await listDirectoryFiles(rootPath);
+                        setCachedFiles((prev) => ({ ...prev, [rootPath]: files }));
+                      }
+                    }
+                  } catch (e) { console.error('Delete failed:', e); }
+                  setDeleteConfirm(null);
+                }}
+                className="px-4 py-1.5 text-xs font-bold text-rose-400 bg-rose-500/20 border border-rose-500/40 rounded hover:bg-rose-500/30 uppercase tracking-wider transition"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── AI Chat Input Rewrite Modal ── */}
+      {rewriteModal?.open && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-[480px] rounded-xl border border-cyber-neon/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none">
+            <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-neon font-bold mb-4">
+              {rewriteModal.type === 'suggest' ? '💻 AI Command Suggester' : '✨ AI Prompt Optimizer'}
+            </h2>
+
+            <div className="mb-4">
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Original Message</label>
+              <div className="max-h-24 overflow-y-auto rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[11px] text-slate-400 font-mono whitespace-pre-wrap break-all">
+                {rewriteModal.originalText}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Optimized Result</label>
+              {rewriteModal.loading ? (
+                <div className="flex flex-col items-center justify-center py-8 rounded border border-cyber-line bg-cyber-base/30 text-cyber-neon/80 text-xs font-mono">
+                  <svg className="animate-spin h-5 w-5 mb-2 text-cyber-neon" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Running local inference...</span>
+                </div>
+              ) : rewriteModal.error ? (
+                <div className="rounded border border-red-500/30 bg-red-950/20 px-3 py-2 text-[11px] text-red-400 font-mono whitespace-pre-wrap break-all">
+                  {rewriteModal.error}
+                </div>
+              ) : (
+                <textarea
+                  value={rewriteModal.resultText}
+                  onChange={(e) => setRewriteModal({ ...rewriteModal, resultText: e.target.value })}
+                  rows={6}
+                  className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-[11px] text-slate-100 font-mono outline-none focus:border-cyber-neon resize-y"
+                />
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 text-xs font-mono mt-6">
+              {!rewriteModal.loading && !rewriteModal.error && rewriteModal.resultText && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChatInput(rewriteModal.resultText);
+                      setRewriteModal(null);
+                    }}
+                    className="rounded border border-cyber-neon/40 bg-cyber-neon/15 px-4 py-2 hover:bg-cyber-neon/25 text-cyber-neon transition uppercase font-bold"
+                  >
+                    ✔️ Apply (Replace Input)
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setRewriteModal(null)}
+                className="rounded border border-cyber-line px-4 py-2 hover:bg-cyber-line/20 text-slate-300 transition uppercase"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

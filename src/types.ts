@@ -91,6 +91,7 @@ export interface RipgrepMatch {
 export interface GitStatusEntry {
   path: string;
   status: 'modified' | 'added' | 'deleted' | 'untracked';
+  staged: boolean;
 }
 
 export interface FolderHistoryEntry {
@@ -137,13 +138,13 @@ export interface ProxyBackend {
   weight: number;
   maxRetries: number;
   headers: Record<string, string>;
+  customUserAgent?: string;
 }
 
 export interface ProxyConfig {
   port: number;
   backends: ProxyBackend[];
   enabled: boolean;
-  customUserAgent?: string;
 }
 
 export interface ProxyStatus {
@@ -178,4 +179,24 @@ export interface NotepadContent {
   text: string;
   language: string;
 }
+
+export interface BuiltinLlmConfig {
+  enabled: boolean;
+  modelPath: string | null;
+  tokenizerPath: string | null;
+  maxTokens: number;
+  temperature: number;
+  repeatPenalty: number;
+  seed: number;
+  runtime: string;
+  serverPath: string | null;
+  serverPort: number;
+}
+
+export interface BuiltinLlmStatus {
+  loaded: boolean;
+  modelPath: string | null;
+  enabled: boolean;
+}
+
 

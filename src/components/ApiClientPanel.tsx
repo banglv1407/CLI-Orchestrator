@@ -230,6 +230,20 @@ const formatBody = (b: string) => { try { return JSON.stringify(JSON.parse(b), n
 
 const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 
+function buildCurl(method: HttpMethod, fullUrl: string, headers: KeyValue[], body: string): string {
+  const parts: string[] = ['curl'];
+  if (method !== 'GET') parts.push(`-X ${method}`);
+  for (const h of headers) {
+    if (h.enabled && h.key) parts.push(`-H '${h.key}: ${h.value}'`);
+  }
+  if (body && method !== 'GET' && method !== 'HEAD') {
+    const escaped = body.replace(/'/g, "'\\''");
+    parts.push(`-d '${escaped}'`);
+  }
+  parts.push(`'${fullUrl}'`);
+  return parts.join(' \\\n  ');
+}
+
 // Simple inline SVGs
 function ApiIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6"><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"/></svg>; }
 function PlayIcon() { return <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>; }
@@ -378,6 +392,12 @@ export function ApiClientPanel() {
   // ── Runner stats ──
   const runnerStats = st.runner.stats;
 
+  // ── Copy cURL ──
+  const copyCurl = useCallback(async () => {
+    const cmd = buildCurl(st.method, fullUrl, st.headers, st.body);
+    try { await navigator.clipboard.writeText(cmd); } catch {}
+  }, [st.method, fullUrl, st.headers, st.body]);
+
   // ── Render ──
   return (
     <div ref={panelRef} className="flex h-full flex-col bg-cyber-base overflow-hidden relative">
@@ -400,7 +420,10 @@ export function ApiClientPanel() {
         {st.isLoading ? (
           <button type="button" onClick={abortRequest} className="h-9 shrink-0 rounded-r-md border border-red-500/40 bg-red-500/10 px-4 text-[11px] font-bold text-red-400 uppercase tracking-wider hover:bg-red-500/20 transition"><LoaderSpinner /></button>
         ) : (
-          <button type="button" onClick={sendRequest} disabled={!st.url.trim()} className="h-9 shrink-0 rounded-r-md border border-cyber-electric/40 bg-cyber-electric/10 px-4 text-[11px] font-bold text-cyber-electric uppercase tracking-wider transition hover:bg-cyber-electric/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"><PlayIcon />Send</button>
+          <>
+            <button type="button" onClick={sendRequest} disabled={!st.url.trim()} className="h-9 shrink-0 border-y border-r border-cyber-electric/40 bg-cyber-electric/10 px-4 text-[11px] font-bold text-cyber-electric uppercase tracking-wider transition hover:bg-cyber-electric/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"><PlayIcon />Send</button>
+            <button type="button" onClick={copyCurl} disabled={!st.url.trim()} title="Copy as cURL" className="h-9 shrink-0 rounded-r-md border border-cyber-line/40 bg-cyber-base/50 px-3 text-[10px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition uppercase tracking-wider font-semibold disabled:opacity-30 disabled:cursor-not-allowed">cURL</button>
+          </>
         )}
       </div>
 

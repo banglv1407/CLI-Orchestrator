@@ -25,6 +25,7 @@ pub struct ProxyBackend {
     pub weight: u32,
     pub max_retries: u32,
     pub headers: HashMap<String, String>,
+    pub custom_user_agent: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +34,6 @@ pub struct ProxyConfig {
     pub port: u16,
     pub backends: Vec<ProxyBackend>,
     pub enabled: bool,
-    pub custom_user_agent: Option<String>,
 }
 
 impl Default for ProxyConfig {
@@ -42,7 +42,6 @@ impl Default for ProxyConfig {
             port: 9876,
             backends: vec![],
             enabled: false,
-            custom_user_agent: Some("CliProxyAI/1.0".to_string()),
         }
     }
 }
@@ -280,25 +279,7 @@ async fn handle_chat_completion(
         );
     }
 
-    let mut client_builder = Client::builder();
-    if let Some(ua) = &config.custom_user_agent {
-        let mut headers = HeaderMap::new();
-        if let Ok(name) = HeaderName::from_bytes(b"user-agent") {
-            headers.insert(name, ua.parse().unwrap_or_else(|_| HeaderValue::from_static("")));
-        }
-        client_builder = client_builder.default_headers(headers);
-    }
-    let client = match client_builder.build() {
-        Ok(c) => c,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({
-                    "error": { "message": format!("Build client error: {}", e), "type": "internal_error" }
-                })),
-            );
-        }
-    };
+    let client = Client::new();
 
     let mut attempts = 0;
     loop {
@@ -330,6 +311,12 @@ async fn handle_chat_completion(
                 if let (Ok(name), Ok(value)) = (HeaderName::from_bytes(k.as_bytes()), v.parse()) {
                     headers.insert(name, value);
                 }
+            }
+            if let Some(ua) = &backend.custom_user_agent {
+                headers.insert(
+                    HeaderName::from_static("user-agent"),
+                    ua.parse().unwrap_or_else(|_| HeaderValue::from_static("CliProxyAI/1.0")),
+                );
             }
 
             let body = serde_json::json!({

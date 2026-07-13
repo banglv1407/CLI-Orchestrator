@@ -85,10 +85,17 @@ pub async fn upsert_cli(
 ) -> Result<CliDefinition, String> {
     let mut cli = request.cli;
     cli.mode = CliMode::Interactive;
-    state
+    let name = cli.name.clone();
+    let res = state
         .registry
         .upsert(cli, request.original_name)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string());
+    
+    match &res {
+        Ok(_) => crate::system_log!(state.logger, "INFO", "CLIRegistry", "Successfully upserted CLI configuration: {}", name),
+        Err(e) => crate::system_log!(state.logger, "ERROR", "CLIRegistry", "Failed to upsert CLI configuration {}: {}", name, e),
+    }
+    res
 }
 
 #[tauri::command]
@@ -96,10 +103,16 @@ pub async fn delete_cli(
     state: State<'_, AppState>,
     request: DeleteCliRequest,
 ) -> Result<(), String> {
-    state
+    let res = state
         .registry
         .delete(&request.name)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string());
+
+    match &res {
+        Ok(_) => crate::system_log!(state.logger, "INFO", "CLIRegistry", "Successfully deleted CLI configuration: {}", request.name),
+        Err(e) => crate::system_log!(state.logger, "ERROR", "CLIRegistry", "Failed to delete CLI configuration {}: {}", request.name, e),
+    }
+    res
 }
 
 #[tauri::command]
@@ -191,11 +204,20 @@ pub async fn create_terminal_session(
 
     let working_dir = normalize_working_dir(request.working_dir)?;
     let command = ExecutionEngine::resolve_command(&cli, "", working_dir.clone());
-    state
+    
+    crate::system_log!(state.logger, "INFO", "SessionManager", "Creating terminal session for CLI: {}, working_dir: {:?}", cli.name, working_dir);
+    
+    let res = state
         .session_manager
         .create_session(app, cli.name, working_dir, request.project_tag, command)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string());
+
+    match &res {
+        Ok(info) => crate::system_log!(state.logger, "INFO", "SessionManager", "Terminal session created successfully: {}", info.id),
+        Err(e) => crate::system_log!(state.logger, "ERROR", "SessionManager", "Failed to create terminal session: {}", e),
+    }
+    res
 }
 
 #[tauri::command]
@@ -216,11 +238,18 @@ pub async fn stop_cli(
     state: State<'_, AppState>,
     request: StopCliRequest,
 ) -> Result<(), String> {
-    state
+    crate::system_log!(state.logger, "INFO", "SessionManager", "Stopping session: {}", request.session_id);
+    let res = state
         .session_manager
         .stop_session(&app, &request.session_id)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string());
+
+    match &res {
+        Ok(_) => crate::system_log!(state.logger, "INFO", "SessionManager", "Session stopped successfully: {}", request.session_id),
+        Err(e) => crate::system_log!(state.logger, "ERROR", "SessionManager", "Failed to stop session {}: {}", request.session_id, e),
+    }
+    res
 }
 
 #[tauri::command]
@@ -389,6 +418,20 @@ pub async fn create_file_content(path: String, content: String) -> Result<(), St
     fs::write(&path, content).map_err(|e| format!("Failed to create file '{}': {}", path, e))
 }
 
+#[tauri::command]
+pub async fn delete_file_or_dir(path: String) -> Result<(), String> {
+    use std::fs;
+    let meta = fs::metadata(&path)
+        .map_err(|e| format!("Cannot access '{}': {}", path, e))?;
+    if meta.is_dir() {
+        fs::remove_dir_all(&path)
+            .map_err(|e| format!("Failed to delete directory '{}': {}", path, e))
+    } else {
+        fs::remove_file(&path)
+            .map_err(|e| format!("Failed to delete file '{}': {}", path, e))
+    }
+}
+
 fn create_silent_command(program: &str) -> std::process::Command {
     let mut cmd = std::process::Command::new(program);
     #[cfg(target_os = "windows")]
@@ -404,6 +447,7 @@ fn create_silent_command(program: &str) -> std::process::Command {
 pub struct GitStatusEntry {
     pub path: String,
     pub status: String,
+    pub staged: bool,
 }
 
 #[tauri::command]
@@ -428,20 +472,35 @@ pub async fn get_git_status(repo_path: String) -> Result<Vec<GitStatusEntry>, St
 
             for line in stdout_str.lines() {
                 if line.len() > 3 {
-                    let git_status = line[..2].trim().to_string();
+                    let index_status = &line[..1];   // staging area
+                    let worktree_status = &line[1..2]; // working tree
                     let file_path = line[3..].trim().to_string();
 
-                    let status_str = match git_status.as_str() {
-                        "M" => "modified",
-                        "A" => "added",
-                        "D" => "deleted",
-                        "??" | "?" => "untracked",
-                        _ => "modified",
+                    // Determine file status from the more "interesting" column
+                    let status_str = if worktree_status != " " {
+                        match worktree_status {
+                            "M" => "modified",
+                            "A" => "added",
+                            "D" => "deleted",
+                            "?" => "untracked",
+                            _ => "modified",
+                        }
+                    } else {
+                        match index_status {
+                            "M" => "modified",
+                            "A" => "added",
+                            "D" => "deleted",
+                            _ => "modified",
+                        }
                     };
+
+                    // Staged if index_status is not ' ' or '?'
+                    let is_staged = index_status != " " && index_status != "?";
 
                     entries.push(GitStatusEntry {
                         path: file_path,
                         status: status_str.to_string(),
+                        staged: is_staged,
                     });
                 }
             }

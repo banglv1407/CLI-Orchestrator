@@ -5,6 +5,7 @@ mod commands;
 mod core;
 mod runners;
 mod terminal;
+mod builtin_llm;
 
 use app_state::AppState;
 use commands::{
@@ -21,7 +22,7 @@ use commands::{
         upsert_cli, write_file_content, write_ssh_file_content, ripgrep_search,
         start_ssh_server, stop_ssh_server, get_ssh_server_status,
         get_ssh_server_config, save_ssh_server_config,
-        create_directory, create_file_content,
+        create_directory, create_file_content, delete_file_or_dir,
     },
     api_proxy::{api_proxy_request, api_proxy_stream, api_proxy_abort},
     quickapps_commands::{
@@ -34,6 +35,10 @@ use commands::{
     },
     system_commands::get_system_logs,
     notepad_commands::{get_notepad, save_notepad},
+    builtin_llm_commands::{
+        builtin_llm_status, builtin_llm_load, builtin_llm_unload,
+        builtin_llm_generate, builtin_llm_get_config, builtin_llm_save_config,
+    },
 };
 use tauri::Manager;
 
@@ -69,6 +74,7 @@ fn main() {
             list_directory_files,
             read_file_content,
             write_file_content,
+            delete_file_or_dir,
             get_git_status,
             get_git_diff,
             send_llm_chat,
@@ -110,6 +116,12 @@ fn main() {
             save_notepad,
             create_directory,
             create_file_content,
+            builtin_llm_status,
+            builtin_llm_load,
+            builtin_llm_unload,
+            builtin_llm_generate,
+            builtin_llm_get_config,
+            builtin_llm_save_config,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

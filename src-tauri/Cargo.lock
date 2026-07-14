@@ -950,6 +950,7 @@ name = "clx"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "bytes",
  "candle-core",
  "candle-transformers",
  "chrono",

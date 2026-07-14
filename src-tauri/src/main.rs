@@ -22,7 +22,7 @@ use commands::{
         upsert_cli, write_file_content, write_ssh_file_content, ripgrep_search,
         start_ssh_server, stop_ssh_server, get_ssh_server_status,
         get_ssh_server_config, save_ssh_server_config,
-        create_directory, create_file_content, delete_file_or_dir,
+        create_directory, create_file_content, delete_file_or_dir, delete_ssh_file_or_dir,
     },
     api_proxy::{api_proxy_request, api_proxy_stream, api_proxy_abort},
     quickapps_commands::{
@@ -87,6 +87,7 @@ fn main() {
             list_ssh_directory_files,
             read_ssh_file_content,
             write_ssh_file_content,
+            delete_ssh_file_or_dir,
             list_all_files_recursive,
             list_ssh_files_recursive,
             list_quickapps,

@@ -403,6 +403,14 @@ const TAB_LABELS: Record<string, { label: string; icon: string }> = {
 };
 
 const DEFAULT_ORDER = ['cli-manager', 'explorer', 'quickapps', 'operator', 'apiclient', 'logs', 'remote', 'proxy', 'settings'];
+const PINNED_TABS = new Set(['logs', 'remote', 'proxy', 'settings']);
+
+function normalizeSidebarOrder(order: string[]): string[] {
+  return [
+    ...order.filter((tab) => !PINNED_TABS.has(tab)),
+    ...order.filter((tab) => PINNED_TABS.has(tab)),
+  ];
+}
 
 function SidebarOrderEditor() {
   const [order, setOrder] = useState<string[]>(() => {
@@ -410,28 +418,29 @@ function SidebarOrderEditor() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return normalizeSidebarOrder(parsed);
       } catch { /* ignore */ }
     }
     return [...DEFAULT_ORDER];
   });
 
   const saveOrder = (newOrder: string[]) => {
-    setOrder(newOrder);
-    localStorage.setItem('ai-cli-sidebar-tabs-order', JSON.stringify(newOrder));
+    const normalizedOrder = normalizeSidebarOrder(newOrder);
+    setOrder(normalizedOrder);
+    localStorage.setItem('ai-cli-sidebar-tabs-order', JSON.stringify(normalizedOrder));
     // Notify sidebar to re-read order
-    window.dispatchEvent(new CustomEvent('sidebar-order-changed', { detail: newOrder }));
+    window.dispatchEvent(new CustomEvent('sidebar-order-changed', { detail: normalizedOrder }));
   };
 
   const moveUp = (idx: number) => {
-    if (idx <= 0) return;
+    if (idx <= 0 || PINNED_TABS.has(order[idx]) !== PINNED_TABS.has(order[idx - 1])) return;
     const newOrder = [...order];
     [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
     saveOrder(newOrder);
   };
 
   const moveDown = (idx: number) => {
-    if (idx >= order.length - 1) return;
+    if (idx >= order.length - 1 || PINNED_TABS.has(order[idx]) !== PINNED_TABS.has(order[idx + 1])) return;
     const newOrder = [...order];
     [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
     saveOrder(newOrder);
@@ -445,10 +454,14 @@ function SidebarOrderEditor() {
     <div className="space-y-1.5">
       {order.map((tab, idx) => {
         const info = TAB_LABELS[tab] || { label: tab, icon: '❓' };
+        const canMoveUp = idx > 0 && PINNED_TABS.has(tab) === PINNED_TABS.has(order[idx - 1]);
+        const canMoveDown = idx < order.length - 1 && PINNED_TABS.has(tab) === PINNED_TABS.has(order[idx + 1]);
         return (
           <div
             key={tab}
-            className="flex items-center gap-2 rounded-lg border border-cyber-line/40 bg-cyber-base/30 px-3 py-2 text-xs text-slate-200 group hover:border-cyber-neon/40 transition"
+            className={`flex items-center gap-2 rounded-lg border border-cyber-line/40 bg-cyber-base/30 px-3 py-2 text-xs text-slate-200 group hover:border-cyber-neon/40 transition ${
+              PINNED_TABS.has(tab) && (idx === 0 || !PINNED_TABS.has(order[idx - 1])) ? 'mt-4' : ''
+            }`}
           >
             <span className="text-slate-600 font-mono text-[10px] w-4 text-center shrink-0">{idx + 1}</span>
             <span className="text-base shrink-0">{info.icon}</span>
@@ -457,7 +470,7 @@ function SidebarOrderEditor() {
               <button
                 type="button"
                 onClick={() => moveUp(idx)}
-                disabled={idx === 0}
+                disabled={!canMoveUp}
                 className="flex h-6 w-6 items-center justify-center rounded border border-cyber-line/50 hover:bg-cyber-neon/15 hover:text-cyber-neon disabled:opacity-20 disabled:cursor-not-allowed transition text-[10px]"
                 title="Move up"
               >
@@ -466,7 +479,7 @@ function SidebarOrderEditor() {
               <button
                 type="button"
                 onClick={() => moveDown(idx)}
-                disabled={idx === order.length - 1}
+                disabled={!canMoveDown}
                 className="flex h-6 w-6 items-center justify-center rounded border border-cyber-line/50 hover:bg-cyber-neon/15 hover:text-cyber-neon disabled:opacity-20 disabled:cursor-not-allowed transition text-[10px]"
                 title="Move down"
               >

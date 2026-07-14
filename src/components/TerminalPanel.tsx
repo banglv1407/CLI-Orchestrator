@@ -990,13 +990,6 @@ export function TerminalPanel({
           }
           return false;
         }
-        if (event.ctrlKey && event.key === 'n') {
-          if (event.type === 'keydown') {
-            triggerQuickSession();
-          }
-          event.preventDefault();
-          return false;
-        }
         if (event.ctrlKey && event.key === 'p') {
           if (event.type === 'keydown') {
             const evt = new CustomEvent('trigger-command-palette');

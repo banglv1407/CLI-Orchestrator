@@ -89,8 +89,12 @@ export function createFileContent(path: string, content: string): Promise<void> 
   return invoke('create_file_content', { path, content });
 }
 
-export function deleteFileOrDir(path: string): Promise<void> {
-  return invoke('delete_file_or_dir', { path });
+export function deleteFileOrDir(path: string, rootPath: string): Promise<void> {
+  return invoke('delete_file_or_dir', { path, rootPath });
+}
+
+export function deleteSshFileOrDir(connection: SshConnection, path: string, rootPath: string): Promise<void> {
+  return invoke('delete_ssh_file_or_dir', { connection, path, rootPath });
 }
 
 export function listSshDirectoryFiles(connection: SshConnection, path: string): Promise<FileEntry[]> {

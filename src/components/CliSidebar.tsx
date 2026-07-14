@@ -19,6 +19,7 @@ import {
   listAllFilesRecursive,
   listSshFilesRecursive,
   deleteFileOrDir,
+  deleteSshFileOrDir,
 } from '../lib/tauri';
 
 // --- SVG Icons ---
@@ -190,6 +191,44 @@ interface CliSidebarProps {
 }
 
 type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'apiclient' | 'proxy' | 'logs';
+
+const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['logs', 'remote', 'proxy', 'settings']);
+
+interface FileContextTarget {
+  path: string;
+  isDir: boolean;
+  name: string;
+  rootPath: string;
+  connection: SshConnection | null;
+  canDelete: boolean;
+}
+
+interface DeleteConfirmation extends FileContextTarget {
+  deleting: boolean;
+  error: string | null;
+}
+
+function normalizeUiPath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function isSameOrDescendantPath(path: string, ancestor: string): boolean {
+  const normalizedPath = normalizeUiPath(path);
+  const normalizedAncestor = normalizeUiPath(ancestor);
+  return normalizedPath === normalizedAncestor || normalizedPath.startsWith(`${normalizedAncestor}/`);
+}
+
+function parentUiPath(path: string): string {
+  const lastSeparator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  return lastSeparator > 0 ? path.slice(0, lastSeparator) : '.';
+}
+
+function joinWorkspacePath(rootPath: string, relativePath: string): string {
+  const useBackslash = rootPath.includes('\\') && !rootPath.includes('/');
+  const separator = useBackslash ? '\\' : '/';
+  const normalizedRelative = relativePath.replace(/[\\/]/g, separator);
+  return `${rootPath.replace(/[\\/]+$/, '')}${separator}${normalizedRelative}`;
+}
 
 
 function ApiHistoryList() {
@@ -403,7 +442,8 @@ export function CliSidebar({
   const handleTabDrop = (e: React.DragEvent, targetTab: SidebarTab) => {
     e.preventDefault();
     const sourceTab = e.dataTransfer.getData('text/plain') as SidebarTab;
-    if (sourceTab && sourceTab !== targetTab) {
+    const sameActivityGroup = PINNED_SIDEBAR_TABS.has(sourceTab) === PINNED_SIDEBAR_TABS.has(targetTab);
+    if (sourceTab && sourceTab !== targetTab && sameActivityGroup) {
       const newOrder = [...tabsOrder];
       const sourceIdx = newOrder.indexOf(sourceTab);
       const targetIdx = newOrder.indexOf(targetTab);
@@ -1111,9 +1151,9 @@ export function CliSidebar({
 
   const [fileContextMenu, setFileContextMenu] = useState<{
     x: number; y: number;
-    path: string; isDir: boolean; name: string; rootPath: string | null;
+    target: FileContextTarget;
   } | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ path: string; name: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmation | null>(null);
 
   useEffect(() => {
     const handleGlobalClick = () => { setInputContextMenu(null); setFileContextMenu(null); };
@@ -1648,6 +1688,76 @@ export function CliSidebar({
     }));
   };
 
+  const openDeleteConfirmation = (target: FileContextTarget) => {
+    setFileContextMenu(null);
+    setDeleteConfirm({ ...target, deleting: false, error: null });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm || deleteConfirm.deleting) return;
+
+    const target = deleteConfirm;
+    setDeleteConfirm({ ...target, deleting: true, error: null });
+
+    try {
+      if (target.connection) {
+        await deleteSshFileOrDir(target.connection, target.path, target.rootPath);
+      } else {
+        await deleteFileOrDir(target.path, target.rootPath);
+      }
+
+      if (selectedFilePath && isSameOrDescendantPath(selectedFilePath, target.path)) {
+        onCloseFile();
+      }
+
+      setAllFiles((prev) => prev.filter((entry) => !isSameOrDescendantPath(entry.path, target.path)));
+      setExpandedPaths((prev) => Object.fromEntries(
+        Object.entries(prev).filter(([path]) => !isSameOrDescendantPath(path, target.path)),
+      ));
+      setCachedFiles((prev) => Object.fromEntries(
+        Object.entries(prev)
+          .filter(([path]) => !isSameOrDescendantPath(path, target.path))
+          .map(([path, entries]) => [
+            path,
+            entries.filter((entry) => !isSameOrDescendantPath(entry.path, target.path)),
+          ]),
+      ));
+
+      const parentPath = parentUiPath(target.path);
+      try {
+        const files = target.connection
+          ? await listSshDirectoryFiles(target.connection, parentPath)
+          : await listDirectoryFiles(parentPath);
+        setCachedFiles((prev) => ({ ...prev, [parentPath]: files }));
+      } catch (refreshError) {
+        console.error(`Failed to refresh directory '${parentPath}':`, refreshError);
+      }
+
+      if (!target.connection) {
+        try {
+          await refreshGitStatus(target.rootPath);
+        } catch (refreshError) {
+          console.error('Failed to refresh Git status after deletion:', refreshError);
+        }
+      }
+
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Done');
+        setAssistantText(`${target.isDir ? 'Folder' : 'File'} deleted: ${target.name}`);
+        setTimeout(() => setAssistantState('Idle'), 2500);
+      }
+      setDeleteConfirm(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Delete failed:', error);
+      setDeleteConfirm({ ...target, deleting: false, error: message });
+      if (setAssistantState && setAssistantText) {
+        setAssistantState('Error');
+        setAssistantText(`Delete failed: ${message}`);
+      }
+    }
+  };
+
 
 
   // Recursive Tree Node Renderer
@@ -1685,7 +1795,19 @@ export function CliSidebar({
           onClick={() => (entry.isDir ? handleToggleExpand(entry.path) : void onFileClick(entry, rootPath))}
           onContextMenu={(e) => {
             e.preventDefault();
-            setFileContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, isDir: entry.isDir, name: entry.name, rootPath });
+            if (!rootPath) return;
+            setFileContextMenu({
+              x: e.clientX,
+              y: e.clientY,
+              target: {
+                path: entry.path,
+                isDir: entry.isDir,
+                name: entry.name,
+                rootPath,
+                connection: isSshSession ? sshConnection ?? null : null,
+                canDelete: !isSshSession || !!sshConnection,
+              },
+            });
           }}
           style={{ paddingLeft: `${depth * 14 + 10}px` }}
           className={`flex w-full items-center gap-2 py-1 pr-3 text-left transition hover:bg-cyber-neon/5 ${
@@ -1778,7 +1900,10 @@ export function CliSidebar({
       {/* 1. Left-most Activity Bar (VSCode Style) */}
       <nav className="flex h-full w-14 flex-col items-center border-r border-cyber-line/50 bg-cyber-base/70 py-4 shrink-0 select-none">
         <div className="flex flex-col gap-4 items-center flex-1 w-full overflow-y-auto scrollbar-none py-1">
-          {tabsOrder.map(renderTabButton)}
+          {tabsOrder.filter((tab) => !PINNED_SIDEBAR_TABS.has(tab)).map(renderTabButton)}
+        </div>
+        <div className="mt-auto flex shrink-0 flex-col items-center gap-3 border-t border-cyber-line/40 pt-3">
+          {tabsOrder.filter((tab) => PINNED_SIDEBAR_TABS.has(tab)).map(renderTabButton)}
         </div>
       </nav>
  
@@ -1855,7 +1980,7 @@ export function CliSidebar({
                               const renderItem = (gitItem: typeof gitStatusList[0]) => {
                                 const entry: FileEntry = {
                                   name: gitItem.path.split('/').pop() || gitItem.path,
-                                  path: rootPath + '/' + gitItem.path,
+                                  path: joinWorkspacePath(rootPath, gitItem.path),
                                   isDir: false
                                 };
                                 const isActive = selectedFilePath === entry.path;
@@ -1867,7 +1992,28 @@ export function CliSidebar({
                                 else if (gitItem.status === 'deleted') { statusBadge = 'D'; textClass = 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 line-through'; }
 
                                 return (
-                                  <button key={gitItem.path} type="button" onClick={() => void onFileClick(entry, rootPath)}
+                                  <button
+                                    key={gitItem.path}
+                                    type="button"
+                                    aria-disabled={gitItem.status === 'deleted'}
+                                    onClick={() => {
+                                      if (gitItem.status !== 'deleted') void onFileClick(entry, rootPath);
+                                    }}
+                                    onContextMenu={(event) => {
+                                      event.preventDefault();
+                                      setFileContextMenu({
+                                        x: event.clientX,
+                                        y: event.clientY,
+                                        target: {
+                                          path: entry.path,
+                                          isDir: false,
+                                          name: entry.name,
+                                          rootPath,
+                                          connection: null,
+                                          canDelete: gitItem.status !== 'deleted',
+                                        },
+                                      });
+                                    }}
                                     className={`flex w-full items-center justify-between px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 ${
                                       isActive ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' : `${textClass}`
                                     }`}>
@@ -2471,66 +2617,71 @@ export function CliSidebar({
         <div
           style={{ top: `${fileContextMenu.y}px`, left: `${fileContextMenu.x}px` }}
           className="fixed z-[150] w-48 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
-          onClick={(e) => { e.stopPropagation(); setFileContextMenu(null); }}
+          onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
             onClick={() => {
-              void navigator.clipboard.writeText(fileContextMenu.path);
+              void navigator.clipboard.writeText(fileContextMenu.target.path);
+              setFileContextMenu(null);
             }}
             className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
           >
             📋 Copy Path
           </button>
-          <div className="my-1 border-t border-cyber-line/50" />
-          <button
-            type="button"
-            onClick={() => setDeleteConfirm({ path: fileContextMenu.path, name: fileContextMenu.name })}
-            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-500/20 hover:text-rose-400 transition"
-          >
-            🗑️ Delete
-          </button>
+          {fileContextMenu.target.canDelete && (
+            <>
+              <div className="my-1 border-t border-cyber-line/50" />
+              <button
+                type="button"
+                onClick={() => openDeleteConfirmation(fileContextMenu.target)}
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-500/20 hover:text-rose-400 transition"
+              >
+                <TrashIcon />
+                Delete
+              </button>
+            </>
+          )}
         </div>
       )}
 
       {/* ── Delete Confirmation Modal ── */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-96 rounded-xl border border-rose-500/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none">
-            <h2 className="font-display text-sm uppercase tracking-[0.2em] text-rose-400 font-bold mb-4">Delete Confirmation</h2>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-confirmation-title"
+            className="w-96 max-w-[calc(100vw-2rem)] rounded-lg border border-rose-500/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none"
+          >
+            <h2 id="delete-confirmation-title" className="font-display text-sm uppercase tracking-[0.2em] text-rose-400 font-bold mb-4">Delete Confirmation</h2>
             <p className="text-sm text-slate-300 mb-2">
-              Are you sure you want to delete:
+              {deleteConfirm.isDir
+                ? 'This permanently deletes the folder and all of its contents:'
+                : 'This permanently deletes the file:'}
             </p>
             <p className="text-sm text-rose-300 font-mono bg-cyber-base/50 p-2 rounded border border-cyber-line mb-6 break-all">
               {deleteConfirm.name}
             </p>
+            {deleteConfirm.error && (
+              <p role="alert" className="mb-4 max-h-24 overflow-y-auto rounded border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300 break-words">
+                {deleteConfirm.error}
+              </p>
+            )}
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider transition"
+                disabled={deleteConfirm.deleting}
+                className="px-4 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={async () => {
-                  try {
-                    await deleteFileOrDir(deleteConfirm.path);
-                    // Refresh file tree
-                    if (rootPath) {
-                      if (isSshSession && sshConnection) {
-                        const files = await listSshDirectoryFiles(sshConnection, rootPath);
-                        setCachedFiles((prev) => ({ ...prev, [rootPath]: files }));
-                      } else {
-                        const files = await listDirectoryFiles(rootPath);
-                        setCachedFiles((prev) => ({ ...prev, [rootPath]: files }));
-                      }
-                    }
-                  } catch (e) { console.error('Delete failed:', e); }
-                  setDeleteConfirm(null);
-                }}
-                className="px-4 py-1.5 text-xs font-bold text-rose-400 bg-rose-500/20 border border-rose-500/40 rounded hover:bg-rose-500/30 uppercase tracking-wider transition"
+                onClick={() => void handleConfirmDelete()}
+                disabled={deleteConfirm.deleting}
+                className="min-w-20 px-4 py-1.5 text-xs font-bold text-rose-400 bg-rose-500/20 border border-rose-500/40 rounded hover:bg-rose-500/30 uppercase tracking-wider transition disabled:cursor-wait disabled:opacity-60"
               >
-                Delete
+                {deleteConfirm.deleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>

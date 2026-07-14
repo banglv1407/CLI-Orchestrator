@@ -418,16 +418,77 @@ pub async fn create_file_content(path: String, content: String) -> Result<(), St
     fs::write(&path, content).map_err(|e| format!("Failed to create file '{}': {}", path, e))
 }
 
-#[tauri::command]
-pub async fn delete_file_or_dir(path: String) -> Result<(), String> {
+fn validate_local_delete_target(
+    path: &std::path::Path,
+    root_path: &std::path::Path,
+) -> Result<std::path::PathBuf, String> {
     use std::fs;
-    let meta = fs::metadata(&path)
+
+    let root = fs::canonicalize(root_path).map_err(|e| {
+        format!(
+            "Cannot access workspace root '{}': {}",
+            root_path.display(),
+            e
+        )
+    })?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Cannot determine parent for '{}'", path.display()))?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| format!("Cannot delete workspace root '{}'", path.display()))?;
+    let resolved = fs::canonicalize(parent)
+        .map_err(|e| format!("Cannot access parent of '{}': {}", path.display(), e))?
+        .join(file_name);
+
+    if resolved == root {
+        return Err("Cannot delete the active workspace root".to_string());
+    }
+    if !resolved.starts_with(&root) {
+        return Err(format!(
+            "Refusing to delete '{}' because it is outside the active workspace",
+            path.display()
+        ));
+    }
+
+    Ok(resolved)
+}
+
+#[tauri::command]
+pub async fn delete_file_or_dir(path: String, root_path: String) -> Result<(), String> {
+    use std::fs;
+
+    let target = validate_local_delete_target(
+        std::path::Path::new(&path),
+        std::path::Path::new(&root_path),
+    )?;
+    let meta = fs::symlink_metadata(&target)
         .map_err(|e| format!("Cannot access '{}': {}", path, e))?;
-    if meta.is_dir() {
-        fs::remove_dir_all(&path)
+
+    if meta.file_type().is_symlink() {
+        #[cfg(windows)]
+        {
+            let points_to_directory = fs::metadata(&target)
+                .map(|target_meta| target_meta.is_dir())
+                .unwrap_or(false);
+            if points_to_directory {
+                fs::remove_dir(&target)
+                    .map_err(|e| format!("Failed to delete directory link '{}': {}", path, e))
+            } else {
+                fs::remove_file(&target)
+                    .map_err(|e| format!("Failed to delete file link '{}': {}", path, e))
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            fs::remove_file(&target)
+                .map_err(|e| format!("Failed to delete file link '{}': {}", path, e))
+        }
+    } else if meta.is_dir() {
+        fs::remove_dir_all(&target)
             .map_err(|e| format!("Failed to delete directory '{}': {}", path, e))
     } else {
-        fs::remove_file(&path)
+        fs::remove_file(&target)
             .map_err(|e| format!("Failed to delete file '{}': {}", path, e))
     }
 }
@@ -1030,6 +1091,70 @@ pub async fn write_ssh_file_content(
     Ok(())
 }
 
+fn normalize_remote_path(path: &str) -> Result<(bool, Vec<&str>), String> {
+    let absolute = path.starts_with('/');
+    let mut components = Vec::new();
+
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                if components.pop().is_none() {
+                    return Err(format!("Remote path escapes its root: {}", path));
+                }
+            }
+            value => components.push(value),
+        }
+    }
+
+    Ok((absolute, components))
+}
+
+fn validate_remote_delete_target(path: &str, root_path: &str) -> Result<(), String> {
+    let (root_absolute, root_components) = normalize_remote_path(root_path)?;
+    let (target_absolute, target_components) = normalize_remote_path(path)?;
+
+    if root_absolute != target_absolute
+        || target_components == root_components
+        || !target_components.starts_with(&root_components)
+    {
+        return Err(format!(
+            "Refusing to delete '{}' because it is outside the active remote workspace",
+            path
+        ));
+    }
+
+    Ok(())
+}
+
+fn quote_posix_shell(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+fn remote_delete_command(path: &str, root_path: &str) -> String {
+    let quoted_path = quote_posix_shell(path);
+    let quoted_root = quote_posix_shell(root_path);
+    format!(
+        "root=$(realpath -m -- {quoted_root}) || exit 1; \
+parent=$(dirname -- {quoted_path}) || exit 1; \
+parent=$(realpath -m -- \"$parent\") || exit 1; \
+case \"$parent/\" in \"$root/\"*) rm -rf -- {quoted_path} ;; \
+*) printf '%s\\n' 'Refusing to delete outside remote workspace' >&2; exit 64 ;; esac"
+    )
+}
+
+#[tauri::command]
+pub async fn delete_ssh_file_or_dir(
+    connection: SshConnection,
+    path: String,
+    root_path: String,
+) -> Result<(), String> {
+    validate_remote_delete_target(&path, &root_path)?;
+    let command = remote_delete_command(&path, &root_path);
+    run_ssh_command(&connection, &command, None)?;
+    Ok(())
+}
+
 fn walk_dir_recursive(dir: &std::path::Path, entries: &mut Vec<FileEntry>) {
     if let Ok(read_dir) = std::fs::read_dir(dir) {
         for entry in read_dir {
@@ -1262,4 +1387,81 @@ pub async fn save_ssh_server_config(
         .map_err(|e| format!("Failed to serialize SSH config: {}", e))?;
     std::fs::write(&path, data).map_err(|e| format!("Failed to write SSH config file: {}", e))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod delete_tests {
+    use super::{
+        quote_posix_shell, remote_delete_command, validate_local_delete_target,
+        validate_remote_delete_target,
+    };
+    use std::path::PathBuf;
+
+    fn temporary_directory(label: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("clx-{label}-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&path).expect("temporary directory should be created");
+        path
+    }
+
+    #[test]
+    fn local_delete_target_must_stay_below_workspace_root() {
+        let parent = temporary_directory("delete-boundary");
+        let root = parent.join("workspace");
+        let nested = root.join("nested");
+        let outside = parent.join("outside.txt");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(&outside, "outside").unwrap();
+
+        let accepted = validate_local_delete_target(&nested.join("file.txt"), &root).unwrap();
+        assert!(accepted.starts_with(std::fs::canonicalize(&root).unwrap()));
+        assert!(validate_local_delete_target(&root, &root).is_err());
+        assert!(validate_local_delete_target(&outside, &root).is_err());
+        assert!(validate_local_delete_target(&root.join("..").join("outside.txt"), &root).is_err());
+
+        std::fs::remove_dir_all(parent).unwrap();
+    }
+
+    #[tokio::test]
+    async fn local_delete_removes_files_and_non_empty_directories() {
+        let root = temporary_directory("delete-operation");
+        let file = root.join("file.txt");
+        let directory = root.join("nested");
+        std::fs::write(&file, "content").unwrap();
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("child.txt"), "content").unwrap();
+
+        super::delete_file_or_dir(
+            file.to_string_lossy().into_owned(),
+            root.to_string_lossy().into_owned(),
+        )
+        .await
+        .unwrap();
+        super::delete_file_or_dir(
+            directory.to_string_lossy().into_owned(),
+            root.to_string_lossy().into_owned(),
+        )
+        .await
+        .unwrap();
+
+        assert!(!file.exists());
+        assert!(!directory.exists());
+        assert!(root.exists());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn remote_delete_target_must_stay_below_remote_root() {
+        assert!(validate_remote_delete_target("/srv/app/src/main.rs", "/srv/app").is_ok());
+        assert!(validate_remote_delete_target("/srv/app", "/srv/app").is_err());
+        assert!(validate_remote_delete_target("/srv/app/../../etc/passwd", "/srv/app").is_err());
+        assert!(validate_remote_delete_target("/etc/passwd", "/srv/app").is_err());
+    }
+
+    #[test]
+    fn remote_delete_path_is_shell_quoted() {
+        assert_eq!(quote_posix_shell("/srv/app/a'b"), "'/srv/app/a'\"'\"'b'");
+        let command = remote_delete_command("/srv/app/a'b", "/srv/app");
+        assert!(command.contains("rm -rf -- '/srv/app/a'\"'\"'b'"));
+        assert!(command.contains("realpath -m -- '/srv/app'"));
+    }
 }

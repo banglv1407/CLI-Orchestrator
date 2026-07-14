@@ -1,10 +1,13 @@
 use axum::{
+    body::Body,
     extract::State,
-    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
-    response::IntoResponse,
+    http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
     routing::post,
     Json, Router,
 };
+use bytes::Bytes;
+use futures_util::{stream, StreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -75,14 +78,15 @@ pub struct ProxyLogEntry {
 
 // ── OpenAI types ──────────────────────────────────────────────
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ChatMessage {
     pub role: String,
-    pub content: String,
+    pub content: serde_json::Value,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ChatCompletionRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
@@ -92,6 +96,8 @@ pub struct ChatCompletionRequest {
     pub temperature: Option<f32>,
     #[serde(default)]
     pub max_tokens: Option<u32>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 // ── State ─────────────────────────────────────────────────────
@@ -100,6 +106,7 @@ pub struct ProxyState {
     pub counter: AtomicU64,
     pub config: RwLock<ProxyConfig>,
     pub logs: Mutex<Vec<ProxyLogEntry>>,
+    persist_config: bool,
 }
 
 impl ProxyState {
@@ -108,6 +115,17 @@ impl ProxyState {
             counter: AtomicU64::new(0),
             config: RwLock::new(config),
             logs: Mutex::new(Vec::with_capacity(100)),
+            persist_config: true,
+        }
+    }
+
+    #[cfg(test)]
+    fn without_persistence(config: ProxyConfig) -> Self {
+        Self {
+            counter: AtomicU64::new(0),
+            config: RwLock::new(config),
+            logs: Mutex::new(Vec::with_capacity(100)),
+            persist_config: false,
         }
     }
 
@@ -121,6 +139,25 @@ impl ProxyState {
 
     pub async fn get_logs(&self) -> Vec<ProxyLogEntry> {
         self.logs.lock().await.clone()
+    }
+}
+
+async fn rotate_failed_backend(state: &Arc<ProxyState>, backend_name: &str) {
+    let config_to_save = {
+        let mut config = state.config.write().await;
+        if let Some(index) = config
+            .backends
+            .iter()
+            .position(|backend| backend.name == backend_name)
+        {
+            let backend = config.backends.remove(index);
+            config.backends.push(backend);
+        }
+        state.persist_config.then(|| config.clone())
+    };
+
+    if let Some(config) = config_to_save {
+        let _ = config.save();
     }
 }
 
@@ -251,51 +288,163 @@ fn extract_token_usage(response_json: &str) -> (u32, u32, u32) {
     (0, 0, 0)
 }
 
+fn extract_stream_token_usage(response_body: &str) -> (u32, u32, u32) {
+    for line in response_body.lines().rev() {
+        let data = line.strip_prefix("data:").map(str::trim).unwrap_or(line);
+        if data.is_empty() || data == "[DONE]" {
+            continue;
+        }
+        let usage = extract_token_usage(data);
+        if usage != (0, 0, 0) {
+            return usage;
+        }
+    }
+    (0, 0, 0)
+}
+
+fn build_upstream_body(
+    request: &ChatCompletionRequest,
+    backend: &ProxyBackend,
+) -> serde_json::Value {
+    let mut body = request.extra.clone();
+    body.insert("model".to_string(), serde_json::json!(backend.model));
+    body.insert("messages".to_string(), serde_json::json!(request.messages));
+    body.insert("stream".to_string(), serde_json::json!(request.stream));
+    body.insert(
+        "temperature".to_string(),
+        serde_json::json!(request.temperature.unwrap_or(0.7)),
+    );
+    body.insert(
+        "max_tokens".to_string(),
+        serde_json::json!(request.max_tokens.unwrap_or(4096)),
+    );
+    serde_json::Value::Object(body)
+}
+
+fn chat_completions_url(base_url: &str) -> String {
+    let base_url = base_url.trim_end_matches('/');
+    if base_url.ends_with("/chat/completions") {
+        base_url.to_string()
+    } else if base_url.ends_with("/v1") {
+        format!("{base_url}/chat/completions")
+    } else {
+        format!("{base_url}/v1/chat/completions")
+    }
+}
+
+const MAX_STREAM_LOG_BYTES: usize = 256 * 1024;
+
+fn append_stream_log_preview(preview: &mut Vec<u8>, chunk: &[u8]) {
+    let remaining = MAX_STREAM_LOG_BYTES.saturating_sub(preview.len());
+    preview.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
+}
+
+fn streaming_response(
+    upstream: reqwest::Response,
+    state: Arc<ProxyState>,
+    backend: ProxyBackend,
+    request_json: String,
+    log_id: u64,
+    started_at: std::time::Instant,
+) -> Response {
+    let status = upstream.status();
+    let status_code = status.as_u16();
+    let (sender, receiver) = tokio::sync::mpsc::channel::<Result<Bytes, std::io::Error>>(16);
+
+    tokio::spawn(async move {
+        let mut upstream_stream = upstream.bytes_stream();
+        let mut preview = Vec::new();
+        let mut stream_error = None;
+
+        while let Some(item) = upstream_stream.next().await {
+            match item {
+                Ok(chunk) => {
+                    append_stream_log_preview(&mut preview, &chunk);
+                    if sender.send(Ok(chunk)).await.is_err() {
+                        stream_error = Some("Downstream client disconnected".to_string());
+                        break;
+                    }
+                }
+                Err(error) => {
+                    let message = error.to_string();
+                    stream_error = Some(message.clone());
+                    let _ = sender
+                        .send(Err(std::io::Error::other(message)))
+                        .await;
+                    break;
+                }
+            }
+        }
+
+        let response_json = String::from_utf8_lossy(&preview).into_owned();
+        let (prompt_tokens, completion_tokens, total_tokens) =
+            extract_stream_token_usage(&response_json);
+        state
+            .add_log(ProxyLogEntry {
+                id: log_id,
+                timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                backend: backend.name,
+                model: backend.model,
+                request_json,
+                response_json,
+                status: status_code,
+                duration_ms: started_at.elapsed().as_millis() as u64,
+                success: stream_error.is_none(),
+                error_msg: stream_error,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
+            })
+            .await;
+    });
+
+    let body_stream = stream::unfold(receiver, |mut receiver| async move {
+        receiver.recv().await.map(|item| (item, receiver))
+    });
+
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "text/event-stream")
+        .header(header::CACHE_CONTROL, "no-cache")
+        .header("x-accel-buffering", "no")
+        .body(Body::from_stream(body_stream))
+        .unwrap_or_else(|error| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": { "message": error.to_string(), "type": "internal_error" }
+                })),
+            )
+                .into_response()
+        })
+}
+
 // ── Handler ───────────────────────────────────────────────────
 
 async fn handle_chat_completion(
     State(state): State<Arc<ProxyState>>,
     Json(request): Json<ChatCompletionRequest>,
-) -> impl IntoResponse {
-    state.counter.fetch_add(1, Ordering::Relaxed);
+) -> Response {
+    let log_id = state.counter.fetch_add(1, Ordering::Relaxed) + 1;
 
-    if request.stream {
-        return (
-            StatusCode::NOT_IMPLEMENTED,
-            Json(serde_json::json!({
-                "error": { "message": "Streaming not supported in MVP", "type": "not_implemented" }
-            })),
-        );
-    }
-
-    let mut config = state.config.write().await;
-    let total = config.backends.len();
-    if total == 0 {
+    let backends = state.config.read().await.backends.clone();
+    if backends.is_empty() {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(serde_json::json!({
                 "error": { "message": "No backends configured", "type": "service_unavailable" }
             })),
-        );
+        )
+            .into_response();
     }
 
     let client = Client::new();
 
-    let mut attempts = 0;
-    loop {
-        if attempts >= total { break; }
-        attempts += 1;
-
-        let backend = match config.backends.first() {
-            Some(b) => b.clone(),
-            None => break,
-        };
-
+    for backend in backends {
         let max_retries = backend.max_retries.max(1);
-        let mut backend_success = false;
 
         for retry in 0..max_retries {
-            let target_url = format!("{}/v1/chat/completions", backend.url.trim_end_matches('/'));
+            let target_url = chat_completions_url(&backend.url);
 
             let mut headers = HeaderMap::new();
             headers.insert(
@@ -319,12 +468,7 @@ async fn handle_chat_completion(
                 );
             }
 
-            let body = serde_json::json!({
-                "model": backend.model,
-                "messages": request.messages,
-                "temperature": request.temperature.unwrap_or(0.7),
-                "max_tokens": request.max_tokens.unwrap_or(4096),
-            });
+            let body = build_upstream_body(&request, &backend);
 
             let start = std::time::Instant::now();
             let result = client
@@ -333,17 +477,27 @@ async fn handle_chat_completion(
                 .json(&body)
                 .send()
                 .await;
-            let duration_ms = start.elapsed().as_millis() as u64;
 
             match result {
                 Ok(resp) => {
                     let status_code = resp.status().as_u16();
+                    if (200..300).contains(&status_code) && request.stream {
+                        let request_json = serde_json::to_string(&body).unwrap_or_default();
+                        return streaming_response(
+                            resp,
+                            state.clone(),
+                            backend.clone(),
+                            request_json,
+                            log_id,
+                            start,
+                        );
+                    }
                     let body_text = resp.text().await.unwrap_or_default();
                     let request_json = serde_json::to_string(&body).unwrap_or_default();
-                    let log_id = state.counter.load(Ordering::Relaxed);
+                    let duration_ms = start.elapsed().as_millis() as u64;
 
                     // Success
-                    if status_code >= 200 && status_code < 300 {
+                    if (200..300).contains(&status_code) {
                         let clean_body = strip_sse_artifacts(&body_text);
                         let parsed: Result<serde_json::Value, _> = serde_json::from_str(&clean_body);
                         let response_json = if let Ok(ref json) = parsed {
@@ -368,8 +522,6 @@ async fn handle_chat_completion(
                             completion_tokens: ct,
                             total_tokens: tt,
                         }).await;
-
-                        let _ = config.save();
 
                         let response = match parsed {
                             Ok(json) => {
@@ -406,7 +558,7 @@ async fn handle_chat_completion(
                                 }
                             }
                         };
-                        return response;
+                        return response.into_response();
                     }
 
                     // Non-success HTTP
@@ -429,16 +581,15 @@ async fn handle_chat_completion(
                         continue;
                     }
                     eprintln!("Backend {} returned {} after {} retries — rotating", backend.name, status_code, max_retries);
-                    config.backends.rotate_left(1);
-                    let _ = config.save();
-                    backend_success = false;
+                    rotate_failed_backend(&state, &backend.name).await;
                 }
 
                 Err(e) => {
+                    let duration_ms = start.elapsed().as_millis() as u64;
                     let err_msg = format!("{}", e);
                     let request_json = serde_json::to_string(&body).unwrap_or_default();
                     state.add_log(ProxyLogEntry {
-                        id: state.counter.load(Ordering::Relaxed),
+                        id: log_id,
                         timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
                         backend: backend.name.clone(),
                         model: backend.model.clone(),
@@ -456,16 +607,11 @@ async fn handle_chat_completion(
                         continue;
                     }
                     eprintln!("Backend {} failed after {} retries — rotating", backend.name, max_retries);
-                    config.backends.rotate_left(1);
-                    let _ = config.save();
-                    backend_success = false;
+                    rotate_failed_backend(&state, &backend.name).await;
                 }
             }
         } // retry loop
-
-        if backend_success { break; }
-        if config.backends.is_empty() { break; }
-    } // backend loop
+    }
 
     (
         StatusCode::BAD_GATEWAY,
@@ -473,6 +619,7 @@ async fn handle_chat_completion(
             "error": { "message": "All backends failed", "type": "bad_gateway" }
         })),
     )
+        .into_response()
 }
 
 // ── Config persistence ────────────────────────────────────────
@@ -503,7 +650,236 @@ impl ProxyConfig {
     }
 
     fn config_path() -> Result<std::path::PathBuf, String> {
+        #[cfg(test)]
+        {
+            if let Some(path) = std::env::var_os("CLX_PROXY_CONFIG") {
+                return Ok(std::path::PathBuf::from(path));
+            }
+        }
         let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
         Ok(home.join(".ai-cli-manager").join("proxy.json"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::Request;
+    use std::convert::Infallible;
+    use tokio::time::{sleep, timeout, Duration, Instant};
+    use tower::ServiceExt;
+
+    #[test]
+    fn joins_openai_chat_completion_urls_without_duplicate_v1() {
+        assert_eq!(
+            chat_completions_url("https://example.test"),
+            "https://example.test/v1/chat/completions"
+        );
+        assert_eq!(
+            chat_completions_url("https://example.test/v1/"),
+            "https://example.test/v1/chat/completions"
+        );
+        assert_eq!(
+            chat_completions_url("https://example.test/v1/chat/completions"),
+            "https://example.test/v1/chat/completions"
+        );
+    }
+
+    async fn mock_streaming_upstream(
+        State(captured): State<Arc<Mutex<Option<serde_json::Value>>>>,
+        Json(body): Json<serde_json::Value>,
+    ) -> Response {
+        *captured.lock().await = Some(body);
+
+        let chunks = stream::unfold(0, |index| async move {
+            let (delay_ms, payload) = match index {
+                0 => (
+                    0,
+                    "data: {\"id\":\"mock-1\",\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\n\n",
+                ),
+                1 => (
+                    150,
+                    "data: {\"id\":\"mock-1\",\"choices\":[{\"delta\":{\"content\":\"lo\"}}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":1,\"total_tokens\":3}}\n\n",
+                ),
+                2 => (0, "data: [DONE]\n\n"),
+                _ => return None,
+            };
+            if delay_ms > 0 {
+                sleep(Duration::from_millis(delay_ms)).await;
+            }
+            Some((
+                Ok::<Bytes, Infallible>(Bytes::from_static(payload.as_bytes())),
+                index + 1,
+            ))
+        });
+
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .body(Body::from_stream(chunks))
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn streams_upstream_chunks_without_buffering_completion() {
+        let captured = Arc::new(Mutex::new(None));
+        let upstream_app = Router::new()
+            .route("/v1/chat/completions", post(mock_streaming_upstream))
+            .with_state(captured.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let upstream_address = listener.local_addr().unwrap();
+        let upstream_task = tokio::spawn(async move {
+            axum::serve(listener, upstream_app).await.unwrap();
+        });
+
+        let state = Arc::new(ProxyState::without_persistence(ProxyConfig {
+            port: 0,
+            enabled: true,
+            backends: vec![ProxyBackend {
+                name: "mock".to_string(),
+                url: format!("http://{}", upstream_address),
+                api_key: "test-key".to_string(),
+                model: "configured-model".to_string(),
+                weight: 1,
+                max_retries: 1,
+                headers: HashMap::new(),
+                custom_user_agent: Some("clx-test".to_string()),
+            }],
+        }));
+        let proxy_app = Router::new()
+            .route("/v1/chat/completions", post(handle_chat_completion))
+            .with_state(state.clone());
+        let request_body = serde_json::json!({
+            "model": "client-model",
+            "messages": [{ "role": "user", "content": "hello" }],
+            "stream": true,
+            "top_p": 0.25
+        });
+
+        let started = Instant::now();
+        let response = proxy_app
+            .oneshot(
+                Request::post("/v1/chat/completions")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(request_body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+        assert!(started.elapsed() < Duration::from_millis(140));
+
+        let mut response_stream = response.into_body().into_data_stream();
+        let first = timeout(Duration::from_secs(1), response_stream.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert!(String::from_utf8_lossy(&first).contains("Hel"));
+
+        let before_second = Instant::now();
+        let second = timeout(Duration::from_secs(1), response_stream.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert!(before_second.elapsed() >= Duration::from_millis(100));
+        assert!(String::from_utf8_lossy(&second).contains("lo"));
+
+        let done = timeout(Duration::from_secs(1), response_stream.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert!(String::from_utf8_lossy(&done).contains("[DONE]"));
+        assert!(response_stream.next().await.is_none());
+
+        let upstream_request = captured.lock().await.clone().unwrap();
+        assert_eq!(upstream_request["stream"], true);
+        assert_eq!(upstream_request["model"], "configured-model");
+        assert_eq!(upstream_request["top_p"], 0.25);
+
+        let logs = state.get_logs().await;
+        assert_eq!(logs.len(), 1);
+        assert!(logs[0].success);
+        assert!(logs[0].response_json.contains("[DONE]"));
+        assert_eq!(logs[0].total_tokens, 3);
+
+        upstream_task.abort();
+    }
+
+    #[tokio::test]
+    #[ignore = "requires the saved CliProxyAI config and live provider access"]
+    async fn streams_with_saved_proxy_config() {
+        let config = ProxyConfig::load().expect("saved proxy config should load");
+        assert!(!config.backends.is_empty(), "at least one backend is required");
+        let configured_keys: Vec<String> = config
+            .backends
+            .iter()
+            .map(|backend| backend.api_key.clone())
+            .filter(|key| !key.is_empty())
+            .collect();
+        let state = Arc::new(ProxyState::without_persistence(config));
+        let proxy_app = Router::new()
+            .route("/v1/chat/completions", post(handle_chat_completion))
+            .with_state(state.clone());
+        let request_body = serde_json::json!({
+            "model": "use-configured-model",
+            "messages": [{
+                "role": "user",
+                "content": "Reply with exactly STREAM_OK and no other text."
+            }],
+            "stream": true,
+            "temperature": 0,
+            "max_tokens": 32
+        });
+
+        let response = timeout(
+            Duration::from_secs(120),
+            proxy_app.oneshot(
+                Request::post("/v1/chat/completions")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(request_body.to_string()))
+                    .unwrap(),
+            ),
+        )
+        .await
+        .expect("live provider should return response headers")
+        .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+
+        let mut response_stream = response.into_body().into_data_stream();
+        let mut chunks = 0usize;
+        let mut response_body = Vec::new();
+        while let Some(chunk) = timeout(Duration::from_secs(120), response_stream.next())
+            .await
+            .expect("live stream should continue")
+        {
+            let chunk = chunk.expect("live stream chunk should be readable");
+            chunks += 1;
+            response_body.extend_from_slice(&chunk);
+        }
+
+        let response_text = String::from_utf8_lossy(&response_body);
+        assert!(chunks >= 2, "expected multiple streamed chunks, got {chunks}");
+        assert!(response_text.contains("data:"));
+        assert!(response_text.contains("[DONE]"));
+        for key in configured_keys {
+            assert!(!response_text.contains(&key));
+        }
+
+        let logs = state.get_logs().await;
+        assert_eq!(logs.len(), 1);
+        assert!(logs[0].success);
     }
 }

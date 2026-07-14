@@ -249,7 +249,7 @@ export function Notepad({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 bg-black/60"
       onClick={e => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className="bg-cyber-panel border border-cyber-line/50 rounded-xl shadow-2xl w-[90vw] max-w-5xl h-[82vh] flex flex-col overflow-hidden">
+      <div className="bg-cyber-panel border border-cyber-line/50 rounded-xl shadow-2xl w-[95vw] max-w-7xl h-[92vh] flex flex-col overflow-hidden">
 
         {/* ==================== Header ==================== */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-cyber-line/40 bg-cyber-base/70">

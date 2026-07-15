@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   proxyStatus, proxyStart, proxyStop,
   proxyGetConfig, proxySaveConfig,
@@ -6,6 +6,20 @@ import {
   proxyGetLogs,
 } from '../lib/tauri';
 import type { ProxyBackend, ProxyConfig, ProxyLogEntry, ProxyStatus } from '../types';
+
+const LOGS_PER_PAGE = 10;
+
+type CopyKey = `request:${number}` | `response:${number}`;
+
+function copyToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+    return Promise.resolve(false);
+  }
+  return navigator.clipboard
+    .writeText(text)
+    .then(() => true)
+    .catch(() => false);
+}
 
 function PlayIcon() {
   return (<svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>);
@@ -322,47 +336,280 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
 }
 
 function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
+  const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  if(logs.length===0) return <div className="flex items-center justify-center h-40 text-slate-500 text-sm">No requests yet.</div>;
+  const [copyState, setCopyState] = useState<{ key: CopyKey; status: 'copied' | 'failed' } | null>(null);
 
-  const fmtJson = (s: string) => { try { return JSON.stringify(JSON.parse(s),null,2); } catch { return s; } };
-  const preview = (e: ProxyLogEntry) => {
-    if(!e.success) return e.errorMsg||'';
-    try { const r=JSON.parse(e.responseJson); return r?.choices?.[0]?.message?.content?.substring(0,80)||''; } catch { return ''; }
+  // Logs are stored oldest -> newest on the wire; present newest first.
+  const orderedLogs = useMemo(() => logs.slice().reverse(), [logs]);
+  const pageCount = Math.max(1, Math.ceil(orderedLogs.length / LOGS_PER_PAGE));
+
+  // Clamp page whenever the underlying log set shrinks.
+  useEffect(() => {
+    setPage((current) => {
+      if (current < 1) return 1;
+      if (current > pageCount) return pageCount;
+      return current;
+    });
+  }, [pageCount]);
+
+  // Reset copy state after a short delay so the button label returns to default.
+  useEffect(() => {
+    if (!copyState) return;
+    const timer = window.setTimeout(() => setCopyState(null), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copyState]);
+
+  // The page slice is derived, not stored — keeps pagination correct on every refresh.
+  const pageLogs = useMemo(() => {
+    const start = (page - 1) * LOGS_PER_PAGE;
+    return orderedLogs.slice(start, start + LOGS_PER_PAGE);
+  }, [orderedLogs, page]);
+
+  // Clamp expansion: if the expanded log is no longer on the current page, close it.
+  useEffect(() => {
+    if (expandedId === null) return;
+    if (!pageLogs.some((entry) => entry.id === expandedId)) {
+      setExpandedId(null);
+    }
+  }, [expandedId, pageLogs]);
+
+  const goToPage = useCallback(
+    (next: number) => {
+      setPage(next);
+      setExpandedId(null);
+    },
+    [],
+  );
+
+  const handleRowToggle = useCallback(
+    (id: number, source: 'button' | 'selection' | 'row') => {
+      // Buttons drive their own copy/close flow and must not collapse the row.
+      if (source === 'button') return;
+      // User is selecting text inside the row — let the selection win.
+      if (source === 'selection') return;
+      setExpandedId((current) => (current === id ? null : id));
+    },
+    [],
+  );
+
+  const handleCopy = useCallback(
+    async (key: CopyKey, text: string) => {
+      const ok = await copyToClipboard(text);
+      setCopyState({ key, status: ok ? 'copied' : 'failed' });
+    },
+    [],
+  );
+
+  const fmtJson = (s: string) => {
+    try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
   };
 
+  const requestText = (e: ProxyLogEntry) => fmtJson(e.requestJson);
+
+  const responseText = (e: ProxyLogEntry) => {
+    if (e.responseJson) return fmtJson(e.responseJson);
+    if (!e.success && e.errorMsg) return e.errorMsg;
+    return '';
+  };
+
+  const preview = (e: ProxyLogEntry) => {
+    if (!e.success) return e.errorMsg || '';
+    try { const r = JSON.parse(e.responseJson); return r?.choices?.[0]?.message?.content?.substring(0, 80) || ''; } catch { return ''; }
+  };
+
+  const copyButtonLabel = (key: CopyKey): string => {
+    if (copyState && copyState.key === key) {
+      return copyState.status === 'copied' ? 'Copied' : 'Copy failed';
+    }
+    return 'Copy';
+  };
+
+  if (logs.length === 0) {
+    return <div className="flex items-center justify-center h-40 text-slate-500 text-sm">No requests yet.</div>;
+  }
+
   return (
-    <div className="p-4">
-      <div className="flex items-center gap-4 text-xs text-slate-500 mb-3 px-2"><span>{logs.length} reqs</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"/>OK: {logs.filter(l=>l.success).length}</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400"/>Fail: {logs.filter(l=>!l.success).length}</span></div>
+    <div className="p-4 select-none">
+      <div className="flex items-center justify-between gap-4 text-xs text-slate-500 mb-3 px-2">
+        <div className="flex items-center gap-4">
+          <span>{logs.length} reqs</span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-green-400" />OK: {logs.filter((l) => l.success).length}
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-red-400" />Fail: {logs.filter((l) => !l.success).length}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 font-mono">
+          <button
+            type="button"
+            onClick={() => goToPage(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="px-2 py-0.5 rounded border border-cyber-line/60 text-slate-300 hover:border-cyber-neon hover:text-cyber-neon transition disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <span className="text-slate-400">Page {page} / {pageCount}</span>
+          <button
+            type="button"
+            onClick={() => goToPage(Math.min(pageCount, page + 1))}
+            disabled={page >= pageCount}
+            className="px-2 py-0.5 rounded border border-cyber-line/60 text-slate-300 hover:border-cyber-neon hover:text-cyber-neon transition disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead><tr className="text-slate-400 uppercase tracking-wider border-b border-cyber-line/50"><th className="text-left px-2 py-2 w-16">Time</th><th className="text-left px-2 py-2 w-24">Backend</th><th className="text-left px-2 py-2 w-14">Status</th><th className="text-left px-2 py-2 w-14">Dur</th><th className="text-left px-2 py-2 w-18">Tokens</th><th className="text-left px-2 py-2">Response</th></tr></thead>
+          <thead>
+            <tr className="text-slate-400 uppercase tracking-wider border-b border-cyber-line/50">
+              <th className="text-left px-2 py-2 w-16">Time</th>
+              <th className="text-left px-2 py-2 w-24">Backend</th>
+              <th className="text-left px-2 py-2 w-14">Status</th>
+              <th className="text-left px-2 py-2 w-14">Dur</th>
+              <th className="text-left px-2 py-2 w-18">Tokens</th>
+              <th className="text-left px-2 py-2">Response</th>
+            </tr>
+          </thead>
           <tbody>
-            {logs.slice().reverse().map(e=>(
-              <tr key={e.id} className="hover:bg-cyber-line/10">
-                <td className="px-2 py-2 text-slate-500 font-mono align-top cursor-pointer" onClick={()=>setExpandedId(e.id===expandedId?null:e.id)}>{e.timestamp}</td>
-                <td className="px-2 py-2 text-slate-300 font-medium truncate max-w-[100px] align-top cursor-pointer" onClick={()=>setExpandedId(e.id===expandedId?null:e.id)}>{e.backend}</td>
-                <td className="px-2 py-2 align-top cursor-pointer" onClick={()=>setExpandedId(e.id===expandedId?null:e.id)}><span className={e.success?'text-green-400':'text-red-400'}>{e.status||'ERR'}</span></td>
-                <td className="px-2 py-2 text-slate-500 font-mono align-top cursor-pointer" onClick={()=>setExpandedId(e.id===expandedId?null:e.id)}>{e.durationMs}ms</td>
-                <td className="px-2 py-2 text-slate-500 font-mono align-top text-right cursor-pointer" onClick={()=>setExpandedId(e.id===expandedId?null:e.id)}>{e.totalTokens>0?<span title={'Prompt: '+e.promptTokens+' / Comp: '+e.completionTokens}>{e.totalTokens.toLocaleString()}</span>:'-'}</td>
-                <td className="px-2 py-2 text-slate-400 truncate max-w-[350px] align-top cursor-pointer" onClick={()=>setExpandedId(e.id===expandedId?null:e.id)}>{preview(e)}</td>
-              </tr>
-            ))}
+            {pageLogs.map((e) => {
+              const isExpanded = expandedId === e.id;
+              const requestKey: CopyKey = `request:${e.id}`;
+              const responseKey: CopyKey = `response:${e.id}`;
+              return (
+                <Fragment key={e.id}>
+                  <tr
+                    className={`hover:bg-cyber-line/10 ${isExpanded ? 'bg-cyber-line/10' : ''}`}
+                    onClick={() => handleRowToggle(e.id, 'row')}
+                    onMouseUp={(event) => {
+                      // Distinguish a text selection from a real click — if the
+                      // user just released the mouse over a selection, leave
+                      // the row alone so they can copy the summary text.
+                      if (window.getSelection && window.getSelection()?.toString()) {
+                        event.stopPropagation();
+                      }
+                    }}
+                  >
+                    <td className="px-2 py-2 text-slate-500 font-mono align-top">{e.timestamp}</td>
+                    <td className="px-2 py-2 text-slate-300 font-medium truncate max-w-[100px] align-top">{e.backend}</td>
+                    <td className="px-2 py-2 align-top">
+                      <span className={e.success ? 'text-green-400' : 'text-red-400'}>{e.status || 'ERR'}</span>
+                    </td>
+                    <td className="px-2 py-2 text-slate-500 font-mono align-top">{e.durationMs}ms</td>
+                    <td className="px-2 py-2 text-slate-500 font-mono align-top text-right">
+                      {e.totalTokens > 0 ? (
+                        <span title={`Prompt: ${e.promptTokens} / Comp: ${e.completionTokens}`}>
+                          {e.totalTokens.toLocaleString()}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-slate-400 truncate max-w-[350px] align-top">{preview(e)}</td>
+                  </tr>
+                  {isExpanded && (
+                    <tr className="bg-cyber-base/80 border-y border-cyber-line/40">
+                      <td colSpan={6} className="px-4 py-4">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
+                            <div className="flex gap-4 flex-wrap">
+                              <span>#{e.id}</span>
+                              <span>{e.timestamp}</span>
+                              <span className={e.success ? 'text-green-400' : 'text-red-400'}>
+                                {e.status || 'ERR'} &middot; {e.durationMs}ms
+                              </span>
+                              <span>Model: {e.model}</span>
+                              {e.totalTokens > 0 && (
+                                <span>
+                                  Tokens: {e.totalTokens.toLocaleString()} (P:{e.promptTokens} C:{e.completionTokens})
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleRowToggle(e.id, 'button');
+                              }}
+                              className="text-slate-500 hover:text-slate-300 text-xs"
+                            >
+                              Close
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Request</span>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void handleCopy(requestKey, requestText(e));
+                                  }}
+                                  className={`text-[10px] px-2 py-0.5 rounded border transition ${
+                                    copyState && copyState.key === requestKey
+                                      ? copyState.status === 'copied'
+                                        ? 'border-green-500/60 text-green-400'
+                                        : 'border-red-500/60 text-red-400'
+                                      : 'border-cyber-line/60 text-slate-400 hover:border-cyber-neon hover:text-cyber-neon'
+                                  }`}
+                                >
+                                  {copyButtonLabel(requestKey)}
+                                </button>
+                              </div>
+                              <pre
+                                className="text-[11px] text-slate-300 bg-black/30 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono select-text"
+                                onClick={(event) => event.stopPropagation()}
+                                onMouseUp={(event) => {
+                                  if (window.getSelection && window.getSelection()?.toString()) {
+                                    event.stopPropagation();
+                                  }
+                                }}
+                              >{requestText(e)}</pre>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] uppercase tracking-wider text-green-400 font-semibold">Response</span>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void handleCopy(responseKey, responseText(e));
+                                  }}
+                                  className={`text-[10px] px-2 py-0.5 rounded border transition ${
+                                    copyState && copyState.key === responseKey
+                                      ? copyState.status === 'copied'
+                                        ? 'border-green-500/60 text-green-400'
+                                        : 'border-red-500/60 text-red-400'
+                                      : 'border-cyber-line/60 text-slate-400 hover:border-cyber-neon hover:text-cyber-neon'
+                                  }`}
+                                >
+                                  {copyButtonLabel(responseKey)}
+                                </button>
+                              </div>
+                              <pre
+                                className="text-[11px] text-slate-300 bg-black/30 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono select-text"
+                                onClick={(event) => event.stopPropagation()}
+                                onMouseUp={(event) => {
+                                  if (window.getSelection && window.getSelection()?.toString()) {
+                                    event.stopPropagation();
+                                  }
+                                }}
+                              >{responseText(e)}</pre>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
-      {expandedId!==null && (()=>{
-        const e = logs.find(l=>l.id===expandedId); if(!e) return null;
-        return (
-          <div className="mt-4 bg-cyber-base/80 border border-cyber-line/40 rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between"><div className="flex gap-4 text-xs text-slate-500"><span>#{e.id}</span><span>{e.timestamp}</span><span className={e.success?'text-green-400':'text-red-400'}>{e.status||'ERR'} &middot; {e.durationMs}ms</span><span>Model: {e.model}</span>{e.totalTokens>0&&<span>Tokens: {e.totalTokens.toLocaleString()} (P:{e.promptTokens} C:{e.completionTokens})</span>}</div><button onClick={()=>setExpandedId(null)} className="text-slate-500 hover:text-slate-300 text-xs">Close</button></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><div className="text-[10px] uppercase tracking-wider text-cyan-400 mb-1 font-semibold">Request</div><pre className="text-[11px] text-slate-300 bg-black/30 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono">{fmtJson(e.requestJson)}</pre></div>
-              <div><div className="text-[10px] uppercase tracking-wider text-green-400 mb-1 font-semibold">Response</div><pre className="text-[11px] text-slate-300 bg-black/30 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono">{fmtJson(e.responseJson)}</pre></div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

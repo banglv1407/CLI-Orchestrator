@@ -13,6 +13,7 @@ import { ProxyPanel } from './ProxyPanel';
 import { SystemLogPanel } from './SystemLogPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
+import { copyTerminalSelection, getTerminalSelectionText, type TerminalCopyMode } from '../lib/terminalClipboard';
 
 function FileIcon() {
   return (
@@ -264,6 +265,19 @@ export function TerminalPanel({
   // But keep local handleContextMenu for TerminalPanel internal wiring (disabled for now)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleContextMenu = (e: React.MouseEvent, sessionId: string) => {
+    // Only intercept the native context menu while the terminal surface is
+    // actually visible. For other views (proxy, logs, settings, remote,
+    // quickapps, apiclient, file editor, etc.) the WebView should keep its
+    // default copy/select context menu so users can still copy text from
+    // tables, JSON panels, and the like.
+    if (activeMainView !== 'terminal') return;
+    if (openedFile) return;
+    if (!visibleSessionIdRef.current) return;
+    // Only treat the click as a terminal-context invocation if the right
+    // click landed on a session we actually own. Without this guard a
+    // right-click inside a sub-view that happens to share the panel would
+    // still pop the terminal menu.
+    if (sessionId !== visibleSessionIdRef.current) return;
     e.preventDefault();
     const activeSess = sessions.find((s) => s.id === sessionId);
     setContextMenu?.({
@@ -967,12 +981,25 @@ export function TerminalPanel({
           return false;
         }
 
-        if (event.ctrlKey && event.key === 'c') {
-          if (term.hasSelection()) {
-            const selected = term.getSelection();
-            void navigator.clipboard.writeText(selected);
+        if (event.ctrlKey && event.key.toLowerCase() === 'c') {
+          // Only act on keydown to avoid double-firing on keyup. We use
+          // toLowerCase() to tolerate Caps Lock; the Shift modifier is what
+          // distinguishes "copy as code" from the regular interrupt path.
+          if (event.type !== 'keydown') return false;
+          if (event.shiftKey) {
+            // Ctrl+Shift+C: code-mode copy. Bail if there is no real
+            // selection so we never write an empty payload to the clipboard.
+            if (term.hasSelection()) {
+              void copyTerminalSelection(term, 'code');
+            }
             return false;
           }
+          if (term.hasSelection()) {
+            void copyTerminalSelection(term, 'exact');
+            return false;
+          }
+          // No selection: fall through so the underlying PTY can interpret
+          // Ctrl+C as an interrupt signal.
         }
         if (event.ctrlKey && event.key === 'v') {
           if (event.type === 'keydown') {
@@ -2276,8 +2303,32 @@ export function TerminalPanel({
             const pageSelection = window.getSelection()?.toString() || '';
             const selectedText = (terminalSelection || pageSelection).trim();
             if (selectedText) {
+              const copyMode = async (mode: TerminalCopyMode) => {
+                if (!sessionTerminal) return;
+                const text = getTerminalSelectionText(sessionTerminal, mode);
+                if (mode === 'code' && text === '') return;
+                try {
+                  await navigator.clipboard.writeText(text);
+                } catch {
+                  /* swallow; UI just won't show a confirmation */
+                }
+              };
               return (
                 <>
+                  <button
+                    type="button"
+                    onClick={() => { void copyMode('exact'); setContextMenu(null); }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition"
+                  >
+                    📋 Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { void copyMode('code'); setContextMenu(null); }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition"
+                  >
+                    🧩 Copy as code
+                  </button>
                   <button
                     type="button"
                     onClick={() => {

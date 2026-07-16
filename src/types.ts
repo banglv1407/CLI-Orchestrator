@@ -167,6 +167,8 @@ export interface ProxyLogEntry {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  normalizedResponseJson: string;
+  responseTruncated: boolean;
 }
 export interface SystemLogEntry {
   timestamp: string;

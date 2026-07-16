@@ -269,6 +269,14 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                         {b.customUserAgent && <div className="text-[10px] text-cyber-neon/60 truncate">UA: {b.customUserAgent}</div>}
                       </div>
                       <div className="flex items-center gap-2">
+                        <button onClick={async ()=>{const n=[...config.backends];if(i>0){[n[i-1],n[i]]=[n[i],n[i-1]];try{setConfig(await proxySaveConfig({...config,backends:n}));}catch{}}}}
+                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition p-1 disabled:opacity-10" title="Move up" disabled={i===0}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5"/></svg>
+                        </button>
+                        <button onClick={async ()=>{const n=[...config.backends];if(i<config.backends.length-1){[n[i],n[i+1]]=[n[i+1],n[i]];try{setConfig(await proxySaveConfig({...config,backends:n}));}catch{}}}}
+                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition p-1 disabled:opacity-10" title="Move down" disabled={i===config.backends.length-1}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+                        </button>
                         <span className="text-[10px] text-slate-500 font-semibold">Max Retries:</span>
                         <input
                           type="number"
@@ -344,7 +352,6 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
   const orderedLogs = useMemo(() => logs.slice().reverse(), [logs]);
   const pageCount = Math.max(1, Math.ceil(orderedLogs.length / LOGS_PER_PAGE));
 
-  // Clamp page whenever the underlying log set shrinks.
   useEffect(() => {
     setPage((current) => {
       if (current < 1) return 1;
@@ -353,20 +360,17 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
     });
   }, [pageCount]);
 
-  // Reset copy state after a short delay so the button label returns to default.
   useEffect(() => {
     if (!copyState) return;
     const timer = window.setTimeout(() => setCopyState(null), 1500);
     return () => window.clearTimeout(timer);
   }, [copyState]);
 
-  // The page slice is derived, not stored — keeps pagination correct on every refresh.
   const pageLogs = useMemo(() => {
     const start = (page - 1) * LOGS_PER_PAGE;
     return orderedLogs.slice(start, start + LOGS_PER_PAGE);
   }, [orderedLogs, page]);
 
-  // Clamp expansion: if the expanded log is no longer on the current page, close it.
   useEffect(() => {
     if (expandedId === null) return;
     if (!pageLogs.some((entry) => entry.id === expandedId)) {
@@ -384,9 +388,7 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
 
   const handleRowToggle = useCallback(
     (id: number, source: 'button' | 'selection' | 'row') => {
-      // Buttons drive their own copy/close flow and must not collapse the row.
       if (source === 'button') return;
-      // User is selecting text inside the row — let the selection win.
       if (source === 'selection') return;
       setExpandedId((current) => (current === id ? null : id));
     },
@@ -408,6 +410,7 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
   const requestText = (e: ProxyLogEntry) => fmtJson(e.requestJson);
 
   const responseText = (e: ProxyLogEntry) => {
+    if (e.normalizedResponseJson) return fmtJson(e.normalizedResponseJson);
     if (e.responseJson) return fmtJson(e.responseJson);
     if (!e.success && e.errorMsg) return e.errorMsg;
     return '';
@@ -415,7 +418,7 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
 
   const preview = (e: ProxyLogEntry) => {
     if (!e.success) return e.errorMsg || '';
-    try { const r = JSON.parse(e.responseJson); return r?.choices?.[0]?.message?.content?.substring(0, 80) || ''; } catch { return ''; }
+    try { const r = JSON.parse(e.normalizedResponseJson || e.responseJson); return r?.choices?.[0]?.message?.content?.substring(0, 80) || ''; } catch { return ''; }
   };
 
   const copyButtonLabel = (key: CopyKey): string => {
@@ -423,6 +426,72 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
       return copyState.status === 'copied' ? 'Copied' : 'Copy failed';
     }
     return 'Copy';
+  };
+
+  const renderSections = (entry: ProxyLogEntry) => {
+    let parsed: any;
+    try { parsed = JSON.parse(entry.normalizedResponseJson || entry.responseJson); } catch { return null; }
+    const renderBlock = (label: string, content: string) => (
+      <div key={label} className="mb-2">
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">{label}</div>
+        <pre className="text-[11px] text-slate-300 bg-black/30 rounded p-2.5 overflow-auto max-h-48 whitespace-pre-wrap font-mono select-text" onClick={(e) => e.stopPropagation()}>{content || '(empty)'}</pre>
+      </div>
+    );
+    const sections: React.ReactNode[] = [];
+
+    const choices = parsed?.choices;
+    if (choices && Array.isArray(choices)) {
+      choices.forEach((choice: any, ci: number) => {
+        const msg = choice?.message || {};
+        // Content
+        if (msg.content) sections.push(renderBlock(choices.length > 1 ? `Content #${ci}` : 'Content', String(msg.content)));
+        // Reasoning — handle all common+provider-specific pattern but dedupe
+        const reasoningKeys = ['reasoning', 'reasoning_content', 'reasoning_text', 'reasoning_details'];
+        for (const key of reasoningKeys) {
+          if (msg[key]) sections.push(renderBlock(key, String(msg[key])));
+        }
+        // Provider-specific reasoning / thinking fields (exclude duplicates from the explicit list above)
+        const alreadyRendered = new Set(reasoningKeys);
+        for (const key of Object.keys(msg)) {
+          if ((key.startsWith('reasoning_') || key.startsWith('thinking')) && msg[key] && !alreadyRendered.has(key)) {
+            sections.push(renderBlock(key, String(msg[key])));
+          }
+        }
+        // Tool calls
+        if (msg.tool_calls || msg.function_call) {
+          sections.push(renderBlock('Tool Calls', fmtJson(JSON.stringify(msg.tool_calls || msg.function_call))));
+        }
+        // Finish reason
+        if (choice.finish_reason) {
+          sections.push(renderBlock('Finish Reason', String(choice.finish_reason)));
+        }
+        // Other message fields
+        const known = new Set(['content', ...reasoningKeys, 'tool_calls', 'function_call', 'role']);
+        const otherMsgFields = Object.keys(msg).filter((k) => !known.has(k) && !k.startsWith('reasoning_') && !k.startsWith('thinking'));
+        if (otherMsgFields.length > 0) {
+          const other: Record<string, any> = {};
+          for (const k of otherMsgFields) other[k] = msg[k];
+          sections.push(renderBlock('Other', fmtJson(JSON.stringify(other))));
+        }
+      });
+    }
+
+    // Usage
+    if (parsed?.usage) {
+      sections.push(renderBlock('Usage', fmtJson(JSON.stringify(parsed.usage))));
+    }
+
+    // Other top-level fields
+    const topKnown = new Set(['id', 'object', 'created', 'model', 'choices', 'usage', 'system_fingerprint']);
+    const otherTop: Record<string, any> = {};
+    for (const k of Object.keys(parsed)) {
+      if (!topKnown.has(k)) otherTop[k] = parsed[k];
+    }
+    if (Object.keys(otherTop).length > 0) {
+      sections.push(renderBlock('Other', fmtJson(JSON.stringify(otherTop))));
+    }
+
+    return sections.length > 0 ? <>{sections}</> : null;
   };
 
   if (logs.length === 0) {
@@ -447,18 +516,14 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
             onClick={() => goToPage(Math.max(1, page - 1))}
             disabled={page <= 1}
             className="px-2 py-0.5 rounded border border-cyber-line/60 text-slate-300 hover:border-cyber-neon hover:text-cyber-neon transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
+          >Previous</button>
           <span className="text-slate-400">Page {page} / {pageCount}</span>
           <button
             type="button"
             onClick={() => goToPage(Math.min(pageCount, page + 1))}
             disabled={page >= pageCount}
             className="px-2 py-0.5 rounded border border-cyber-line/60 text-slate-300 hover:border-cyber-neon hover:text-cyber-neon transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
+          >Next</button>
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -484,9 +549,6 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                     className={`hover:bg-cyber-line/10 ${isExpanded ? 'bg-cyber-line/10' : ''}`}
                     onClick={() => handleRowToggle(e.id, 'row')}
                     onMouseUp={(event) => {
-                      // Distinguish a text selection from a real click — if the
-                      // user just released the mouse over a selection, leave
-                      // the row alone so they can copy the summary text.
                       if (window.getSelection && window.getSelection()?.toString()) {
                         event.stopPropagation();
                       }
@@ -503,9 +565,7 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                         <span title={`Prompt: ${e.promptTokens} / Comp: ${e.completionTokens}`}>
                           {e.totalTokens.toLocaleString()}
                         </span>
-                      ) : (
-                        '-'
-                      )}
+                      ) : '-'}
                     </td>
                     <td className="px-2 py-2 text-slate-400 truncate max-w-[350px] align-top">{preview(e)}</td>
                   </tr>
@@ -522,21 +582,14 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                               </span>
                               <span>Model: {e.model}</span>
                               {e.totalTokens > 0 && (
-                                <span>
-                                  Tokens: {e.totalTokens.toLocaleString()} (P:{e.promptTokens} C:{e.completionTokens})
-                                </span>
+                                <span>Tokens: {e.totalTokens.toLocaleString()} (P:{e.promptTokens} C:{e.completionTokens})</span>
                               )}
                             </div>
                             <button
                               type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleRowToggle(e.id, 'button');
-                              }}
+                              onClick={(event) => { event.stopPropagation(); handleRowToggle(e.id, 'button'); }}
                               className="text-slate-500 hover:text-slate-300 text-xs"
-                            >
-                              Close
-                            </button>
+                            >Close</button>
                           </div>
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div>
@@ -544,29 +597,17 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                                 <span className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Request</span>
                                 <button
                                   type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void handleCopy(requestKey, requestText(e));
-                                  }}
+                                  onClick={(event) => { event.stopPropagation(); void handleCopy(requestKey, requestText(e)); }}
                                   className={`text-[10px] px-2 py-0.5 rounded border transition ${
                                     copyState && copyState.key === requestKey
-                                      ? copyState.status === 'copied'
-                                        ? 'border-green-500/60 text-green-400'
-                                        : 'border-red-500/60 text-red-400'
+                                      ? copyState.status === 'copied' ? 'border-green-500/60 text-green-400' : 'border-red-500/60 text-red-400'
                                       : 'border-cyber-line/60 text-slate-400 hover:border-cyber-neon hover:text-cyber-neon'
                                   }`}
-                                >
-                                  {copyButtonLabel(requestKey)}
-                                </button>
+                                >{copyButtonLabel(requestKey)}</button>
                               </div>
                               <pre
                                 className="text-[11px] text-slate-300 bg-black/30 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono select-text"
-                                onClick={(event) => event.stopPropagation()}
-                                onMouseUp={(event) => {
-                                  if (window.getSelection && window.getSelection()?.toString()) {
-                                    event.stopPropagation();
-                                  }
-                                }}
+                                onClick={(e) => e.stopPropagation()}
                               >{requestText(e)}</pre>
                             </div>
                             <div>
@@ -574,30 +615,28 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                                 <span className="text-[10px] uppercase tracking-wider text-green-400 font-semibold">Response</span>
                                 <button
                                   type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void handleCopy(responseKey, responseText(e));
-                                  }}
+                                  onClick={(event) => { event.stopPropagation(); void handleCopy(responseKey, responseText(e)); }}
                                   className={`text-[10px] px-2 py-0.5 rounded border transition ${
                                     copyState && copyState.key === responseKey
-                                      ? copyState.status === 'copied'
-                                        ? 'border-green-500/60 text-green-400'
-                                        : 'border-red-500/60 text-red-400'
+                                      ? copyState.status === 'copied' ? 'border-green-500/60 text-green-400' : 'border-red-500/60 text-red-400'
                                       : 'border-cyber-line/60 text-slate-400 hover:border-cyber-neon hover:text-cyber-neon'
                                   }`}
-                                >
-                                  {copyButtonLabel(responseKey)}
-                                </button>
+                                >{copyButtonLabel(responseKey)}</button>
                               </div>
-                              <pre
-                                className="text-[11px] text-slate-300 bg-black/30 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono select-text"
-                                onClick={(event) => event.stopPropagation()}
-                                onMouseUp={(event) => {
-                                  if (window.getSelection && window.getSelection()?.toString()) {
-                                    event.stopPropagation();
-                                  }
-                                }}
-                              >{responseText(e)}</pre>
+                              {e.normalizedResponseJson ? (
+                                <div className="space-y-1 max-h-[32rem] overflow-y-auto scrollbar-thin select-text" onClick={(e) => e.stopPropagation()}>
+                                  {renderSections(e)}
+                                  <details className="mt-2">
+                                    <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 select-none">Raw {e.responseTruncated && <span className="text-amber-400">(256 KiB truncated)</span>}</summary>
+                                    <pre className="text-[11px] text-slate-400 bg-black/20 rounded p-2.5 mt-1 overflow-auto max-h-48 whitespace-pre-wrap font-mono select-text" onClick={(e) => e.stopPropagation()}>{e.responseJson || '(empty)'}</pre>
+                                  </details>
+                                </div>
+                              ) : (
+                                <pre
+                                  className="text-[11px] text-slate-300 bg-black/30 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono select-text"
+                                  onClick={(e) => e.stopPropagation()}
+                                >{responseText(e)}</pre>
+                              )}
                             </div>
                           </div>
                         </div>

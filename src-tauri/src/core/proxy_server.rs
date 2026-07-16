@@ -74,6 +74,10 @@ pub struct ProxyLogEntry {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    #[serde(default)]
+    pub normalized_response_json: String,
+    #[serde(default)]
+    pub response_truncated: bool,
 }
 
 // ── OpenAI types ──────────────────────────────────────────────
@@ -302,6 +306,18 @@ fn extract_stream_token_usage(response_body: &str) -> (u32, u32, u32) {
     (0, 0, 0)
 }
 
+/// Build the normalized response for the OFF path. The OFF path captures
+/// the raw bytes and only assembles once at the end. We reuse the same
+/// `StreamAssembler` so the final inspector view is identical to the
+/// `Done` event the ON path would have emitted.
+fn compute_normalized_for_off(raw: &str) -> String {
+    let mut assembler = crate::core::stream_assembler::StreamAssembler::default();
+    assembler.push(raw.as_bytes());
+    serde_json::to_string(assembler.normalized()).unwrap_or_default()
+}
+
+// ── SSE helpers ────────────────────────────────────────────────
+
 fn build_upstream_body(
     request: &ChatCompletionRequest,
     backend: &ProxyBackend,
@@ -354,7 +370,7 @@ fn streaming_response(
     tokio::spawn(async move {
         let mut upstream_stream = upstream.bytes_stream();
         let mut preview = Vec::new();
-        let mut stream_error = None;
+        let mut stream_error: Option<String> = None;
 
         while let Some(item) = upstream_stream.next().await {
             match item {
@@ -379,6 +395,7 @@ fn streaming_response(
         let response_json = String::from_utf8_lossy(&preview).into_owned();
         let (prompt_tokens, completion_tokens, total_tokens) =
             extract_stream_token_usage(&response_json);
+        let normalized_response_json = compute_normalized_for_off(&response_json);
         state
             .add_log(ProxyLogEntry {
                 id: log_id,
@@ -394,6 +411,8 @@ fn streaming_response(
                 prompt_tokens,
                 completion_tokens,
                 total_tokens,
+                normalized_response_json,
+                response_truncated: false,
             })
             .await;
     });
@@ -521,6 +540,8 @@ async fn handle_chat_completion(
                             prompt_tokens: pt,
                             completion_tokens: ct,
                             total_tokens: tt,
+                            normalized_response_json: response_json,
+                            response_truncated: false,
                         }).await;
 
                         let response = match parsed {
@@ -574,6 +595,8 @@ async fn handle_chat_completion(
                         success: false,
                         error_msg: Some(format!("HTTP {}", status_code)),
                         prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
+                        normalized_response_json: String::new(),
+                        response_truncated: false,
                     }).await;
 
                     if retry + 1 < max_retries {
@@ -600,6 +623,8 @@ async fn handle_chat_completion(
                         success: false,
                         error_msg: Some(err_msg.clone()),
                         prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
+                        normalized_response_json: String::new(),
+                        response_truncated: false,
                     }).await;
 
                     if retry + 1 < max_retries {
@@ -665,6 +690,7 @@ impl ProxyConfig {
 mod tests {
     use super::*;
     use axum::http::Request;
+    use futures_util::StreamExt;
     use std::convert::Infallible;
     use tokio::time::{sleep, timeout, Duration, Instant};
     use tower::ServiceExt;
@@ -811,6 +837,68 @@ mod tests {
         assert_eq!(logs[0].total_tokens, 3);
 
         upstream_task.abort();
+    }
+
+    #[tokio::test]
+    async fn streamed_log_has_normalized_response_json() {
+        let (upstream_app, upstream_address) = {
+            let captured = Arc::new(Mutex::new(None));
+            let app = Router::new()
+                .route("/v1/chat/completions", post(mock_streaming_upstream))
+                .with_state(captured.clone());
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let task = tokio::spawn(async move {
+                axum::serve(listener, app).await.unwrap();
+            });
+            (task, addr)
+        };
+
+        let state = Arc::new(ProxyState::without_persistence(ProxyConfig {
+            port: 0,
+            enabled: true,
+            backends: vec![ProxyBackend {
+                name: "mock".to_string(),
+                url: format!("http://{}", upstream_address),
+                api_key: "test-key".to_string(),
+                model: "configured-model".to_string(),
+                weight: 1,
+                max_retries: 1,
+                headers: HashMap::new(),
+                custom_user_agent: Some("clx-test".to_string()),
+            }],
+        }));
+        let proxy_app = Router::new()
+            .route("/v1/chat/completions", post(handle_chat_completion))
+            .with_state(state.clone());
+        let request_body = serde_json::json!({
+            "model": "client-model",
+            "messages": [{ "role": "user", "content": "hi" }],
+            "stream": true,
+        });
+
+        let response = proxy_app
+            .oneshot(
+                Request::post("/v1/chat/completions")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(request_body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let _ = response.into_body().into_data_stream().collect::<Vec<_>>().await;
+
+        let logs = state.get_logs().await;
+        assert_eq!(logs.len(), 1);
+        assert!(logs[0].success);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&logs[0].normalized_response_json)
+                .unwrap()["choices"][0]["message"]["content"],
+            serde_json::json!("Hello")
+        );
+
+        upstream_app.abort();
     }
 
     #[tokio::test]

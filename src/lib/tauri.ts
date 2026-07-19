@@ -12,11 +12,15 @@ import type {
   QuickApp,
   RipgrepMatch,
   ProxyBackend,
+  ProxyBackendUsage,
   ProxyConfig,
   ProxyLogEntry,
   ProxyStatus,
   SystemLogEntry,
   NotepadContent,
+  WebAiProfile,
+  WebAiConfig,
+  WebAiRect,
 } from '../types';
 
 export function listClis(): Promise<CliDefinition[]> {
@@ -139,6 +143,10 @@ export function createRdpSession(connection: SshConnection): Promise<void> {
 
 export function openWorkspaceFolder(path: string): Promise<void> {
   return invoke('open_workspace_folder', { path });
+}
+
+export function revealInFileManager(path: string): Promise<void> {
+  return invoke('reveal_in_file_manager', { path });
 }
 
 export function getGitStatus(repoPath: string): Promise<any[]> {
@@ -279,6 +287,14 @@ export function proxyGetLogs(): Promise<ProxyLogEntry[]> {
   return invoke('proxy_get_logs');
 }
 
+export function proxyGetUsage(id: string): Promise<ProxyBackendUsage> {
+  return invoke('proxy_get_usage', { id });
+}
+
+export function proxyResetUsage(id: string): Promise<void> {
+  return invoke('proxy_reset_usage', { id });
+}
+
 export function getSystemLogs(limit?: number): Promise<SystemLogEntry[]> {
   return invoke('get_system_logs', { limit });
 }
@@ -289,4 +305,241 @@ export function getNotepad(): Promise<NotepadContent> {
 
 export function saveNotepad(content: NotepadContent): Promise<void> {
   return invoke('save_notepad', { content });
+}
+
+export function webAiLoadProfiles(): Promise<WebAiConfig> {
+  return invoke('web_ai_load_profiles');
+}
+
+export function webAiSaveProfiles(config: WebAiConfig): Promise<void> {
+  return invoke('web_ai_save_profiles', { config });
+}
+
+export function webAiSpawnProfile(profile: WebAiProfile, rect: WebAiRect): Promise<void> {
+  return invoke('web_ai_spawn_profile', { profile, rect });
+}
+
+export function webAiReposition(rect: WebAiRect): Promise<void> {
+  return invoke('web_ai_reposition', { rect });
+}
+
+export function webAiSetVisible(visible: boolean): Promise<void> {
+  return invoke('web_ai_set_visible', { visible });
+}
+
+export function webAiClose(): Promise<void> {
+  return invoke('web_ai_close');
+}
+
+export function webAiClearData(): Promise<void> {
+  return invoke('web_ai_clear_data');
+}
+
+// ── Dashboard ───────────────────────────────────────────────────────
+
+export interface ResourceUsage {
+  memoryBytes: number;
+  memoryMb: number;
+  memoryPercent: number;
+  childCount: number;
+}
+
+export interface ProcessDetail {
+  exePath?: string | null;
+  memoryBytes: number;
+  memoryMb: number;
+  cpuTimeSeconds: number;
+  uptimeSeconds: number;
+}
+
+export interface PortInfo {
+  port: number;
+  listening: boolean;
+  pid?: number | null;
+  processName?: string | null;
+  detail?: ProcessDetail | null;
+}
+
+export function dashboardGetResourceUsage(): Promise<ResourceUsage> {
+  return invoke('dashboard_get_resource_usage');
+}
+
+/** Batch probe — one netstat call for all tracked ports. */
+export function dashboardProbePorts(ports: number[]): Promise<PortInfo[]> {
+  return invoke('dashboard_probe_ports', { ports });
+}
+
+/** Single-port probe for one-off use. */
+export function dashboardProbePort(port: number): Promise<PortInfo> {
+  return invoke('dashboard_probe_port', { port });
+}
+
+export function dashboardKillPort(port: number): Promise<boolean> {
+  return invoke('dashboard_kill_port', { port });
+}
+
+export interface ProcessLogInfo {
+  serviceName: string;
+  logPath: string;
+  logContent: string;
+  logSizeBytes: number;
+}
+
+export function dashboardGetProcessLogs(pid: number): Promise<ProcessLogInfo> {
+  return invoke('dashboard_get_process_logs', { pid });
+}
+
+// ── Target-aware Dashboard monitoring ─────────────────────────────
+
+export interface MonitorSshHop {
+  host: string;
+  sshPort: number;
+  user: string;
+  authMode: 'password' | 'key';
+  keyPath?: string | null;
+  hasSecret: boolean;
+}
+
+export interface MonitorLogSource {
+  kind: 'auto' | 'file' | 'systemd' | 'container' | 'windowsEvent' | 'custom';
+  path?: string | null;
+  unit?: string | null;
+  engine?: 'docker' | 'podman' | null;
+  container?: string | null;
+  logName?: string | null;
+  provider?: string | null;
+  command?: string | null;
+  shell?: 'auto' | 'posix' | 'powershell' | null;
+}
+
+export interface MonitorConfig {
+  id: string;
+  label: string;
+  servicePort: number;
+  targetType: 'local' | 'ssh';
+  target?: MonitorSshHop | null;
+  jump?: MonitorSshHop | null;
+  targetOs: 'auto' | 'linux' | 'windows';
+  logSource: MonitorLogSource;
+  legacyImported: boolean;
+}
+
+export interface MonitorSecrets {
+  targetSecret?: string | null;
+  jumpSecret?: string | null;
+  clearTargetSecret?: boolean;
+  clearJumpSecret?: boolean;
+}
+
+export interface MonitorSaveResult {
+  monitor: MonitorConfig;
+  vaultPersistent: boolean;
+}
+
+export interface MonitorProcessIdentity {
+  pid: number;
+  startToken: string;
+  processName: string;
+  exePath?: string | null;
+  commandLine?: string | null;
+  workingDir?: string | null;
+  memoryBytes: number;
+  memoryMb: number;
+  cpuTimeSeconds: number;
+  uptimeSeconds: number;
+}
+
+export interface MonitorSnapshot {
+  monitorId: string;
+  servicePort: number;
+  status: 'listening' | 'notListening' | 'unreachable' | 'permissionDenied' | 'unsupported' | 'stale';
+  targetOs: 'auto' | 'linux' | 'windows';
+  unverifiedSsh: boolean;
+  listeners: MonitorProcessIdentity[];
+  error?: string | null;
+  lastCheckedAt: string;
+}
+
+export interface MonitorTestResult {
+  ok: boolean;
+  targetOs: string;
+  message: string;
+  unverifiedSsh: boolean;
+}
+
+export interface MonitorLogSourceCandidate {
+  id: string;
+  label: string;
+  confidence: number;
+  reason: string;
+  requiresElevation: boolean;
+  source: MonitorLogSource;
+}
+
+export interface MonitorLogChunkEvent {
+  streamId: string;
+  monitorId: string;
+  sequence: number;
+  stream: 'stdout' | 'stderr' | 'system';
+  text: string;
+}
+
+export interface MonitorLogStateEvent {
+  streamId: string;
+  monitorId: string;
+  state: 'connecting' | 'following' | 'reconnecting' | 'needsElevation' | 'ended' | 'stopped' | 'error';
+  message?: string | null;
+  attempt: number;
+}
+
+export interface MonitorKillResult {
+  requested: number[];
+  stopped: number[];
+  stillListening: number[];
+  forceAvailable: boolean;
+}
+
+export function dashboardListMonitors(): Promise<MonitorConfig[]> {
+  return invoke('dashboard_list_monitors');
+}
+
+export function dashboardTestMonitor(monitor: MonitorConfig, secrets?: MonitorSecrets): Promise<MonitorTestResult> {
+  return invoke('dashboard_test_monitor', { monitor, secrets });
+}
+
+export function dashboardUpsertMonitor(monitor: MonitorConfig, secrets?: MonitorSecrets): Promise<MonitorSaveResult> {
+  return invoke('dashboard_upsert_monitor', { monitor, secrets });
+}
+
+export function dashboardDeleteMonitor(monitorId: string): Promise<void> {
+  return invoke('dashboard_delete_monitor', { monitorId });
+}
+
+export function dashboardProbeMonitors(monitorIds?: string[]): Promise<MonitorSnapshot[]> {
+  return invoke('dashboard_probe_monitors', { monitorIds });
+}
+
+export function dashboardDiscoverLogSources(monitorId: string, pid: number): Promise<MonitorLogSourceCandidate[]> {
+  return invoke('dashboard_discover_log_sources', { monitorId, pid });
+}
+
+export function dashboardStartLogStream(
+  monitorId: string,
+  source: MonitorLogSource,
+  sudoPassword?: string,
+): Promise<{ streamId: string; source: MonitorLogSource }> {
+  return invoke('dashboard_start_log_stream', { request: { monitorId, source, sudoPassword } });
+}
+
+export function dashboardStopLogStream(streamId: string): Promise<void> {
+  return invoke('dashboard_stop_log_stream', { streamId });
+}
+
+export function dashboardKillProcesses(
+  monitorId: string,
+  processes: MonitorProcessIdentity[],
+  mode: 'normal' | 'force',
+  sudoPassword?: string,
+): Promise<MonitorKillResult> {
+  return invoke('dashboard_kill_processes', { request: { monitorId, processes, mode, sudoPassword } });
 }

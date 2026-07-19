@@ -56,7 +56,11 @@ impl SystemLogger {
 
         // File persistence (append)
         let line = serde_json::to_string(&entry).unwrap_or_default();
-        if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&self.file_path) {
+        if let Ok(mut f) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.file_path)
+        {
             let _ = writeln!(f, "{}", line);
             // Rotate if too large
             if let Ok(m) = f.metadata() {

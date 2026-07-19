@@ -91,7 +91,12 @@ fn read_icon_file_bytes(path: &PathBuf) -> Option<Vec<u8>> {
 /// On Windows, try to resolve a .lnk shortcut to its target executable path.
 #[cfg(windows)]
 fn resolve_lnk(path: &PathBuf) -> Option<PathBuf> {
-    if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("lnk")) != Some(true) {
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("lnk"))
+        != Some(true)
+    {
         return None;
     }
     // Use the Windows Shell API via a simple COM-free approach:
@@ -113,7 +118,9 @@ fn resolve_lnk(path: &PathBuf) -> Option<PathBuf> {
     let has_id_list = (link_flags & 0x01) != 0;
     let mut offset: usize = 0x4C;
     if has_id_list {
-        if offset + 2 > bytes.len() { return None; }
+        if offset + 2 > bytes.len() {
+            return None;
+        }
         let id_list_size = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize;
         offset += 2 + id_list_size;
     }
@@ -124,17 +131,32 @@ fn resolve_lnk(path: &PathBuf) -> Option<PathBuf> {
         // Fall back to StringData – look for HasName or LocalBasePath
         return None;
     }
-    if offset + 4 > bytes.len() { return None; }
-    let link_info_size = u32::from_le_bytes([bytes[offset], bytes[offset+1], bytes[offset+2], bytes[offset+3]]) as usize;
-    if offset + link_info_size > bytes.len() { return None; }
+    if offset + 4 > bytes.len() {
+        return None;
+    }
+    let link_info_size = u32::from_le_bytes([
+        bytes[offset],
+        bytes[offset + 1],
+        bytes[offset + 2],
+        bytes[offset + 3],
+    ]) as usize;
+    if offset + link_info_size > bytes.len() {
+        return None;
+    }
     // LocalBasePathOffset at 0x10 within LinkInfo
-    if offset + 0x10 + 4 > bytes.len() { return None; }
+    if offset + 0x10 + 4 > bytes.len() {
+        return None;
+    }
     let local_base_path_offset = u32::from_le_bytes([
-        bytes[offset + 0x10], bytes[offset + 0x11],
-        bytes[offset + 0x12], bytes[offset + 0x13],
+        bytes[offset + 0x10],
+        bytes[offset + 0x11],
+        bytes[offset + 0x12],
+        bytes[offset + 0x13],
     ]) as usize;
     let abs_path_start = offset + local_base_path_offset;
-    if abs_path_start >= bytes.len() { return None; }
+    if abs_path_start >= bytes.len() {
+        return None;
+    }
     // Read null-terminated string
     let end = bytes[abs_path_start..].iter().position(|&b| b == 0)?;
     let path_bytes = &bytes[abs_path_start..abs_path_start + end];

@@ -70,7 +70,7 @@ export function Dashboard() {
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
-  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote'>('terminal');
+  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote' | 'dashboard' | 'web-ai'>('terminal');
   const [showNotepad, setShowNotepad] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -206,11 +206,35 @@ export function Dashboard() {
     const handler = (e: Event) => {
       const customEvt = e as CustomEvent<string>;
       if (customEvt.detail) {
-        setActiveMainView(customEvt.detail as any);
+        const view = customEvt.detail;
+        if (view === 'proxy' || view === 'remote' || view === 'logs') {
+          setActiveMainView('settings');
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('settings-select-section', { detail: view }));
+          }, 50);
+        } else {
+          setActiveMainView(view as any);
+        }
       }
     };
     window.addEventListener('switch-main-view', handler);
     return () => window.removeEventListener('switch-main-view', handler);
+  }, []);
+
+  // Listen for custom open-settings event
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvt = e as CustomEvent<string>;
+      if (customEvt.detail) {
+        setActiveMainView('settings');
+        // Dispatch settings-select-section with a short delay to ensure SettingsPanel is mounted
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('settings-select-section', { detail: customEvt.detail }));
+        }, 50);
+      }
+    };
+    window.addEventListener('open-settings', handler);
+    return () => window.removeEventListener('open-settings', handler);
   }, []);
 
   const handleNewFile = useCallback(() => {

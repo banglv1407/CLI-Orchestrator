@@ -31,12 +31,22 @@ pub const DEFAULT_CAPACITY: usize = 256 * 1024;
 /// Extract `prompt_tokens`, `completion_tokens`, `total_tokens` from the
 /// top-level `usage` object of a normalized response. Returns `(0, 0, 0)`
 /// when the field is missing.
+#[allow(dead_code)]
 pub fn extract_token_usage(response_json: &str) -> (u32, u32, u32) {
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(response_json) {
         if let Some(usage) = v.get("usage") {
-            let pt = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-            let ct = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-            let tt = usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            let pt = usage
+                .get("prompt_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32;
+            let ct = usage
+                .get("completion_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32;
+            let tt = usage
+                .get("total_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32;
             return (pt, ct, tt);
         }
     }
@@ -68,6 +78,7 @@ impl Default for StreamAssembler {
     }
 }
 
+#[allow(dead_code)]
 impl StreamAssembler {
     pub fn new(capacity: usize) -> Self {
         Self {
@@ -252,7 +263,11 @@ fn find_event_boundary(bytes: &[u8], from: usize) -> Option<usize> {
             }
         } else if bytes[i] == b'\r' {
             // Match "\r\n\r\n" (CRLF CRLF).
-            if i + 3 < bytes.len() && bytes[i + 1] == b'\n' && bytes[i + 2] == b'\r' && bytes[i + 3] == b'\n' {
+            if i + 3 < bytes.len()
+                && bytes[i + 1] == b'\n'
+                && bytes[i + 2] == b'\r'
+                && bytes[i + 3] == b'\n'
+            {
                 return Some(i + 4);
             }
         }
@@ -404,11 +419,13 @@ mod tests {
     fn splits_inside_utf8_payload() {
         // A 3-byte UTF-8 char ('ể' = 0xE1, 0xBB, 0x83) split mid-sequence.
         let mut a = StreamAssembler::default();
-        let payload =
-            "data: {\"choices\":[{\"delta\":{\"content\":\"ể\"}}]}\n\n";
+        let payload = "data: {\"choices\":[{\"delta\":{\"content\":\"ể\"}}]}\n\n";
         // Find the char and split inside it.
         let bytes = payload.as_bytes();
-        let char_pos = bytes.windows(3).position(|w| w == [0xE1, 0xBB, 0x83]).unwrap();
+        let char_pos = bytes
+            .windows(3)
+            .position(|w| w == [0xE1, 0xBB, 0x83])
+            .unwrap();
         a.push(&bytes[..char_pos + 1]);
         a.push(&bytes[char_pos + 1..]);
         assert_eq!(
@@ -481,10 +498,7 @@ mod tests {
         );
         let tc = &a.normalized()["choices"][0]["message"]["tool_calls"][0];
         assert_eq!(tc["function"]["name"], json!("get_weather"));
-        assert_eq!(
-            tc["function"]["arguments"],
-            json!("{\"city\":\"Hanoi\"}")
-        );
+        assert_eq!(tc["function"]["arguments"], json!("{\"city\":\"Hanoi\"}"));
     }
 
     #[test]
@@ -545,7 +559,8 @@ mod tests {
     fn truncates_at_256_kib() {
         let mut a = StreamAssembler::new(16);
         let big = "x".repeat(64);
-        let payload = format!("data: {{\"choices\":[{{\"delta\":{{\"content\":\"{big}\"}}}}]}}\n\n");
+        let payload =
+            format!("data: {{\"choices\":[{{\"delta\":{{\"content\":\"{big}\"}}}}]}}\n\n");
         a.push(payload.as_bytes());
         assert!(a.truncated());
         // Raw was clipped to 16 bytes.

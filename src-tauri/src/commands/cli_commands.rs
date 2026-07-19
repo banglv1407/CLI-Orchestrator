@@ -90,10 +90,23 @@ pub async fn upsert_cli(
         .registry
         .upsert(cli, request.original_name)
         .map_err(|error| error.to_string());
-    
+
     match &res {
-        Ok(_) => crate::system_log!(state.logger, "INFO", "CLIRegistry", "Successfully upserted CLI configuration: {}", name),
-        Err(e) => crate::system_log!(state.logger, "ERROR", "CLIRegistry", "Failed to upsert CLI configuration {}: {}", name, e),
+        Ok(_) => crate::system_log!(
+            state.logger,
+            "INFO",
+            "CLIRegistry",
+            "Successfully upserted CLI configuration: {}",
+            name
+        ),
+        Err(e) => crate::system_log!(
+            state.logger,
+            "ERROR",
+            "CLIRegistry",
+            "Failed to upsert CLI configuration {}: {}",
+            name,
+            e
+        ),
     }
     res
 }
@@ -109,8 +122,21 @@ pub async fn delete_cli(
         .map_err(|error| error.to_string());
 
     match &res {
-        Ok(_) => crate::system_log!(state.logger, "INFO", "CLIRegistry", "Successfully deleted CLI configuration: {}", request.name),
-        Err(e) => crate::system_log!(state.logger, "ERROR", "CLIRegistry", "Failed to delete CLI configuration {}: {}", request.name, e),
+        Ok(_) => crate::system_log!(
+            state.logger,
+            "INFO",
+            "CLIRegistry",
+            "Successfully deleted CLI configuration: {}",
+            request.name
+        ),
+        Err(e) => crate::system_log!(
+            state.logger,
+            "ERROR",
+            "CLIRegistry",
+            "Failed to delete CLI configuration {}: {}",
+            request.name,
+            e
+        ),
     }
     res
 }
@@ -204,9 +230,16 @@ pub async fn create_terminal_session(
 
     let working_dir = normalize_working_dir(request.working_dir)?;
     let command = ExecutionEngine::resolve_command(&cli, "", working_dir.clone());
-    
-    crate::system_log!(state.logger, "INFO", "SessionManager", "Creating terminal session for CLI: {}, working_dir: {:?}", cli.name, working_dir);
-    
+
+    crate::system_log!(
+        state.logger,
+        "INFO",
+        "SessionManager",
+        "Creating terminal session for CLI: {}, working_dir: {:?}",
+        cli.name,
+        working_dir
+    );
+
     let res = state
         .session_manager
         .create_session(app, cli.name, working_dir, request.project_tag, command)
@@ -214,8 +247,20 @@ pub async fn create_terminal_session(
         .map_err(|error| error.to_string());
 
     match &res {
-        Ok(info) => crate::system_log!(state.logger, "INFO", "SessionManager", "Terminal session created successfully: {}", info.id),
-        Err(e) => crate::system_log!(state.logger, "ERROR", "SessionManager", "Failed to create terminal session: {}", e),
+        Ok(info) => crate::system_log!(
+            state.logger,
+            "INFO",
+            "SessionManager",
+            "Terminal session created successfully: {}",
+            info.id
+        ),
+        Err(e) => crate::system_log!(
+            state.logger,
+            "ERROR",
+            "SessionManager",
+            "Failed to create terminal session: {}",
+            e
+        ),
     }
     res
 }
@@ -238,7 +283,13 @@ pub async fn stop_cli(
     state: State<'_, AppState>,
     request: StopCliRequest,
 ) -> Result<(), String> {
-    crate::system_log!(state.logger, "INFO", "SessionManager", "Stopping session: {}", request.session_id);
+    crate::system_log!(
+        state.logger,
+        "INFO",
+        "SessionManager",
+        "Stopping session: {}",
+        request.session_id
+    );
     let res = state
         .session_manager
         .stop_session(&app, &request.session_id)
@@ -246,8 +297,21 @@ pub async fn stop_cli(
         .map_err(|error| error.to_string());
 
     match &res {
-        Ok(_) => crate::system_log!(state.logger, "INFO", "SessionManager", "Session stopped successfully: {}", request.session_id),
-        Err(e) => crate::system_log!(state.logger, "ERROR", "SessionManager", "Failed to stop session {}: {}", request.session_id, e),
+        Ok(_) => crate::system_log!(
+            state.logger,
+            "INFO",
+            "SessionManager",
+            "Session stopped successfully: {}",
+            request.session_id
+        ),
+        Err(e) => crate::system_log!(
+            state.logger,
+            "ERROR",
+            "SessionManager",
+            "Failed to stop session {}: {}",
+            request.session_id,
+            e
+        ),
     }
     res
 }
@@ -404,8 +468,7 @@ pub async fn write_file_content(path: String, content: String) -> Result<(), Str
 #[tauri::command]
 pub async fn create_directory(path: String) -> Result<(), String> {
     use std::fs;
-    fs::create_dir_all(&path)
-        .map_err(|e| format!("Failed to create directory '{}': {}", path, e))
+    fs::create_dir_all(&path).map_err(|e| format!("Failed to create directory '{}': {}", path, e))
 }
 
 #[tauri::command]
@@ -462,8 +525,8 @@ pub async fn delete_file_or_dir(path: String, root_path: String) -> Result<(), S
         std::path::Path::new(&path),
         std::path::Path::new(&root_path),
     )?;
-    let meta = fs::symlink_metadata(&target)
-        .map_err(|e| format!("Cannot access '{}': {}", path, e))?;
+    let meta =
+        fs::symlink_metadata(&target).map_err(|e| format!("Cannot access '{}': {}", path, e))?;
 
     if meta.file_type().is_symlink() {
         #[cfg(windows)]
@@ -488,8 +551,7 @@ pub async fn delete_file_or_dir(path: String, root_path: String) -> Result<(), S
         fs::remove_dir_all(&target)
             .map_err(|e| format!("Failed to delete directory '{}': {}", path, e))
     } else {
-        fs::remove_file(&target)
-            .map_err(|e| format!("Failed to delete file '{}': {}", path, e))
+        fs::remove_file(&target).map_err(|e| format!("Failed to delete file '{}': {}", path, e))
     }
 }
 
@@ -533,7 +595,7 @@ pub async fn get_git_status(repo_path: String) -> Result<Vec<GitStatusEntry>, St
 
             for line in stdout_str.lines() {
                 if line.len() > 3 {
-                    let index_status = &line[..1];   // staging area
+                    let index_status = &line[..1]; // staging area
                     let worktree_status = &line[1..2]; // working tree
                     let file_path = line[3..].trim().to_string();
 
@@ -921,6 +983,49 @@ pub async fn create_rdp_session(
 }
 
 #[tauri::command]
+pub fn reveal_in_file_manager(path: String) -> Result<(), String> {
+    let p = PathBuf::from(path.clone());
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if p.is_file() {
+            Command::new("explorer")
+                .args(["/select,", &p.to_string_lossy()])
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            Command::new("explorer")
+                .arg(&p)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        return Ok(());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let parent = p
+            .parent()
+            .map(|x| x.to_path_buf())
+            .unwrap_or_else(|| p.clone());
+        Command::new("open")
+            .args(["-R", &p.to_string_lossy()])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        Command::new("xdg-open")
+            .arg(p.parent().map(|x| x.as_os_str()).unwrap_or(p.as_os_str()))
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+}
+
+#[tauri::command]
 pub fn open_workspace_folder(path: String) -> Result<(), String> {
     let p = PathBuf::from(path);
     if !p.exists() {
@@ -1260,16 +1365,15 @@ pub async fn ripgrep_search(path: String, query: String) -> Result<Vec<RipgrepMa
     }
 
     let mut cmd = std::process::Command::new("rg");
-    cmd.current_dir(&root_path)
-        .args(&[
-            "--line-number",
-            "--color=never",
-            "--smart-case",
-            "--max-count=2",
-            "--",
-            &query,
-            ".",
-        ]);
+    cmd.current_dir(&root_path).args(&[
+        "--line-number",
+        "--color=never",
+        "--smart-case",
+        "--max-count=2",
+        "--",
+        &query,
+        ".",
+    ]);
 
     #[cfg(target_os = "windows")]
     {
@@ -1277,7 +1381,8 @@ pub async fn ripgrep_search(path: String, query: String) -> Result<Vec<RipgrepMa
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .map_err(|e| format!("Failed to execute ripgrep (is rg installed?): {}", e))?;
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
@@ -1321,7 +1426,13 @@ pub async fn start_ssh_server(
     let root_dir = state.registry.data_dirs().root_dir;
     let config = load_ssh_server_config_internal(&root_dir)?;
     let mut manager = state.ssh_server_manager.lock().map_err(|e| e.to_string())?;
-    manager.start(app, state.session_manager.clone(), port, config, root_dir.clone())
+    manager.start(
+        app,
+        state.session_manager.clone(),
+        port,
+        config,
+        root_dir.clone(),
+    )
 }
 
 #[tauri::command]
@@ -1339,7 +1450,7 @@ pub async fn get_ssh_server_status(
 ) -> Result<SshStatusResponse, String> {
     let manager = state.ssh_server_manager.lock().map_err(|e| e.to_string())?;
     let (running, port, logs) = manager.status();
-    
+
     let local_ip = std::net::UdpSocket::bind("0.0.0.0:0")
         .and_then(|socket| {
             socket.connect("8.8.8.8:80")?;
@@ -1347,11 +1458,18 @@ pub async fn get_ssh_server_status(
         })
         .map(|addr| addr.ip().to_string())
         .unwrap_or_else(|_| "127.0.0.1".to_string());
-        
-    Ok(SshStatusResponse { running, port, local_ip, logs })
+
+    Ok(SshStatusResponse {
+        running,
+        port,
+        local_ip,
+        logs,
+    })
 }
 
-fn load_ssh_server_config_internal(root_dir: &std::path::Path) -> Result<crate::core::ssh_server::SshServerConfig, String> {
+fn load_ssh_server_config_internal(
+    root_dir: &std::path::Path,
+) -> Result<crate::core::ssh_server::SshServerConfig, String> {
     let path = root_dir.join("ssh_server_config.json");
     if !path.exists() {
         let default_config = crate::core::ssh_server::SshServerConfig::default();
@@ -1361,7 +1479,8 @@ fn load_ssh_server_config_internal(root_dir: &std::path::Path) -> Result<crate::
         }
         return Ok(default_config);
     }
-    let data = std::fs::read_to_string(&path).map_err(|e| format!("Failed to read SSH config: {}", e))?;
+    let data =
+        std::fs::read_to_string(&path).map_err(|e| format!("Failed to read SSH config: {}", e))?;
     let config: crate::core::ssh_server::SshServerConfig = serde_json::from_str(&data)
         .map_err(|e| format!("Failed to parse SSH config JSON: {}", e))?;
     Ok(config)

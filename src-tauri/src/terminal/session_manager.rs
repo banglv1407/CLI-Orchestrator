@@ -78,9 +78,7 @@ impl SessionManager {
     pub fn broadcast_output(&self, session_id: &str, chunk: &str) {
         if let Ok(mut map) = self.listeners.lock() {
             if let Some(senders) = map.get_mut(session_id) {
-                senders.retain(|tx| {
-                    tx.send(chunk.to_string()).is_ok()
-                });
+                senders.retain(|tx| tx.send(chunk.to_string()).is_ok());
             }
         }
     }

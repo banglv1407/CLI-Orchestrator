@@ -25,7 +25,7 @@ interface CommandPaletteProps {
   onAddCli: () => void;
   onAddSsh: () => void;
   onQuickSession: (panel: 'bottom' | 'right') => void;
-  onSwitchView: (view: 'terminal' | 'quickapps' | 'apiclient' | 'proxy') => void;
+  onSwitchView: (view: any) => void;
   onSwitchTheme: (theme: AppTheme) => void;
   activeMainView: string;
 }
@@ -171,6 +171,68 @@ export function CommandPalette({
         label: 'View: API Client',
         description: 'Switch to API client panel',
         action: () => onSwitchView('apiclient'),
+      });
+    }
+    if (activeMainView !== 'proxy') {
+      items.push({
+        id: 'action-view-proxy', type: 'action' as const,
+        label: 'View: CliProxyAI',
+        description: 'Switch to proxy panel',
+        action: () => onSwitchView('proxy'),
+      });
+    }
+    if (activeMainView !== 'logs') {
+      items.push({
+        id: 'action-view-logs', type: 'action' as const,
+        label: 'View: System Logs',
+        description: 'Switch to system logs panel',
+        action: () => onSwitchView('logs'),
+      });
+    }
+    if (activeMainView !== 'remote') {
+      items.push({
+        id: 'action-view-remote', type: 'action' as const,
+        label: 'View: Remote SSH',
+        description: 'Switch to remote SSH panel',
+        action: () => onSwitchView('remote'),
+      });
+    }
+    if (activeMainView !== 'web-ai') {
+      items.push({
+        id: 'action-view-web-ai', type: 'action' as const,
+        label: 'Launch Web AI',
+        description: 'Launch Web AI sandboxed profiles browser',
+        action: () => onSwitchView('web-ai'),
+      });
+    }
+    items.push({
+      id: 'action-view-ai-companion', type: 'action' as const,
+      label: 'Launch AI Companion',
+      description: 'Open the custom AI Companion sidebar panel',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('open-sidebar-tab', { detail: 'ai-chat' }));
+      },
+    });
+
+    // Settings sections deep links
+    const settingsSections: { id: string; label: string; desc: string }[] = [
+      { id: 'appearance', label: 'Settings: Appearance', desc: 'Configure application theme and styling' },
+      { id: 'mythical-pet', label: 'Settings: Mythical Pet', desc: 'Enable/disable and select mythical pets' },
+      { id: 'ai-companion', label: 'Settings: AI Companion', desc: 'Configure OpenAI-compatible endpoint settings' },
+      { id: 'local-llm', label: 'Settings: Local LLM', desc: 'Manage offline GGUF inference fallbacks' },
+      { id: 'web-ai', label: 'Settings: Web AI', desc: 'Manage secure in-app Web AI profile configurations' },
+      { id: 'navigation', label: 'Settings: Sidebar Navigation', desc: 'Reorder sidebar activity icons' },
+    ];
+
+    for (const sec of settingsSections) {
+      items.push({
+        id: 'settings-section-' + sec.id,
+        type: 'action' as const,
+        label: sec.label,
+        description: sec.desc,
+        action: () => {
+          window.dispatchEvent(new CustomEvent('open-settings', { detail: sec.id }));
+        },
       });
     }
 

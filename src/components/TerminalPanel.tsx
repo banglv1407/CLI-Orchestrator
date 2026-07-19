@@ -13,6 +13,8 @@ import { ProxyPanel } from './ProxyPanel';
 import { SystemLogPanel } from './SystemLogPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
+import { DashboardPanel } from './DashboardPanel';
+import { WebAiPanel } from './WebAiPanel';
 import { copyTerminalSelection, getTerminalSelectionText, type TerminalCopyMode } from '../lib/terminalClipboard';
 
 function FileIcon() {
@@ -92,7 +94,6 @@ interface TerminalHandle {
   fit: FitAddon;
   search: SearchAddon;
   miniTerm: Terminal;
-  miniFit: FitAddon;
   writeQueue: string[];
   isWriting: boolean;
   isAtBottom: boolean;
@@ -695,22 +696,21 @@ export function TerminalPanel({
       convertEol: false,
       scrollback: 2000,
       fontFamily: TERMINAL_FONT_FAMILY,
-      fontSize: 7,
+      fontSize: 13,
+      cols: handle.term.cols,
+      rows: handle.term.rows,
       disableStdin: true,
       scrollOnUserInput: false,
       theme: getTerminalTheme(),
     });
-    const newMiniFit = new FitAddon();
-    newMiniTerm.loadAddon(newMiniFit);
 
     handle.miniTerm = newMiniTerm;
-    handle.miniFit = newMiniFit;
     handle.cleanupMiniScroll = () => {};
 
-    return { miniTerm: newMiniTerm, miniFit: newMiniFit };
+    return { miniTerm: newMiniTerm };
   }, []);
 
-  const replayHistoryIntoMiniTerm = useCallback((sessionId: string, miniTerm: Terminal, miniFit: FitAddon) => {
+  const replayHistoryIntoMiniTerm = useCallback((sessionId: string, miniTerm: Terminal) => {
     const history = mainOutputHistory.current[sessionId];
     if (!history || history.length === 0) return;
     if (hasAlternateScreenOutput(history)) return;
@@ -718,7 +718,6 @@ export function TerminalPanel({
       for (const chunk of history) {
         miniTerm.write(chunk);
       }
-      miniFit.fit();
       miniTerm.scrollToBottom();
       miniTerm.refresh(0, miniTerm.rows - 1);
     } catch (e) {
@@ -733,18 +732,17 @@ export function TerminalPanel({
     if (!mountNode) return;
 
     // Dispose and recreate for a clean state
-    const { miniTerm, miniFit } = createFreshMiniTerminal(handle);
+    const { miniTerm } = createFreshMiniTerminal(handle);
     miniTerm.open(mountNode);
 
     const miniViewport = (mountNode.querySelector('.xterm-scrollable-element') as HTMLElement | null)
       ?? (mountNode.querySelector('.xterm-viewport') as HTMLElement | null);
     if (miniViewport) miniViewport.style.overflowY = 'hidden';
 
-    replayHistoryIntoMiniTerm(sessionId, miniTerm, miniFit);
+    replayHistoryIntoMiniTerm(sessionId, miniTerm);
 
     setTimeout(() => {
       try {
-        miniFit.fit();
         miniTerm.scrollToBottom();
         miniTerm.refresh(0, miniTerm.rows - 1);
       } catch (_e) {}
@@ -890,7 +888,9 @@ export function TerminalPanel({
         convertEol: false,
         scrollback: 2000,
         fontFamily: TERMINAL_FONT_FAMILY,
-        fontSize: 7,
+        fontSize: 13,
+        cols: term.cols,
+        rows: term.rows,
         disableStdin: true,
         scrollOnUserInput: false,
         theme: getTerminalTheme(),
@@ -1045,15 +1045,11 @@ export function TerminalPanel({
       const search = new SearchAddon();
       term.loadAddon(search);
 
-      const miniFit = new FitAddon();
-      miniTerm.loadAddon(miniFit);
-
       terminalRefs.current[session.id] = {
         term,
         fit,
         search,
         miniTerm,
-        miniFit,
         writeQueue: [],
         isWriting: false,
         isAtBottom: true,
@@ -1071,6 +1067,10 @@ export function TerminalPanel({
         invoke('resize_cli', {
           request: { sessionId: session.id, rows: dim.rows, cols: dim.cols },
         }).catch(console.error);
+        // Keep miniTerm grid in sync — prevents ANSI escape misalignment
+        if (handle?.miniTerm) {
+          handle.miniTerm.resize(dim.cols, dim.rows);
+        }
       });
 
       term.onData((data) => {
@@ -1216,7 +1216,7 @@ export function TerminalPanel({
       // DOM node changed (drag-and-drop or first mount) — dispose and recreate miniTerm entirely
       lastMiniMountNode.current[session.id] = mountNode;
 
-      const { miniTerm, miniFit } = createFreshMiniTerminal(handle);
+      const { miniTerm } = createFreshMiniTerminal(handle);
       miniTerm.open(mountNode);
 
       const miniViewport = (mountNode.querySelector('.xterm-scrollable-element') as HTMLElement | null)
@@ -1226,12 +1226,11 @@ export function TerminalPanel({
       }
 
       // Replay accumulated output history into the fresh terminal
-      replayHistoryIntoMiniTerm(session.id, miniTerm, miniFit);
+      replayHistoryIntoMiniTerm(session.id, miniTerm);
 
-      // Delayed fit+refresh to allow DOM layout to settle after mount
+      // Delayed refresh to allow DOM layout to settle after mount
       setTimeout(() => {
         try {
-          miniFit.fit();
           miniTerm.scrollToBottom();
           miniTerm.refresh(0, miniTerm.rows - 1);
         } catch (_e) {}
@@ -1239,7 +1238,6 @@ export function TerminalPanel({
 
       setTimeout(() => {
         try {
-          miniFit.fit();
           miniTerm.scrollToBottom();
           miniTerm.refresh(0, miniTerm.rows - 1);
         } catch (_e) {}
@@ -1390,6 +1388,10 @@ export function TerminalPanel({
         try {
           handle.fit.fit();
           handle.term.refresh(0, handle.term.rows - 1);
+          handle.term.scrollToBottom();
+          if (handle.miniTerm) {
+            handle.miniTerm.scrollToBottom();
+          }
         } catch (_e) {}
       }
     };
@@ -1478,14 +1480,6 @@ export function TerminalPanel({
     const saved = localStorage.getItem('clx-mini-terminal-scale');
     return saved ? parseFloat(saved) : 1.0;
   });
-
-  const handleAdjustScale = useCallback((delta: number) => {
-    setMiniTerminalScale((prev) => {
-      const next = Math.min(2.0, Math.max(0.5, prev + delta));
-      localStorage.setItem('clx-mini-terminal-scale', next.toFixed(1));
-      return next;
-    });
-  }, []);
 
   // Dynamic height and scale calculation to ensure up to 10 sessions fit on a single screen without scrolling!
   const thumbSizes = useMemo(() => {
@@ -1576,43 +1570,6 @@ export function TerminalPanel({
                     </button>
                   </div>
                 </div>
-              )}
-
-              {/* Active Session Info Header */}
-              {activeSession && !openedFile && !activeSessionUsesNestedTui && (
-                <div className="absolute top-3 left-4 z-20 flex items-center gap-2 select-none">
-                  <div className="px-3 py-1 rounded bg-[#0a0f1f]/85 border border-cyber-line/50 text-[10px] font-mono font-bold text-cyber-electric shadow-neon-blue-sm">
-                    🟢 {activeSession.cliName} - {activeSession.workingDir || ''}
-                  </div>
-                </div>
-              )}
-
-              {/* Toggle Right Panel Button */}
-              {visibleSessionId && !openedFile && (cliSessions.length >= 1 || !!activeDragId) && (
-                <button
-                  type="button"
-                  onClick={() => setRightPanelVisible(prev => !prev)}
-                  className={`absolute top-3 right-12 z-20 flex h-6 w-8 items-center justify-center rounded-lg border border-cyber-neon/60 bg-[#0a0f1f]/90 text-cyber-neon hover:bg-cyber-neon hover:text-black transition cursor-pointer select-none font-bold text-xs shadow-neon-sm ${
-                    activeSessionUsesNestedTui ? 'opacity-0 hover:opacity-100 focus:opacity-100' : 'opacity-100'
-                  }`}
-                  title={rightPanelVisible ? "Hide Right Panel" : "Show Right Panel"}
-                >
-                  {rightPanelVisible ? '▶' : '◀'}
-                </button>
-              )}
-
-              {/* Stop Session (Close) Button on top right */}
-              {visibleSessionId && !openedFile && (
-                <button
-                  type="button"
-                  onClick={() => onStopSession(visibleSessionId)}
-                  className={`absolute top-3 right-4 z-20 flex h-6 w-6 items-center justify-center rounded-lg border border-cyber-warn/60 bg-[#0a0f1f]/90 text-cyber-warn hover:bg-cyber-warn hover:text-white transition cursor-pointer select-none font-bold text-xs shadow-neon-sm ${
-                    activeSessionUsesNestedTui ? 'opacity-0 hover:opacity-100 focus:opacity-100' : 'opacity-100'
-                  }`}
-                  title="Stop / Close Session"
-                >
-                  ✕
-                </button>
               )}
 
               {/* @ Mention Autocomplete Overlay */}
@@ -1831,10 +1788,15 @@ export function TerminalPanel({
                 {/* Sub-view overlays */}
                 {activeMainView === 'quickapps' && <QuickAppsPanel />}
                 {activeMainView === 'apiclient' && <ApiClientPanel />}
-                {activeMainView === 'proxy' && <ProxyPanel />}
-                {activeMainView === 'logs' && <SystemLogPanel />}
                 {activeMainView === 'settings' && <SettingsPanel theme={theme!} setTheme={setTheme!} />}
-                {activeMainView === 'remote' && <RemoteSshPanel />}
+                {/* Dashboard: always mounted to preserve state (keep-alive) */}
+                <div style={{ position: 'absolute', inset: 0, visibility: activeMainView === 'dashboard' ? 'visible' : 'hidden', zIndex: activeMainView === 'dashboard' ? 5 : 0 }}>
+                  <DashboardPanel />
+                </div>
+                {/* Web AI: always mounted to preserve session state */}
+                <div style={{ position: 'absolute', inset: 0, visibility: activeMainView === 'web-ai' ? 'visible' : 'hidden', zIndex: activeMainView === 'web-ai' ? 5 : 0 }}>
+                  <WebAiPanel visible={activeMainView === 'web-ai'} />
+                </div>
 
                 {/* File viewer overlay — rendered on top of terminals when a file is open */}
                 {openedFile && (
@@ -2016,23 +1978,19 @@ export function TerminalPanel({
                       ⚡ CMD ({sshSessions.length})
                     </h3>
                     <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-0.5 scale-90 select-none">
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustScale(-0.1)}
-                        title="Smaller mini terminals"
-                        className="text-[9px] text-slate-400 hover:text-cyber-electric transition px-0.5"
-                      >
-                        ➖
-                      </button>
-                      <span className="text-[8px] font-mono text-slate-500 font-semibold">{Math.round(miniTerminalScale * 100)}%</span>
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustScale(0.1)}
-                        title="Larger mini terminals"
-                        className="text-[9px] text-slate-400 hover:text-cyber-electric transition px-0.5"
-                      >
-                        ➕
-                      </button>
+                      <span className="text-[7px] font-mono text-cyber-electric/70 font-semibold tabular-nums min-w-[22px] text-right">{Math.round(miniTerminalScale * 100)}%</span>
+                      <input
+                        type="range"
+                        min="50" max="200" step="5"
+                        value={Math.round(miniTerminalScale * 100)}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value) / 100;
+                          setMiniTerminalScale(v);
+                          localStorage.setItem('clx-mini-terminal-scale', v.toFixed(1));
+                        }}
+                        className="w-14 h-1 accent-cyber-electric cursor-pointer"
+                        title="Mini terminal scale"
+                      />
                     </div>
                   </div>
                   <button
@@ -2075,7 +2033,7 @@ export function TerminalPanel({
                             userSelect: 'none',
                             WebkitUserDrag: 'none'
                           } as React.CSSProperties}
-                          className={`relative rounded-lg border-2 overflow-hidden transition-all duration-200 shrink-0 cursor-grab active:cursor-grabbing ${
+                          className={`flex flex-col rounded-lg border-2 overflow-hidden transition-all duration-200 shrink-0 cursor-grab active:cursor-grabbing ${
                             isDragging 
                               ? 'opacity-30 border-cyber-neon shadow-neon-sm scale-105' 
                               : isActive 
@@ -2083,54 +2041,57 @@ export function TerminalPanel({
                                 : 'border-cyber-line/50 hover:border-cyber-electric/80 bg-[#0a0f1f] hover:shadow-neon-blue-sm'
                           }`}
                         >
-                          {/* Live scaled view */}
-                          <div 
-                            style={{ 
-                              transform: `scale(${thumbSizes.scale})`, 
-                              width: '640px', 
-                              height: '400px' 
-                            }}
-                            className="absolute inset-0 origin-top-left pointer-events-none"
-                          >
-                            <div
-                              ref={(node) => {
-                                miniContainerRefs.current[session.id] = node;
-                                if (node) {
-                                  containerToSessionRef.current.set(node, session.id);
-                                  ensureMiniTerminal(session, node);
-                                }
+                          {/* Terminal area — flex-1, no overlay */}
+                          <div className="flex-1 relative min-h-0">
+                            {/* Live scaled view */}
+                            <div 
+                              style={{ 
+                                transform: `scale(${thumbSizes.scale})`, 
+                                width: '640px', 
+                                height: '400px',
                               }}
-                              className="h-full w-full"
-                            />
+                              className="absolute origin-top-left pointer-events-none inset-0"
+                            >
+                              <div
+                                ref={(node) => {
+                                  miniContainerRefs.current[session.id] = node;
+                                  if (node) {
+                                    containerToSessionRef.current.set(node, session.id);
+                                    ensureMiniTerminal(session, node);
+                                  }
+                                }}
+                                className="h-full w-full"
+                              />
+                            </div>
+
+                            {/* Quick Close button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onStopSession(session.id);
+                              }}
+                              style={{
+                                width: thumbSizes.cardHeight < 70 ? '14px' : '18px',
+                                height: thumbSizes.cardHeight < 70 ? '14px' : '18px',
+                                fontSize: thumbSizes.cardHeight < 70 ? '7px' : '9px',
+                              }}
+                              className="absolute top-1 right-1 z-30 flex items-center justify-center rounded bg-rose-500/80 hover:bg-rose-600 text-white transition font-bold opacity-75 hover:opacity-100 shadow-sm"
+                              title="Stop / Close Session"
+                            >
+                              ✕
+                            </button>
                           </div>
 
-                          {/* Overlay connection name / label */}
+                          {/* Info bar — below terminal, not overlay */}
                           {thumbSizes.cardHeight >= 70 && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-[#0a0f1f]/85 border-t border-cyber-line/20 px-2 py-0.5 flex items-center justify-between pointer-events-none text-[8px]">
+                            <div className="shrink-0 bg-[#0a0f1f]/90 border-t border-cyber-line/20 px-2 py-1 flex items-center justify-between text-[8px]">
                               <MarqueeTitle text={`${session.cliName} - ${session.workingDir || ''}`} className="text-cyber-electric" />
-                              <span className="font-mono text-[7px] px-1 rounded bg-[#0a0f1f]/80 border border-cyber-line text-slate-400 select-none scale-90">
+                              <span className="font-mono text-[7px] px-1 rounded bg-[#0a0f1f]/80 border border-cyber-line text-slate-400 select-none">
                                 {session.id.substring(0, 4)}
                               </span>
                             </div>
                           )}
-
-                          {/* Quick Close button on SSH thumbnail */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onStopSession(session.id);
-                            }}
-                            style={{
-                              width: thumbSizes.cardHeight < 70 ? '14px' : '18px',
-                              height: thumbSizes.cardHeight < 70 ? '14px' : '18px',
-                              fontSize: thumbSizes.cardHeight < 70 ? '7px' : '9px',
-                            }}
-                            className="absolute top-1 right-1 z-30 flex items-center justify-center rounded bg-rose-500/80 hover:bg-rose-600 text-white transition font-bold opacity-75 hover:opacity-100 shadow-sm"
-                            title="Stop / Close Session"
-                          >
-                            ✕
-                          </button>
                         </div>
                       );
                     })}
@@ -2143,44 +2104,52 @@ export function TerminalPanel({
           {/* Right live scaled session thumbnails panel */}
           {/* Right live scaled session thumbnails panel */}
           {(cliSessions.length >= 1 || !!activeDragId) && (
-            <div 
-              style={{ width: rightPanelVisible ? `${thumbSizes.containerWidth}px` : '0px' }}
-              onMouseEnter={() => {
-                if (activeDragId) {
-                  const sess = sessions.find(s => s.id === activeDragId);
-                  const currentPanel = sess?.panel || 'right';
-                  if (currentPanel !== 'right') {
-                    onMoveSessionToPanel?.(activeDragId, 'right');
+            <>
+              {/* Expand tab — visible only when panel is collapsed */}
+              {!rightPanelVisible && (
+                <button
+                  type="button"
+                  onClick={() => setRightPanelVisible(true)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex h-14 w-5 items-center justify-center rounded-l border border-l-0 border-cyber-neon/50 bg-[#0a0f1f]/90 text-cyber-neon hover:bg-cyber-neon hover:text-black transition cursor-pointer select-none font-bold text-[10px]"
+                  title="Show Right Panel"
+                >
+                  ◀
+                </button>
+              )}
+              <div 
+                style={{ width: rightPanelVisible ? `${thumbSizes.containerWidth}px` : '0px' }}
+                onMouseEnter={() => {
+                  if (activeDragId) {
+                    const sess = sessions.find(s => s.id === activeDragId);
+                    const currentPanel = sess?.panel || 'right';
+                    if (currentPanel !== 'right') {
+                      onMoveSessionToPanel?.(activeDragId, 'right');
+                    }
                   }
-                }
-              }}
-              className={`h-full border-cyber-line bg-cyber-base/40 flex flex-col gap-2 shrink-0 select-none overflow-hidden transition-all duration-300 ease-in-out ${
-                rightPanelVisible ? 'border-l p-3.5 opacity-100' : 'border-l-0 p-0 opacity-0'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">
-                    AI AGENT ({cliSessions.length})
-                  </h3>
-                  <div className="flex items-center gap-0.5 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-0.5 scale-75 select-none shrink-0 origin-left">
-                    <button
-                      type="button"
-                      onClick={() => handleAdjustScale(-0.1)}
-                      title="Smaller mini terminals"
-                      className="text-[9px] text-slate-400 hover:text-cyber-electric transition"
-                    >
-                      ➖
-                    </button>
-                    <span className="text-[8px] font-mono text-slate-500 font-semibold">{Math.round(miniTerminalScale * 100)}%</span>
-                    <button
-                      type="button"
-                      onClick={() => handleAdjustScale(0.1)}
-                      title="Larger mini terminals"
-                      className="text-[9px] text-slate-400 hover:text-cyber-electric transition"
-                    >
-                      ➕
-                    </button>
+                }}
+                className={`h-full border-cyber-line bg-cyber-base/40 flex flex-col gap-2 shrink-0 select-none overflow-hidden transition-all duration-300 ease-in-out ${
+                  rightPanelVisible ? 'border-l p-3.5 opacity-100' : 'border-l-0 p-0 opacity-0'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">
+                      AI AGENT ({cliSessions.length})
+                    </h3>
+                  <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-1 select-none shrink-0">
+                    <span className="text-[7px] font-mono text-cyber-electric/70 font-semibold tabular-nums min-w-[22px] text-right">{Math.round(miniTerminalScale * 100)}%</span>
+                    <input
+                      type="range"
+                      min="50" max="200" step="5"
+                      value={Math.round(miniTerminalScale * 100)}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value) / 100;
+                        setMiniTerminalScale(v);
+                        localStorage.setItem('clx-mini-terminal-scale', v.toFixed(1));
+                      }}
+                      className="w-14 h-1 accent-cyber-electric cursor-pointer"
+                      title="Mini terminal scale"
+                    />
                   </div>
                 </div>
                 <button
@@ -2190,6 +2159,14 @@ export function TerminalPanel({
                   className="flex items-center gap-0.5 rounded border border-cyber-neon/50 bg-cyber-neon/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-cyber-neon transition hover:bg-cyber-neon/25 hover:border-cyber-neon shadow-neon-sm-faint shrink-0"
                 >
                   + New
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRightPanelVisible(false)}
+                  title="Collapse panel"
+                  className="flex items-center justify-center w-5 h-5 text-[10px] text-slate-500 hover:text-cyber-neon hover:bg-white/5 rounded transition ml-1 shrink-0"
+                >
+                  ▶
                 </button>
               </div>
               
@@ -2223,7 +2200,7 @@ export function TerminalPanel({
                           userSelect: 'none',
                           WebkitUserDrag: 'none'
                         } as React.CSSProperties}
-                        className={`relative rounded-lg border-2 overflow-hidden transition-all duration-200 shrink-0 cursor-grab active:cursor-grabbing ${
+                        className={`flex flex-col rounded-lg border-2 overflow-hidden transition-all duration-200 shrink-0 cursor-grab active:cursor-grabbing ${
                           isDragging 
                             ? 'opacity-30 border-cyber-neon shadow-neon-sm scale-105' 
                             : isActive 
@@ -2231,60 +2208,64 @@ export function TerminalPanel({
                               : 'border-cyber-line/50 hover:border-cyber-electric/80 bg-[#0a0f1f] hover:shadow-neon-blue-sm'
                         }`}
                       >
-                        {/* Live scaled view */}
-                        <div 
-                          style={{ 
-                            transform: `scale(${thumbSizes.scale})`, 
-                            width: '640px', 
-                            height: '400px' 
-                          }}
-                          className="absolute inset-0 origin-top-left pointer-events-none"
-                        >
-                          <div
-                            ref={(node) => {
-                              miniContainerRefs.current[session.id] = node;
-                              if (node) {
-                                containerToSessionRef.current.set(node, session.id);
-                                ensureMiniTerminal(session, node);
-                              }
+                        {/* Terminal area — flex-1, no overlay */}
+                        <div className="flex-1 relative min-h-0">
+                          {/* Live scaled view */}
+                          <div 
+                            style={{ 
+                              transform: `scale(${thumbSizes.scale})`, 
+                              width: '640px', 
+                              height: '400px',
                             }}
-                            className="h-full w-full"
-                          />
+                            className="absolute origin-top-left pointer-events-none inset-0"
+                          >
+                            <div
+                              ref={(node) => {
+                                miniContainerRefs.current[session.id] = node;
+                                if (node) {
+                                  containerToSessionRef.current.set(node, session.id);
+                                  ensureMiniTerminal(session, node);
+                                }
+                              }}
+                              className="h-full w-full"
+                            />
+                          </div>
+
+                          {/* Quick Close button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onStopSession(session.id);
+                            }}
+                            style={{
+                              width: thumbSizes.cardHeight < 70 ? '14px' : '18px',
+                              height: thumbSizes.cardHeight < 70 ? '14px' : '18px',
+                              fontSize: thumbSizes.cardHeight < 70 ? '7px' : '9px',
+                            }}
+                            className="absolute top-1 right-1 z-30 flex items-center justify-center rounded bg-rose-500/80 hover:bg-rose-600 text-white transition font-bold opacity-75 hover:opacity-100 shadow-sm"
+                            title="Stop / Close Session"
+                          >
+                            ✕
+                          </button>
                         </div>
 
-                        {/* Overlay directory / label */}
+                        {/* Info bar — below terminal, not overlay */}
                         {thumbSizes.cardHeight >= 70 && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-[#0a0f1f]/85 border-t border-cyber-line/20 px-2 py-0.5 flex items-center justify-between pointer-events-none text-[8px]">
+                          <div className="shrink-0 bg-[#0a0f1f]/90 border-t border-cyber-line/20 px-2 py-1 flex items-center justify-between text-[8px]">
                             <MarqueeTitle text={`${session.cliName} - ${session.workingDir || ''}`} className="text-slate-300" />
-                            <span className="font-mono text-[7px] px-1 rounded bg-[#0a0f1f]/80 border border-cyber-line text-slate-400 select-none scale-90">
+                            <span className="font-mono text-[7px] px-1 rounded bg-[#0a0f1f]/80 border border-cyber-line text-slate-400 select-none">
                               {session.id.substring(0, 4)}
                             </span>
                           </div>
                         )}
-
-                        {/* Quick Close button on thumbnail */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStopSession(session.id);
-                          }}
-                          style={{
-                            width: thumbSizes.cardHeight < 70 ? '14px' : '18px',
-                            height: thumbSizes.cardHeight < 70 ? '14px' : '18px',
-                            fontSize: thumbSizes.cardHeight < 70 ? '7px' : '9px',
-                          }}
-                          className="absolute top-1 right-1 z-30 flex items-center justify-center rounded bg-rose-500/80 hover:bg-rose-600 text-white transition font-bold opacity-75 hover:opacity-100 shadow-sm"
-                          title="Stop / Close Session"
-                        >
-                          ✕
-                        </button>
                       </div>
                     );
                   })}
                 </div>
               )}
             </div>
+          </>
           )}
         </div>
       )}
@@ -2391,3 +2372,4 @@ export function TerminalPanel({
     </section>
   );
 }
+

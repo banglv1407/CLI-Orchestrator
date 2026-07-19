@@ -1,15 +1,15 @@
 #[cfg(feature = "builtin-llm")]
-use candle_core::{Device, Tensor, DType};
-#[cfg(feature = "builtin-llm")]
-use candle_transformers::models::quantized_llama::ModelWeights;
+use candle_core::{DType, Device, Tensor};
 #[cfg(feature = "builtin-llm")]
 use candle_transformers::generation::LogitsProcessor;
 #[cfg(feature = "builtin-llm")]
-use tokenizers::Tokenizer;
+use candle_transformers::models::quantized_llama::ModelWeights;
 #[cfg(feature = "builtin-llm")]
 use std::fs::File;
 #[cfg(feature = "builtin-llm")]
 use std::path::{Path, PathBuf};
+#[cfg(feature = "builtin-llm")]
+use tokenizers::Tokenizer;
 
 use crate::builtin_llm::config::BuiltinLlmConfig;
 
@@ -59,11 +59,13 @@ impl Drop for BuiltinLlmEngine {
 
 #[cfg(feature = "builtin-llm")]
 impl BuiltinLlmEngine {
-
     pub fn load_model(&mut self) -> Result<(), String> {
-        let model_path_str = self.config.model_path.as_ref()
+        let model_path_str = self
+            .config
+            .model_path
+            .as_ref()
             .ok_or("No model path configured in settings")?;
-        
+
         let model_path = Path::new(model_path_str);
         if !model_path.exists() {
             return Err(format!("Model file not found at: {}", model_path_str));
@@ -103,9 +105,9 @@ impl BuiltinLlmEngine {
                     "https://huggingface.co/SupraLabs/Supra-1.5-50M-Instruct-exp/resolve/main/tokenizer.json",
                     "https://huggingface.co/hf-internal-testing/llama-tokenizer/resolve/main/tokenizer.json",
                 ];
-                
+
                 std::fs::create_dir_all(&cache_dir).ok();
-                
+
                 for url in urls {
                     if let Ok(response) = reqwest::blocking::get(url) {
                         if response.status().is_success() {
@@ -133,7 +135,11 @@ impl BuiltinLlmEngine {
             .map_err(|e| format!("Failed to load tokenizer: {}", e))?;
 
         if self.config.runtime == "llamacpp" {
-            let server_exe = self.config.server_path.clone().unwrap_or_else(|| "llama-server".to_string());
+            let server_exe = self
+                .config
+                .server_path
+                .clone()
+                .unwrap_or_else(|| "llama-server".to_string());
             let child = std::process::Command::new(&server_exe)
                 .arg("-m")
                 .arg(model_path_str)
@@ -154,9 +160,9 @@ impl BuiltinLlmEngine {
         }
 
         // Load Model
-        let file = File::open(model_path)
-            .map_err(|e| format!("Failed to open model file: {}", e))?;
-        
+        let file =
+            File::open(model_path).map_err(|e| format!("Failed to open model file: {}", e))?;
+
         let mut reader = std::io::BufReader::new(file);
         let gguf_content = candle_core::quantized::gguf_file::Content::read(&mut reader)
             .map_err(|e| format!("Failed to read GGUF content: {}", e))?;
@@ -188,11 +194,11 @@ impl BuiltinLlmEngine {
             || self.config.runtime != config.runtime
             || self.config.server_path != config.server_path
             || self.config.server_port != config.server_port;
-        
+
         let disabled = self.config.enabled && !config.enabled;
-        
+
         self.config = config;
-        
+
         if model_changed || disabled {
             self.unload_model();
         }
@@ -208,10 +214,10 @@ impl BuiltinLlmEngine {
                 .timeout(std::time::Duration::from_secs(60))
                 .build()
                 .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-                
+
             let url = format!("http://127.0.0.1:{}/completion", self.config.server_port);
             let max_gen_tokens = max_tokens.unwrap_or(self.config.max_tokens);
-            
+
             let body = serde_json::json!({
                 "prompt": prompt,
                 "n_predict": max_gen_tokens,
@@ -219,18 +225,20 @@ impl BuiltinLlmEngine {
                 "repeat_penalty": self.config.repeat_penalty,
                 "stream": false,
             });
-            
+
             let res = client.post(&url)
                 .json(&body)
                 .send()
                 .map_err(|e| format!("Failed to communicate with llama-server on port {}: {}. Please ensure the server is running.", self.config.server_port, e))?;
-                
-            let res_json: serde_json::Value = res.json()
+
+            let res_json: serde_json::Value = res
+                .json()
                 .map_err(|e| format!("Failed to parse llama-server response JSON: {}", e))?;
-                
-            let content = res_json["content"].as_str()
+
+            let content = res_json["content"]
+                .as_str()
                 .ok_or_else(|| format!("Missing 'content' field in response: {:?}", res_json))?;
-                
+
             return Ok(content.to_string());
         }
 
@@ -239,7 +247,8 @@ impl BuiltinLlmEngine {
 
         let mut model_weights = model.clone(); // ModelWeights has cheap clones or wraps internal state
 
-        let tokens = tokenizer.encode(prompt, true)
+        let tokens = tokenizer
+            .encode(prompt, true)
             .map_err(|e| format!("Tokenizer encoding error: {}", e))?;
         let prompt_tokens = tokens.get_ids();
 
@@ -257,14 +266,11 @@ impl BuiltinLlmEngine {
             None, // top_p
         );
 
-        let eos_token_id = tokenizer.get_vocab(true)
+        let eos_token_id = tokenizer
+            .get_vocab(true)
             .get("</s>")
             .copied()
-            .or_else(|| {
-                tokenizer.get_vocab(true)
-                    .get("<|im_end|>")
-                    .copied()
-            })
+            .or_else(|| tokenizer.get_vocab(true).get("<|im_end|>").copied())
             .unwrap_or(2); // fallback to standard llama EOS id
 
         // Run prompt tokens through the model (prefill)
@@ -276,7 +282,8 @@ impl BuiltinLlmEngine {
                 .map_err(|e| e.to_string())?
                 .unsqueeze(0)
                 .map_err(|e| e.to_string())?;
-            logits = model_weights.forward(&input, pos)
+            logits = model_weights
+                .forward(&input, pos)
                 .map_err(|e| format!("Model forward error during prefill: {}", e))?;
             index_pos = pos + 1;
         }
@@ -289,12 +296,13 @@ impl BuiltinLlmEngine {
             } else {
                 logits
             };
-            logits_processor.sample(&logits)
+            logits_processor
+                .sample(&logits)
                 .map_err(|e| format!("Logits sampling error: {}", e))?
         };
 
         tokens.push(next_token);
-        
+
         if next_token == eos_token_id {
             return Ok(generated_text);
         }
@@ -309,10 +317,11 @@ impl BuiltinLlmEngine {
                 .map_err(|e| e.to_string())?
                 .unsqueeze(0)
                 .map_err(|e| e.to_string())?;
-            
-            let l = model_weights.forward(&input, index_pos + i as usize)
+
+            let l = model_weights
+                .forward(&input, index_pos + i as usize)
                 .map_err(|e| format!("Model forward error during generation: {}", e))?;
-            
+
             let l = l.squeeze(0).map_err(|e| e.to_string())?;
             let mut l = if l.rank() == 2 {
                 l.squeeze(0).map_err(|e| e.to_string())?
@@ -326,13 +335,15 @@ impl BuiltinLlmEngine {
                 l = candle_transformers::utils::apply_repeat_penalty(
                     &l,
                     self.config.repeat_penalty,
-                    &tokens[start_at..]
-                ).map_err(|e| format!("Repeat penalty error: {}", e))?;
+                    &tokens[start_at..],
+                )
+                .map_err(|e| format!("Repeat penalty error: {}", e))?;
             }
 
-            next_token = logits_processor.sample(&l)
+            next_token = logits_processor
+                .sample(&l)
                 .map_err(|e| format!("Sampling error: {}", e))?;
-            
+
             tokens.push(next_token);
 
             if next_token == eos_token_id {

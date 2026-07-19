@@ -57,14 +57,14 @@ impl BuiltinLlmConfig {
     pub fn save(&self) -> Result<(), String> {
         let path = Self::config_path();
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("Failed to create config dir: {}", e))?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create config dir: {}", e))?;
         }
 
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
 
-        fs::write(&path, content)
-            .map_err(|e| format!("Failed to write config file: {}", e))?;
+        fs::write(&path, content).map_err(|e| format!("Failed to write config file: {}", e))?;
 
         Ok(())
     }

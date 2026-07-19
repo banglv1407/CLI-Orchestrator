@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/core';
 import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry } from '../types';
 import { loadApiHistory, clearApiHistory, type ApiHistoryEntry, METHOD_COLORS } from '../lib/api-history';
 import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled } from '../lib/mythical-pets';
-import { LlmConfigModal } from './LlmConfigModal';
 import { ProxyPanel } from './ProxyPanel';
 
 import { 
@@ -13,6 +12,7 @@ import {
   readFileContent,
   writeFileContent,
   openWorkspaceFolder,
+  revealInFileManager,
   getGitStatus,
   getGitDiff,
   listSshDirectoryFiles,
@@ -190,9 +190,9 @@ interface CliSidebarProps {
   onLogsTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'apiclient' | 'proxy' | 'logs';
+type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'apiclient' | 'proxy' | 'logs' | 'dashboard' | 'web-ai';
 
-const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['logs', 'remote', 'proxy', 'settings']);
+const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['settings']);
 
 interface FileContextTarget {
   path: string;
@@ -362,7 +362,7 @@ export function CliSidebar({
   const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
 
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
-    const tabsWithNoLeftArea = new Set(['quickapps', 'proxy', 'logs', 'remote', 'settings']);
+    const tabsWithNoLeftArea = new Set(['quickapps', 'proxy', 'logs', 'remote', 'settings', 'dashboard', 'web-ai']);
     
     if (tabsWithNoLeftArea.has(tab)) {
       setIsSidebarCollapsed(true);
@@ -385,6 +385,20 @@ export function CliSidebar({
         if (onProxyTabChange) onProxyTabChange(false);
         if (onLogsTabChange) onLogsTabChange(false);
         window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'remote' }));
+      }
+      else if (tab === 'dashboard') {
+        if (onQuickAppsTabChange) onQuickAppsTabChange(false);
+        if (onApiClientTabChange) onApiClientTabChange(false);
+        if (onProxyTabChange) onProxyTabChange(false);
+        if (onLogsTabChange) onLogsTabChange(false);
+        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'dashboard' }));
+      }
+      else if (tab === 'web-ai') {
+        if (onQuickAppsTabChange) onQuickAppsTabChange(false);
+        if (onApiClientTabChange) onApiClientTabChange(false);
+        if (onProxyTabChange) onProxyTabChange(false);
+        if (onLogsTabChange) onLogsTabChange(false);
+        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'web-ai' }));
       }
     } else {
       if (activeTab === tab && !isSidebarCollapsed) {
@@ -425,14 +439,29 @@ export function CliSidebar({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed as SidebarTab[];
+        if (Array.isArray(parsed)) {
+          let list = [...parsed].filter((t) => t !== 'logs' && t !== 'remote' && t !== 'proxy');
+          if (!list.includes('dashboard')) {
+            list.unshift('dashboard');
+          }
+          if (!list.includes('web-ai')) {
+            const firstPinnedIndex = list.findIndex((tab) => PINNED_SIDEBAR_TABS.has(tab as SidebarTab));
+            if (firstPinnedIndex !== -1) {
+              list.splice(firstPinnedIndex, 0, 'web-ai');
+            } else {
+              list.push('web-ai');
+            }
+          }
+          return [
+            ...list.filter((t) => !PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
+            ...list.filter((t) => PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
+          ] as SidebarTab[];
         }
       } catch {
         // ignore
       }
     }
-    return ['cli-manager', 'explorer', 'quickapps', 'operator', 'apiclient', 'logs', 'remote', 'proxy', 'settings'];
+    return ['dashboard', 'cli-manager', 'explorer', 'quickapps', 'operator', 'apiclient', 'web-ai', 'settings'];
   });
 
   const handleTabDragStart = (e: React.DragEvent, tab: SidebarTab) => {
@@ -469,7 +498,7 @@ export function CliSidebar({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleTabDrop(e, 'cli-manager')}
             onClick={() => handleSetActiveTab('cli-manager')}
-            title="CLI Orchestrator"
+            title="Terminal Orchestor"
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
               activeTab === 'cli-manager'
                 ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
@@ -670,6 +699,65 @@ export function CliSidebar({
             </div>
           </div>
         );
+      case 'dashboard':
+        return (
+          <div
+            key="dashboard"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'dashboard')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'dashboard')}
+            onClick={() => handleSetActiveTab('dashboard')}
+            title="Dashboard"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'dashboard'
+                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
+                : 'text-slate-400 hover:text-cyber-electric hover:bg-cyber-electric/10'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'dashboard' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
+              )}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            </div>
+          </div>
+        );
+      case 'web-ai':
+        return (
+          <div
+            key="web-ai"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'web-ai')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'web-ai')}
+            onClick={() => handleSetActiveTab('web-ai')}
+            title="Web AI Profiles"
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
+              activeTab === 'web-ai'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'web-ai' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+              )}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+              </svg>
+            </div>
+          </div>
+        );
       case 'settings':
         return (
           <div
@@ -701,12 +789,40 @@ export function CliSidebar({
     }
   };
 
-  // Listen for pet click → open AI chat
+  // Listen for pet click → open Web AI
   useEffect(() => {
-    const handler = () => handleSetActiveTab('ai-chat');
+    const handler = () => {
+      window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'web-ai' }));
+      setIsSidebarCollapsed(true);
+      localStorage.setItem('ai-cli-sidebar-collapsed', 'true');
+    };
     window.addEventListener('mythical-pet-click', handler);
     return () => window.removeEventListener('mythical-pet-click', handler);
+  }, []);
+
+  // Listen for opening a specific sidebar tab (e.g. ai-chat from Command Palette)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvt = e as CustomEvent<SidebarTab>;
+      if (customEvt.detail) {
+        handleSetActiveTab(customEvt.detail);
+      }
+    };
+    window.addEventListener('open-sidebar-tab', handler);
+    return () => window.removeEventListener('open-sidebar-tab', handler);
   }, [handleSetActiveTab]);
+
+  // Listen for LLM Companion config changes from Settings Panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvt = e as CustomEvent<LlmConfig>;
+      if (customEvt.detail) {
+        setLlmConfig(customEvt.detail);
+      }
+    };
+    window.addEventListener('llm-config-changed', handler);
+    return () => window.removeEventListener('llm-config-changed', handler);
+  }, []);
 
   // Listen for sidebar order changes from Settings panel
   useEffect(() => {
@@ -2088,7 +2204,7 @@ export function CliSidebar({
               <div className="flex gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setConfigModalOpen(true)}
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-settings', { detail: 'ai-companion' }))}
                   className="rounded border border-cyber-electric/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10"
                 >
                   Config
@@ -2247,7 +2363,7 @@ export function CliSidebar({
           <div className="flex h-full flex-col overflow-hidden">
             <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4 bg-cyber-base/20">
               <div>
-                <h1 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">CLI Orchestrator</h1>
+                <h1 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">Terminal Orchestor</h1>
                 <p className="text-[10px] text-slate-400 mt-0.5">Sessions and Profiles</p>
               </div>
             </div>
@@ -2510,13 +2626,7 @@ export function CliSidebar({
       </aside>
       )}
 
-      {/* LLM Configuration Modal */}
-      <LlmConfigModal
-        isOpen={configModalOpen}
-        onClose={() => setConfigModalOpen(false)}
-        config={llmConfig}
-        onSave={handleSaveLlmConfig}
-      />
+      {/* LLM Configuration Modal - Removed in favor of category Settings */}
 
       {/* Ctrl+P File Finder Modal */}
       {isSearchModalOpen && (
@@ -2629,6 +2739,20 @@ export function CliSidebar({
           >
             📋 Copy Path
           </button>
+          {!fileContextMenu.target.connection && (
+            <button
+              type="button"
+              onClick={async () => {
+                const p = fileContextMenu.target.path;
+                setFileContextMenu(null);
+                try { await revealInFileManager(p); }
+                catch (e) { console.error('Reveal failed:', e); }
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
+            >
+              📂 Reveal in Explorer
+            </button>
+          )}
           {fileContextMenu.target.canDelete && (
             <>
               <div className="my-1 border-t border-cyber-line/50" />

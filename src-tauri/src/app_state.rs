@@ -4,6 +4,7 @@ use crate::{
     commands::api_proxy::{ApiProxyState, SharedApiProxyState},
     core::{
         cli_registry::CliRegistry,
+        monitoring::MonitorManager,
         project_store::ProjectStore,
         proxy_server::{ProxyConfig, ProxyServer},
         quickapp_registry::QuickAppRegistry,
@@ -20,6 +21,7 @@ pub struct AppState {
     pub quickapps: Arc<QuickAppRegistry>,
     pub proxy_server: Arc<ProxyServer>,
     pub logger: Arc<SystemLogger>,
+    pub monitoring: Arc<MonitorManager>,
     pub ssh_server_manager: Arc<std::sync::Mutex<crate::core::ssh_server::SshServerManager>>,
     pub builtin_llm: Arc<tokio::sync::Mutex<crate::builtin_llm::engine::BuiltinLlmEngine>>,
 }
@@ -30,20 +32,30 @@ impl AppState {
         let project_store =
             Arc::new(ProjectStore::new(&registry).map_err(|error| error.to_string())?);
         let quickapps = Arc::new(QuickAppRegistry::new().map_err(|error| error.to_string())?);
-        let proxy_config = ProxyConfig::load().unwrap_or_default();
+        let _ = crate::core::proxy_usage_db::init_db();
+        let mut proxy_config = ProxyConfig::load().unwrap_or_default();
+        let mut migrated = false;
+        for backend in &mut proxy_config.backends {
+            if backend.id.is_none() || backend.id.as_ref().unwrap().is_empty() {
+                backend.id = Some(uuid::Uuid::new_v4().to_string());
+                migrated = true;
+            }
+        }
+        if migrated {
+            let _ = proxy_config.save();
+        }
         let proxy_server = Arc::new(ProxyServer::new(proxy_config));
         let logger = Arc::new(SystemLogger::new(registry.data_dirs().logs_dir));
+        let monitoring = Arc::new(MonitorManager::new(registry.data_dirs().root_dir.clone())?);
 
         let builtin_config = crate::builtin_llm::config::BuiltinLlmConfig::load();
-        let mut builtin_llm_engine = crate::builtin_llm::engine::BuiltinLlmEngine::new(builtin_config.clone());
-        
-        // Auto load if enabled
+        let mut builtin_llm_engine =
+            crate::builtin_llm::engine::BuiltinLlmEngine::new(builtin_config.clone());
         if builtin_config.enabled {
             if let Err(e) = builtin_llm_engine.load_model() {
                 eprintln!("Failed to auto-load built-in LLM: {}", e);
             }
         }
-        
         let builtin_llm = Arc::new(tokio::sync::Mutex::new(builtin_llm_engine));
 
         Ok(Self {
@@ -54,7 +66,10 @@ impl AppState {
             api_proxy: Arc::new(ApiProxyState::new()),
             proxy_server,
             logger,
-            ssh_server_manager: Arc::new(std::sync::Mutex::new(crate::core::ssh_server::SshServerManager::new())),
+            monitoring,
+            ssh_server_manager: Arc::new(std::sync::Mutex::new(
+                crate::core::ssh_server::SshServerManager::new(),
+            )),
             builtin_llm,
         })
     }

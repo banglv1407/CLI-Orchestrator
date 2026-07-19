@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLX Dashboard Redesign — Prototype</title>
+<style>
+  :root {
+    --bg: #0a0f1f;
+    --panel: #111827;
+    --border: #1e293b;
+    --text: #cbd5e1;
+    --dim: #64748b;
+    --electric: #00ffd1;
+    --neon: #b6ff2f;
+    --red: #ff5f6d;
+    --amber: #f8e16a;
+    --cyan: #43b8ff;
+    --font: 'Cascadia Mono', 'Fira Code', 'Consolas', monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    font-family: var(--font);
+    color: var(--text);
+    font-size: 11px;
+    line-height: 1.5;
+    overflow: hidden;
+    height: 100vh;
+  }
+  .dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+    height: 100vh;
+    overflow: hidden;
+  }
+  /* Resource bar — full width */
+  .resource-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 8px 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .resource-bar .clx-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--dim);
+  }
+  .resource-bar .mem {
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--neon);
+  }
+  .resource-bar .stat {
+    font-size: 9px;
+    color: var(--dim);
+  }
+  .resource-bar .sep { width: 1px; height: 20px; background: var(--border); }
+
+  /* Card */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .card-header h3 {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .card-header .actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-body {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    padding: 8px 12px;
+  }
+  .card-body::-webkit-scrollbar { width: 4px; }
+  .card-body::-webkit-scrollbar-track { background: transparent; }
+  .card-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Status dot */
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.on { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+  .status-dot.off { background: var(--red); }
+
+  /* Buttons */
+  .btn {
+    font-family: var(--font);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-start {
+    border: 1px solid rgba(34,197,94,0.4);
+    background: rgba(34,197,94,0.08);
+    color: #4ade80;
+  }
+  .btn-start:hover { background: rgba(34,197,94,0.18); }
+  .btn-stop {
+    border: 1px solid rgba(255,95,109,0.4);
+    background: rgba(255,95,109,0.08);
+    color: var(--red);
+  }
+  .btn-stop:hover { background: rgba(255,95,109,0.18); }
+
+  /* Log line */
+  .log-line {
+    font-size: 10px;
+    padding: 1px 0;
+    border-bottom: 1px solid rgba(30,41,59,0.5);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .log-line .ts { color: var(--dim); margin-right: 6px; }
+  .log-line .level { font-weight: 700; margin-right: 6px; }
+  .log-line .src { color: var(--cyan); margin-right: 6px; }
+  .log-line.error .level { color: var(--red); }
+  .log-line.warn .level { color: var(--amber); }
+  .log-line.info .level { color: var(--cyan); }
+
+  /* Proxy / SSH status line */
+  .svc-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    padding: 4px 0;
+  }
+  .svc-status .port { color: var(--electric); font-weight: 700; }
+
+  /* Counter badge */
+  .badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(67,184,255,0.1);
+    color: var(--cyan);
+    border: 1px solid rgba(67,184,255,0.2);
+  }
+
+  /* Port grid inside card */
+  .port-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .port-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    border: 1px solid var(--border);
+  }
+  .port-item.live { border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.04); }
+  .port-item.dead { border-color: rgba(255,95,109,0.3); background: rgba(255,95,109,0.04); }
+  .port-item .p-num { font-weight: 700; color: #fff; }
+  .port-item .p-name { color: var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--dim);
+    gap: 6px;
+  }
+  .empty-state .title { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .empty-state .hint { font-size: 9px; color: #334155; }
+
+  /* Responsive: 1 column on narrow */
+  @media (max-width: 900px) {
+    .dashboard { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="dashboard">
+  <!-- ── Resource Bar ── -->
+  <div class="resource-bar">
+    <span class="clx-label">CLX</span>
+    <span class="mem">156.3 MB</span>
+    <span class="stat">4.8% RAM</span>
+    <div class="sep"></div>
+    <span class="stat">8 children</span>
+    <span style="flex:1"></span>
+    <span class="stat">Uptime 1h 23m</span>
+  </div>
+
+  <!-- ── System Logs ── -->
+  <div class="card">
+    <div class="card-header">
+      <h3>System Logs</h3>
+      <span class="badge">287 entries</span>
+    </div>
+    <div class="card-body">
+      <div class="log-line info">
+        <span class="ts">14:32:01</span>
+        <span class="level">INFO</span>
+        <span class="src">cli_manager</span>
+        Session 4f2a started for hermes
+      </div>
+      <div class="log-line info">
+        <span class="ts">14:31:58</span>
+        <span class="level">INFO</span>
+        <span class="src">proxy</span>
+        Proxy server listening on :1407
+      </div>
+      <div class="log-line warn">
+        <span class="ts">14:31:45</span>
+        <span class="level">WARN</span>
+        <span class="src">ssh_server</span>
+        SSH authentication failed from 192.168.1.5
+      </div>
+      <div class="log-line error">
+        <span class="ts">14:31:22</span>
+        <span class="level">ERROR</span>
+        <span class="src">llm_proxy</span>
+        Backend openai: connection timeout
+      </div>
+      <div class="log-line info">
+        <span class="ts">14:31:10</span>
+        <span class="level">INFO</span>
+        <span class="src">tauri</span>
+        Window created: main
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Port Monitor ── -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Port Monitor</h3>
+      <span class="badge">4 tracked</span>
+    </div>
+    <div class="card-body">
+      <div class="port-grid">
+        <div class="port-item live">
+          <span class="status-dot on"></span>
+          <span class="p-num">:1407</span>
+          <span class="p-name" style="flex:1">clx-proxy</span>
+          <span style="font-size:9px;color:var(--dim)">PID 8452</span>
+        </div>
+        <div class="port-item live">
+          <span class="status-dot on"></span>
+          <span class="p-num">:2222</span>
+          <span class="p-name" style="flex:1">ssh-server</span>
+          <span style="font-size:9px;color:var(--dim)">PID 8461</span>
+        </div>
+        <div class="port-item dead">
+          <span class="status-dot off"></span>
+          <span class="p-num">:3000</span>
+          <span class="p-name" style="flex:1">next-dev</span>
+          <span style="font-size:9px;color:var(--dim)">—</span>
+        </div>
+        <div class="port-item live">
+          <span class="status-dot on"></span>
+          <span class="p-num">:5173</span>
+          <span class="p-name" style="flex:1">vite</span>
+          <span style="font-size:9px;color:var(--dim)">PID 8389</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Proxy ── -->
+  <div class="card">
+    <div class="card-header">
+      <h3>LLM Proxy</h3>
+      <div class="actions">
+        <span class="badge">3 backends</span>
+        <button class="btn btn-stop">STOP</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="svc-status">
+        <span class="status-dot on"></span>
+        <span class="port">:1407</span>
+        <span style="color:var(--dim)">active</span>
+        <span style="flex:1"></span>
+        <span style="font-size:9px;color:var(--dim)">1.2K req</span>
+      </div>
+      <div class="log-line info" style="margin-top:4px">
+        <span class="ts">14:32:00</span>
+        <span class="level">200</span>
+        <span class="src">openai/gpt-4o-mini</span>
+        234 ms · 1.2K tokens
+      </div>
+      <div class="log-line error">
+        <span class="ts">14:31:55</span>
+        <span class="level">502</span>
+        <span class="src">openai/gpt-4o</span>
+        upstream error
+      </div>
+      <div class="log-line info">
+        <span class="ts">14:31:48</span>
+        <span class="level">200</span>
+        <span class="src">openai/gpt-4o-mini</span>
+        189 ms · 3.4K tokens
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SSH Server ── -->
+  <div class="card">
+    <div class="card-header">
+      <h3>SSH Server</h3>
+      <div class="actions">
+        <button class="btn btn-start">START</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="svc-status">
+        <span class="status-dot off"></span>
+        <span style="color:var(--dim)">stopped</span>
+      </div>
+      <div class="empty-state" style="flex:1;display:flex;margin-top:12px">
+        <span class="title">SSH server off</span>
+        <span class="hint">Start to accept remote connections</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -26,35 +26,57 @@ pub async fn builtin_llm_save_config(
     config.save()?;
     let mut engine = state.builtin_llm.lock().await;
     engine.update_config(config);
-    crate::system_log!(state.logger, "INFO", "BuiltinLLM", "Built-in local LLM configuration updated");
+    crate::system_log!(
+        state.logger,
+        "INFO",
+        "BuiltinLLM",
+        "Built-in local LLM configuration updated"
+    );
     Ok(())
 }
 
 #[tauri::command]
-pub async fn builtin_llm_load(
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn builtin_llm_load(state: tauri::State<'_, AppState>) -> Result<(), String> {
     let mut engine = state.builtin_llm.lock().await;
-    crate::system_log!(state.logger, "INFO", "BuiltinLLM", "Attempting to load built-in local LLM model");
+    crate::system_log!(
+        state.logger,
+        "INFO",
+        "BuiltinLLM",
+        "Attempting to load built-in local LLM model"
+    );
     match engine.load_model() {
         Ok(_) => {
-            crate::system_log!(state.logger, "INFO", "BuiltinLLM", "Built-in local LLM model loaded successfully");
+            crate::system_log!(
+                state.logger,
+                "INFO",
+                "BuiltinLLM",
+                "Built-in local LLM model loaded successfully"
+            );
             Ok(())
         }
         Err(e) => {
-            crate::system_log!(state.logger, "ERROR", "BuiltinLLM", "Failed to load built-in local LLM model: {}", e);
+            crate::system_log!(
+                state.logger,
+                "ERROR",
+                "BuiltinLLM",
+                "Failed to load built-in local LLM model: {}",
+                e
+            );
             Err(e)
         }
     }
 }
 
 #[tauri::command]
-pub async fn builtin_llm_unload(
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn builtin_llm_unload(state: tauri::State<'_, AppState>) -> Result<(), String> {
     let mut engine = state.builtin_llm.lock().await;
     engine.unload_model();
-    crate::system_log!(state.logger, "INFO", "BuiltinLLM", "Built-in local LLM model unloaded");
+    crate::system_log!(
+        state.logger,
+        "INFO",
+        "BuiltinLLM",
+        "Built-in local LLM model unloaded"
+    );
     Ok(())
 }
 

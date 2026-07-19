@@ -5,12 +5,15 @@ use tokio::sync::Mutex;
 
 // ── Shared state for abort support ──
 pub struct ApiProxyState {
-    pub cancel_tokens: Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>,
+    pub cancel_tokens:
+        Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>,
 }
 
 impl ApiProxyState {
     pub fn new() -> Self {
-        Self { cancel_tokens: Mutex::new(std::collections::HashMap::new()) }
+        Self {
+            cancel_tokens: Mutex::new(std::collections::HashMap::new()),
+        }
     }
 }
 
@@ -52,10 +55,7 @@ pub struct ApiProxyStreamChunk {
 
 const STREAM_EVENT: &str = "api-proxy-stream";
 
-fn build_request(
-    client: &reqwest::Client,
-    request: &ApiProxyRequest,
-) -> reqwest::RequestBuilder {
+fn build_request(client: &reqwest::Client, request: &ApiProxyRequest) -> reqwest::RequestBuilder {
     let method = request.method.to_uppercase();
     let mut req = match method.as_str() {
         "GET" => client.get(&request.url),
@@ -93,21 +93,37 @@ pub async fn api_proxy_request(request: ApiProxyRequest) -> Result<ApiProxyRespo
 
     let req = build_request(&client, &request);
     let response = req.send().await.map_err(|e| {
-        if e.is_timeout() { "Request timed out after 60s".to_string() }
-        else if e.is_connect() { format!("Connection failed: {}", e) }
-        else { format!("Request error: {}", e) }
+        if e.is_timeout() {
+            "Request timed out after 60s".to_string()
+        } else if e.is_connect() {
+            format!("Connection failed: {}", e)
+        } else {
+            format!("Request error: {}", e)
+        }
     })?;
 
     let status = response.status().as_u16();
-    let status_text = response.status().canonical_reason().unwrap_or("Unknown").to_string();
+    let status_text = response
+        .status()
+        .canonical_reason()
+        .unwrap_or("Unknown")
+        .to_string();
     let headers: Vec<(String, String)> = response
-        .headers().iter()
+        .headers()
+        .iter()
         .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
         .collect();
     let body = response.text().await.unwrap_or_default();
     let duration = start.elapsed().as_millis() as u64;
 
-    Ok(ApiProxyResponse { status, status_text, headers, body, duration, request_id: request.request_id.clone() })
+    Ok(ApiProxyResponse {
+        status,
+        status_text,
+        headers,
+        body,
+        duration,
+        request_id: request.request_id.clone(),
+    })
 }
 
 // ── Streaming request (SSE / long-poll) ──
@@ -117,7 +133,10 @@ pub async fn api_proxy_stream(
     state: tauri::State<'_, SharedApiProxyState>,
     request: ApiProxyRequest,
 ) -> Result<String, String> {
-    let request_id = request.request_id.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let request_id = request
+        .request_id
+        .clone()
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let cancel = tokio_util::sync::CancellationToken::new();
     {
         let mut tokens = state.cancel_tokens.lock().await;
@@ -174,28 +193,40 @@ async fn do_stream(
     app: &AppHandle,
 ) -> Result<(), String> {
     let response = req.send().await.map_err(|e| {
-        if e.is_timeout() { "Request timed out".to_string() }
-        else if e.is_connect() { format!("Connection failed: {}", e) }
-        else { format!("Request error: {}", e) }
+        if e.is_timeout() {
+            "Request timed out".to_string()
+        } else if e.is_connect() {
+            format!("Connection failed: {}", e)
+        } else {
+            format!("Request error: {}", e)
+        }
     })?;
 
     let status = response.status().as_u16();
-    let status_text = response.status().canonical_reason().unwrap_or("Unknown").to_string();
+    let status_text = response
+        .status()
+        .canonical_reason()
+        .unwrap_or("Unknown")
+        .to_string();
     let headers: Vec<(String, String)> = response
-        .headers().iter()
+        .headers()
+        .iter()
         .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
         .collect();
 
     // Emit "start" event with status + headers
-    let _ = app.emit(STREAM_EVENT, ApiProxyStreamChunk {
-        request_id: request_id.to_string(),
-        chunk: String::new(),
-        event_type: "start".to_string(),
-        status: Some(status),
-        status_text: Some(status_text),
-        headers: Some(headers),
-        error: None,
-    });
+    let _ = app.emit(
+        STREAM_EVENT,
+        ApiProxyStreamChunk {
+            request_id: request_id.to_string(),
+            chunk: String::new(),
+            event_type: "start".to_string(),
+            status: Some(status),
+            status_text: Some(status_text),
+            headers: Some(headers),
+            error: None,
+        },
+    );
 
     // Read stream via bytes_stream() - works for SSE and any continuous stream
     use futures_util::StreamExt;
@@ -205,36 +236,51 @@ async fn do_stream(
             Ok(bytes) => {
                 if !bytes.is_empty() {
                     let text = String::from_utf8_lossy(&bytes).to_string();
-                    let _ = app.emit(STREAM_EVENT, ApiProxyStreamChunk {
-                        request_id: request_id.to_string(),
-                        chunk: text,
-                        event_type: "data".to_string(),
-                        status: None, status_text: None, headers: None,
-                        error: None,
-                    });
+                    let _ = app.emit(
+                        STREAM_EVENT,
+                        ApiProxyStreamChunk {
+                            request_id: request_id.to_string(),
+                            chunk: text,
+                            event_type: "data".to_string(),
+                            status: None,
+                            status_text: None,
+                            headers: None,
+                            error: None,
+                        },
+                    );
                 }
             }
             Err(e) => {
-                let _ = app.emit(STREAM_EVENT, ApiProxyStreamChunk {
-                    request_id: request_id.to_string(),
-                    chunk: String::new(),
-                    event_type: "error".to_string(),
-                    status: None, status_text: None, headers: None,
-                    error: Some(format!("Stream error: {}", e)),
-                });
+                let _ = app.emit(
+                    STREAM_EVENT,
+                    ApiProxyStreamChunk {
+                        request_id: request_id.to_string(),
+                        chunk: String::new(),
+                        event_type: "error".to_string(),
+                        status: None,
+                        status_text: None,
+                        headers: None,
+                        error: Some(format!("Stream error: {}", e)),
+                    },
+                );
                 return Ok(());
             }
         }
     }
 
     // Emit "done"
-    let _ = app.emit(STREAM_EVENT, ApiProxyStreamChunk {
-        request_id: request_id.to_string(),
-        chunk: String::new(),
-        event_type: "done".to_string(),
-        status: None, status_text: None, headers: None,
-        error: None,
-    });
+    let _ = app.emit(
+        STREAM_EVENT,
+        ApiProxyStreamChunk {
+            request_id: request_id.to_string(),
+            chunk: String::new(),
+            event_type: "done".to_string(),
+            status: None,
+            status_text: None,
+            headers: None,
+            error: None,
+        },
+    );
 
     Ok(())
 }

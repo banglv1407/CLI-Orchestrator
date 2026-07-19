@@ -1,10 +1,13 @@
-pub mod system_log;
-pub mod proxy_server;
-pub mod stream_assembler;
 pub mod cli_registry;
 pub mod events;
 pub mod execution_engine;
 pub mod icon_extractor;
+pub mod monitoring;
 pub mod project_store;
+pub mod proxy_server;
+pub mod proxy_usage_db;
 pub mod quickapp_registry;
 pub mod ssh_server;
+pub mod stream_assembler;
+pub mod system_log;
+pub mod web_ai_config;

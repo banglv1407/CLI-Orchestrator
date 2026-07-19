@@ -131,6 +131,7 @@ export interface SshConnection {
   workingDir?: string;
 }
 export interface ProxyBackend {
+  id?: string;
   name: string;
   url: string;
   apiKey: string;
@@ -139,6 +140,17 @@ export interface ProxyBackend {
   maxRetries: number;
   headers: Record<string, string>;
   customUserAgent?: string;
+}
+
+export interface ProxyBackendUsage {
+  backendId: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  reportedRequests: number;
+  unreportedRequests: number;
+  resetAt: string;
+  updatedAt: string;
 }
 
 export interface ProxyConfig {
@@ -199,6 +211,27 @@ export interface BuiltinLlmStatus {
   loaded: boolean;
   modelPath: string | null;
   enabled: boolean;
+}
+
+export interface WebAiProfile {
+  id: string;
+  name: string;
+  userAgent?: string;
+  partition: string;
+  defaultUrl: string;
+  allowNavigationRules: string[];
+}
+
+export interface WebAiConfig {
+  profiles: WebAiProfile[];
+  preferredProfileId?: string;
+}
+
+export interface WebAiRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 

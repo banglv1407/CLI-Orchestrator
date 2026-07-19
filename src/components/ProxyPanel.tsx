@@ -1,11 +1,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import {
   proxyStatus, proxyStart, proxyStop,
   proxyGetConfig, proxySaveConfig,
   proxyAddBackend, proxyRemoveBackend,
-  proxyGetLogs,
+  proxyGetLogs, proxyGetUsage, proxyResetUsage,
 } from '../lib/tauri';
-import type { ProxyBackend, ProxyConfig, ProxyLogEntry, ProxyStatus } from '../types';
+import type { ProxyBackend, ProxyConfig, ProxyLogEntry, ProxyStatus, ProxyBackendUsage } from '../types';
 
 const LOGS_PER_PAGE = 10;
 
@@ -50,6 +51,60 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
   const [nName, setNName] = useState(''); const [nUrl, setNUrl] = useState('');
   const [nKey, setNKey] = useState(''); const [nModel, setNModel] = useState('');
   const [nUa, setNUa] = useState('');
+  const [usageMap, setUsageMap] = useState<Record<string, ProxyBackendUsage>>({});
+  const [resetConfirmId, setResetConfirmId] = useState<string | null>(null);
+
+  const loadUsage = useCallback(async () => {
+    if (!config) return;
+    const map: Record<string, ProxyBackendUsage> = {};
+    for (const b of config.backends) {
+      if (b.id) {
+        try {
+          map[b.id] = await proxyGetUsage(b.id);
+        } catch {}
+      }
+    }
+    setUsageMap(map);
+  }, [config]);
+
+  useEffect(() => {
+    loadUsage();
+  }, [config, loadUsage]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<string>('proxy-usage-updated', async (event) => {
+      const id = event.payload;
+      try {
+        const usage = await proxyGetUsage(id);
+        setUsageMap(prev => ({ ...prev, [id]: usage }));
+      } catch {}
+    }).then(fn => {
+      unlisten = fn;
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  // Listen for deep-link sub-tab selection (from Dashboard logs click)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail === 'logs' || detail === 'config') setSubTab(detail);
+    };
+    window.addEventListener('proxy-select-subtab', handler);
+    return () => window.removeEventListener('proxy-select-subtab', handler);
+  }, []);
+
+  const handleResetUsage = useCallback(async (id: string) => {
+    try {
+      await proxyResetUsage(id);
+      setResetConfirmId(null);
+    } catch (e: any) {
+      setError(String(e));
+    }
+  }, []);
 
   const resetForm = () => { setNName('');setNUrl('');setNKey('');setNModel('');setNUa('');setShowAdd(false);setEditingIdx(null); };
   const loadBackend = (b: ProxyBackend, idx: number) => { setNName(b.name);setNUrl(b.url);setNKey(b.apiKey);setNModel(b.model);setNUa(b.customUserAgent||'');setShowAdd(false);setEditingIdx(idx); };
@@ -267,6 +322,33 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                         <div className="text-sm text-slate-200 font-semibold truncate">{b.name}</div>
                         <div className="text-xs text-slate-500 truncate">{b.model} @ {b.url}</div>
                         {b.customUserAgent && <div className="text-[10px] text-cyber-neon/60 truncate">UA: {b.customUserAgent}</div>}
+                        
+                        {/* Durable Usage Statistics */}
+                        {b.id && usageMap[b.id] && (
+                          <div className="mt-2 space-y-0.5 border-t border-cyber-line/20 pt-1.5 text-[10px] text-slate-400 font-mono">
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                              <span>Prompt: <span className="text-slate-200">{usageMap[b.id].promptTokens.toLocaleString()}</span></span>
+                              <span>Completion: <span className="text-slate-200">{usageMap[b.id].completionTokens.toLocaleString()}</span></span>
+                              <span>Total: <span className="text-cyber-electric font-bold">{usageMap[b.id].totalTokens.toLocaleString()}</span></span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-500">
+                              <span>Requests: <span className="text-slate-300">{usageMap[b.id].reportedRequests}</span></span>
+                              {usageMap[b.id].unreportedRequests > 0 && (
+                                <span className="text-amber-400 font-semibold" title="Success requests without reported usage">
+                                  Unreported: {usageMap[b.id].unreportedRequests}*
+                                </span>
+                              )}
+                              {usageMap[b.id].resetAt && (
+                                <span>Reset: {new Date(usageMap[b.id].resetAt).toLocaleDateString()} {new Date(usageMap[b.id].resetAt).toLocaleTimeString()}</span>
+                              )}
+                            </div>
+                            {usageMap[b.id].unreportedRequests > 0 && (
+                              <div className="text-[9px] text-amber-500/80 italic mt-0.5">
+                                * Totals are incomplete: unreported requests found.
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={async ()=>{const n=[...config.backends];if(i>0){[n[i-1],n[i]]=[n[i],n[i-1]];try{setConfig(await proxySaveConfig({...config,backends:n}));}catch{}}}}
@@ -291,6 +373,11 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                           max={10}
                         />
                         <button onClick={()=>loadBackend(b,i)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyber-neon transition p-1" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.86 3.49a2.2 2.2 0 1 1 3.11 3.11L8 18.57l-4 1 1-4 11.86-12.08Z"/></svg></button>
+                        {b.id && (
+                          <button onClick={()=>setResetConfirmId(b.id!)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-amber-400 transition p-1" title="Reset Usage">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                          </button>
+                        )}
                         <button onClick={()=>rmBackend(b.name)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition p-1"><TrashIcon/></button>
                       </div>
                     </div>
@@ -339,6 +426,20 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
           <LogsTab logs={logs}/>
         )}
       </div>
+      
+      {/* Usage Reset Confirmation Modal */}
+      {resetConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border border-cyber-line/80 bg-cyber-panel p-6 shadow-2xl space-y-4">
+            <h3 className="font-display text-sm uppercase tracking-widest text-amber-400 font-bold">Confirm Reset Usage</h3>
+            <p className="text-xs text-slate-300">Are you sure you want to reset the accumulated token usage for this backend to zero? This action cannot be undone.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setResetConfirmId(null)} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">Cancel</button>
+              <button onClick={() => handleResetUsage(resetConfirmId)} className="px-3 py-1.5 text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded hover:bg-amber-500/30 uppercase tracking-wider">Reset Usage</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

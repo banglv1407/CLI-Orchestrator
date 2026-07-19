@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 pub const CLI_OUTPUT_EVENT: &str = "cli-output";

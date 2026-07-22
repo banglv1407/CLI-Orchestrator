@@ -94,6 +94,18 @@ pub async fn proxy_get_logs(state: State<'_, AppState>) -> Result<Vec<ProxyLogEn
 }
 
 #[tauri::command]
+pub async fn proxy_get_recent_logs(
+    state: State<'_, AppState>,
+    limit: Option<usize>,
+) -> Result<Vec<ProxyLogEntry>, String> {
+    Ok(state
+        .proxy_server
+        .state
+        .get_recent_logs(limit.unwrap_or(10).clamp(1, 25))
+        .await)
+}
+
+#[tauri::command]
 pub async fn proxy_get_usage(id: String) -> Result<ProxyBackendUsage, String> {
     proxy_usage_db::get_usage(&id)
 }

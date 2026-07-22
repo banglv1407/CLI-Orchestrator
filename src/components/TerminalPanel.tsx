@@ -15,6 +15,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
 import { DashboardPanel } from './DashboardPanel';
 import { WebAiPanel } from './WebAiPanel';
+import { useUiActive } from '../hooks/useUiActive';
 import { copyTerminalSelection, getTerminalSelectionText, type TerminalCopyMode } from '../lib/terminalClipboard';
 
 function FileIcon() {
@@ -93,8 +94,9 @@ interface TerminalHandle {
   term: Terminal;
   fit: FitAddon;
   search: SearchAddon;
-  miniTerm: Terminal;
+  miniTerm: Terminal | null;
   writeQueue: string[];
+  writeQueueBytes: number;
   isWriting: boolean;
   isAtBottom: boolean;
   cleanupScroll: () => void;
@@ -103,6 +105,9 @@ interface TerminalHandle {
 
 const INPUT_FLUSH_MS = 16;
 const MOUNT_DELAY_MS = 50;
+const MAX_TERMINAL_WRITE_QUEUE_BYTES = 2 * 1024 * 1024;
+const MAX_REPLAY_HISTORY_BYTES = 1024 * 1024;
+const MAX_REPLAY_HISTORY_CHUNKS = 1_000;
 const TERMINAL_FONT_FAMILY = 'Cascadia Mono, CaskaydiaCove Nerd Font, Fira Code, Consolas, "Segoe UI Symbol", monospace';
 const TUI_CLI_NAME_PATTERNS = ['codex', 'opencode', 'claude', 'gemini', 'aider'];
 const ALT_SCREEN_PATTERN = /\x1b\[\?(?:47|1047|1048|1049)h/;
@@ -151,6 +156,7 @@ export function TerminalPanel({
   contextMenu,
   setContextMenu,
 }: TerminalPanelProps) {
+  const uiActive = useUiActive();
   // Search state
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -261,6 +267,7 @@ export function TerminalPanel({
   const containerToSessionRef = useRef<WeakMap<Element, string>>(new WeakMap());
   // Accumulate ALL raw terminal output so we can replay it into mini terminals after DOM moves
   const mainOutputHistory = useRef<Record<string, string[]>>({});
+  const mainOutputHistoryBytes = useRef<Record<string, number>>({});
 
   // Context menu is now lifted to Dashboard — reuse its state
   // But keep local handleContextMenu for TerminalPanel internal wiring (disabled for now)
@@ -317,6 +324,7 @@ export function TerminalPanel({
       while (handle.writeQueue.length > 0) {
         const chunk = handle.writeQueue.shift();
         if (chunk) {
+          handle.writeQueueBytes = Math.max(0, handle.writeQueueBytes - chunk.length * 2);
           // Refresh the cache from xterm's authoritative state right before
           // the write. `term.onScroll` keeps this in sync, but a write may
           // race the listener (xterm mutates ydisp synchronously inside the
@@ -689,12 +697,12 @@ export function TerminalPanel({
   const createFreshMiniTerminal = useCallback((handle: TerminalHandle) => {
     // Dispose old miniTerm completely
     handle.cleanupMiniScroll();
-    try { handle.miniTerm.dispose(); } catch (_e) { /* ignore if already disposed */ }
+    try { handle.miniTerm?.dispose(); } catch (_e) { /* ignore if already disposed */ }
 
     const newMiniTerm = new Terminal({
       cursorBlink: false,
       convertEol: false,
-      scrollback: 2000,
+      scrollback: 500,
       fontFamily: TERMINAL_FONT_FAMILY,
       fontSize: 13,
       cols: handle.term.cols,
@@ -874,24 +882,11 @@ export function TerminalPanel({
       const term = new Terminal({
         cursorBlink: true,
         convertEol: false,
-        scrollback: 5000,
+        scrollback: 2000,
         fontFamily: TERMINAL_FONT_FAMILY,
         fontSize: 13,
         disableStdin: false,
         // Disable auto-scroll on user input so we respect manual scroll position
-        scrollOnUserInput: false,
-        theme: getTerminalTheme(),
-      });
-
-      const miniTerm = new Terminal({
-        cursorBlink: false,
-        convertEol: false,
-        scrollback: 2000,
-        fontFamily: TERMINAL_FONT_FAMILY,
-        fontSize: 13,
-        cols: term.cols,
-        rows: term.rows,
-        disableStdin: true,
         scrollOnUserInput: false,
         theme: getTerminalTheme(),
       });
@@ -1049,8 +1044,9 @@ export function TerminalPanel({
         term,
         fit,
         search,
-        miniTerm,
+        miniTerm: null,
         writeQueue: [],
+        writeQueueBytes: 0,
         isWriting: false,
         isAtBottom: true,
         cleanupScroll: () => {},
@@ -1061,6 +1057,7 @@ export function TerminalPanel({
       // Initialize output history for this session
       if (!mainOutputHistory.current[session.id]) {
         mainOutputHistory.current[session.id] = [];
+        mainOutputHistoryBytes.current[session.id] = 0;
       }
 
       term.onResize((dim) => {
@@ -1131,7 +1128,6 @@ export function TerminalPanel({
       if (pendingTerminalWrites.current[session.id]?.length) {
         for (const chunk of pendingTerminalWrites.current[session.id]) {
           term.write(chunk);
-          miniTerm.write(chunk);
         }
         delete pendingTerminalWrites.current[session.id];
       }
@@ -1247,9 +1243,25 @@ export function TerminalPanel({
   );
 
   useEffect(() => {
+    if (!rightPanelVisible) {
+      Object.values(terminalRefs.current).forEach((handle) => {
+        handle.cleanupMiniScroll();
+        try { handle.miniTerm?.dispose(); } catch (_e) {}
+        handle.miniTerm = null;
+      });
+      lastMiniMountNode.current = {};
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      sessions.forEach((session) => ensureMiniTerminal(session, miniContainerRefs.current[session.id]));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [rightPanelVisible, sessions, ensureMiniTerminal]);
+
+  useEffect(() => {
     sessions.forEach((session) => {
       ensureTerminal(session, containerRefs.current[session.id]);
-      ensureMiniTerminal(session, miniContainerRefs.current[session.id]);
+      if (rightPanelVisible) ensureMiniTerminal(session, miniContainerRefs.current[session.id]);
     });
 
     const existingIds = Object.keys(terminalRefs.current);
@@ -1259,8 +1271,9 @@ export function TerminalPanel({
         terminalRefs.current[sessionId].cleanupMiniScroll();
         try { terminalRefs.current[sessionId].search.dispose(); } catch (_e) {}
         terminalRefs.current[sessionId].term.dispose();
-        terminalRefs.current[sessionId].miniTerm.dispose();
+        terminalRefs.current[sessionId].miniTerm?.dispose();
         terminalRefs.current[sessionId].writeQueue = [];
+        terminalRefs.current[sessionId].writeQueueBytes = 0;
         terminalRefs.current[sessionId].isWriting = false;
         delete terminalRefs.current[sessionId];
         delete containerRefs.current[sessionId];
@@ -1269,6 +1282,7 @@ export function TerminalPanel({
         delete pendingTerminalWrites.current[sessionId];
         delete initializedRef.current[sessionId];
         delete mainOutputHistory.current[sessionId];
+        delete mainOutputHistoryBytes.current[sessionId];
         delete lastMiniMountNode.current[sessionId];
         if (inputTimers.current[sessionId]) {
           window.clearTimeout(inputTimers.current[sessionId]);
@@ -1276,7 +1290,7 @@ export function TerminalPanel({
         }
       }
     });
-  }, [ensureTerminal, ensureMiniTerminal, sessions]);
+  }, [ensureTerminal, ensureMiniTerminal, rightPanelVisible, sessions]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -1292,11 +1306,17 @@ export function TerminalPanel({
         // Accumulate output history for replay after drag
         if (!mainOutputHistory.current[payload.sessionId]) {
           mainOutputHistory.current[payload.sessionId] = [];
+          mainOutputHistoryBytes.current[payload.sessionId] = 0;
         }
-        mainOutputHistory.current[payload.sessionId].push(payload.chunk);
-        // Cap history to prevent memory issues (keep last 5000 chunks)
-        if (mainOutputHistory.current[payload.sessionId].length > 5000) {
-          mainOutputHistory.current[payload.sessionId] = mainOutputHistory.current[payload.sessionId].slice(-3000);
+        const replayHistory = mainOutputHistory.current[payload.sessionId];
+        replayHistory.push(payload.chunk);
+        mainOutputHistoryBytes.current[payload.sessionId] += payload.chunk.length * 2;
+        while (
+          replayHistory.length > MAX_REPLAY_HISTORY_CHUNKS
+          || mainOutputHistoryBytes.current[payload.sessionId] > MAX_REPLAY_HISTORY_BYTES
+        ) {
+          const removed = replayHistory.shift();
+          if (removed) mainOutputHistoryBytes.current[payload.sessionId] -= removed.length * 2;
         }
         const handle = terminalRefs.current[payload.sessionId];
         if (!handle) {
@@ -1304,9 +1324,22 @@ export function TerminalPanel({
             pendingTerminalWrites.current[payload.sessionId] = [];
           }
           pendingTerminalWrites.current[payload.sessionId].push(payload.chunk);
+          let pendingBytes = pendingTerminalWrites.current[payload.sessionId]
+            .reduce((total, chunk) => total + chunk.length * 2, 0);
+          while (pendingBytes > MAX_TERMINAL_WRITE_QUEUE_BYTES) {
+            const removed = pendingTerminalWrites.current[payload.sessionId].shift();
+            if (!removed) break;
+            pendingBytes -= removed.length * 2;
+          }
           return;
         }
         handle.writeQueue.push(payload.chunk);
+        handle.writeQueueBytes += payload.chunk.length * 2;
+        while (handle.writeQueueBytes > MAX_TERMINAL_WRITE_QUEUE_BYTES) {
+          const removed = handle.writeQueue.shift();
+          if (!removed) break;
+          handle.writeQueueBytes -= removed.length * 2;
+        }
         void processWriteQueue(payload.sessionId);
       });
 
@@ -1448,14 +1481,17 @@ export function TerminalPanel({
         item.cleanupMiniScroll();
         try { item.search.dispose(); } catch (_e) {}
         item.term.dispose();
-        item.miniTerm.dispose();
+        item.miniTerm?.dispose();
         item.writeQueue = [];
+        item.writeQueueBytes = 0;
         item.isWriting = false;
       });
       terminalRefs.current = {};
       inputBuffers.current = {};
       inputTimers.current = {};
       pendingTerminalWrites.current = {};
+      mainOutputHistory.current = {};
+      mainOutputHistoryBytes.current = {};
       containerRefs.current = {};
       miniContainerRefs.current = {};
       initializedRef.current = {};
@@ -1789,14 +1825,17 @@ export function TerminalPanel({
                 {activeMainView === 'quickapps' && <QuickAppsPanel />}
                 {activeMainView === 'apiclient' && <ApiClientPanel />}
                 {activeMainView === 'settings' && <SettingsPanel theme={theme!} setTheme={setTheme!} />}
-                {/* Dashboard: always mounted to preserve state (keep-alive) */}
-                <div style={{ position: 'absolute', inset: 0, visibility: activeMainView === 'dashboard' ? 'visible' : 'hidden', zIndex: activeMainView === 'dashboard' ? 5 : 0 }}>
-                  <DashboardPanel />
-                </div>
-                {/* Web AI: always mounted to preserve session state */}
-                <div style={{ position: 'absolute', inset: 0, visibility: activeMainView === 'web-ai' ? 'visible' : 'hidden', zIndex: activeMainView === 'web-ai' ? 5 : 0 }}>
-                  <WebAiPanel visible={activeMainView === 'web-ai'} />
-                </div>
+                {/* Heavy UI surfaces own work only while selected and visible. */}
+                {uiActive && activeMainView === 'dashboard' && (
+                  <div className="absolute inset-0 z-[5]">
+                    <DashboardPanel />
+                  </div>
+                )}
+                {uiActive && activeMainView === 'web-ai' && (
+                  <div className="absolute inset-0 z-[5]">
+                    <WebAiPanel visible />
+                  </div>
+                )}
 
                 {/* File viewer overlay — rendered on top of terminals when a file is open */}
                 {openedFile && (
@@ -2057,7 +2096,7 @@ export function TerminalPanel({
                                   miniContainerRefs.current[session.id] = node;
                                   if (node) {
                                     containerToSessionRef.current.set(node, session.id);
-                                    ensureMiniTerminal(session, node);
+                                    if (rightPanelVisible) ensureMiniTerminal(session, node);
                                   }
                                 }}
                                 className="h-full w-full"
@@ -2224,7 +2263,7 @@ export function TerminalPanel({
                                 miniContainerRefs.current[session.id] = node;
                                 if (node) {
                                   containerToSessionRef.current.set(node, session.id);
-                                  ensureMiniTerminal(session, node);
+                                  if (rightPanelVisible) ensureMiniTerminal(session, node);
                                 }
                               }}
                               className="h-full w-full"
@@ -2372,4 +2411,3 @@ export function TerminalPanel({
     </section>
   );
 }
-

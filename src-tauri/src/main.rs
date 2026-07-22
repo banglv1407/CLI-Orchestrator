@@ -3,11 +3,18 @@
 mod app_state;
 mod builtin_llm;
 mod commands;
+mod companion;
 mod core;
 mod runners;
 mod terminal;
 
 use app_state::AppState;
+use companion::commands::{
+    companion_cancel, companion_clear_history, companion_get_catalog, companion_get_config,
+    companion_get_help, companion_get_history, companion_get_safe_context, companion_help_search,
+    companion_import_legacy, companion_save_config, companion_send,
+    companion_set_actions_enabled,
+};
 use commands::{
     api_proxy::{api_proxy_abort, api_proxy_request, api_proxy_stream},
     builtin_llm_commands::{
@@ -28,15 +35,16 @@ use commands::{
         write_ssh_file_content,
     },
     dashboard_commands::{
-        dashboard_delete_monitor, dashboard_discover_log_sources, dashboard_get_process_logs,
-        dashboard_get_resource_usage, dashboard_kill_port, dashboard_kill_processes,
-        dashboard_list_monitors, dashboard_probe_monitors,
-        dashboard_probe_port, dashboard_probe_ports, dashboard_start_log_stream,
-        dashboard_stop_log_stream, dashboard_test_monitor, dashboard_upsert_monitor,
+        dashboard_delete_monitor, dashboard_discover_log_sources, dashboard_get_all_connections,
+        dashboard_get_process_logs, dashboard_get_resource_usage, dashboard_get_target_connections,
+        dashboard_kill_port, dashboard_kill_processes, dashboard_list_monitors,
+        dashboard_probe_monitors, dashboard_probe_port, dashboard_probe_ports,
+        dashboard_start_log_stream, dashboard_stop_log_stream, dashboard_test_monitor,
+        dashboard_upsert_monitor,
     },
     notepad_commands::{get_notepad, save_notepad},
     proxy_commands::{
-        proxy_add_backend, proxy_get_config, proxy_get_logs, proxy_get_usage, proxy_remove_backend,
+        proxy_add_backend, proxy_get_config, proxy_get_logs, proxy_get_recent_logs, proxy_get_usage, proxy_remove_backend,
         proxy_reset_usage, proxy_save_config, proxy_start, proxy_status, proxy_stop,
     },
     quickapps_commands::{
@@ -48,7 +56,31 @@ use commands::{
         web_ai_save_profiles, web_ai_set_visible, web_ai_spawn_profile,
     },
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+
+fn close_web_ai(app: &tauri::AppHandle) {
+    use std::sync::atomic::Ordering;
+    let state = app.state::<AppState>();
+    state.web_ai_generation.fetch_add(1, Ordering::SeqCst);
+    let operation = &state.web_ai_operation;
+    tauri::async_runtime::block_on(async {
+        let _guard = operation.lock().await;
+        if let Some(webview) = app.get_webview("web-ai-viewer") {
+            let _ = webview.close();
+        }
+    });
+}
+
+fn cleanup_for_exit(app: &tauri::AppHandle) {
+    close_web_ai(app);
+    let state = app.state::<AppState>();
+    let companion = state.companion.clone();
+    let monitoring = state.monitoring.clone();
+    tauri::async_runtime::block_on(async move {
+        let _ = companion.cancel("").await;
+        monitoring.stop_all_streams().await;
+    });
+}
 
 fn main() {
     let state = match AppState::new() {
@@ -64,6 +96,18 @@ fn main() {
         .manage(state.api_proxy.clone())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
+            companion_get_catalog,
+            companion_help_search,
+            companion_get_help,
+            companion_get_safe_context,
+            companion_send,
+            companion_cancel,
+            companion_get_config,
+            companion_save_config,
+            companion_get_history,
+            companion_clear_history,
+            companion_set_actions_enabled,
+            companion_import_legacy,
             list_clis,
             upsert_cli,
             delete_cli,
@@ -121,6 +165,7 @@ fn main() {
             proxy_add_backend,
             proxy_remove_backend,
             proxy_get_logs,
+            proxy_get_recent_logs,
             proxy_get_usage,
             proxy_reset_usage,
             get_system_logs,
@@ -155,8 +200,28 @@ fn main() {
             dashboard_start_log_stream,
             dashboard_stop_log_stream,
             dashboard_kill_processes,
+            dashboard_get_target_connections,
+            dashboard_get_all_connections,
         ])
         .setup(|app| {
+            // Initialize companion with app handle for event emission
+            if let Some(state) = app.try_state::<AppState>() {
+                state.companion.set_app_handle(app.handle().clone());
+                // Inject service refs
+                let mut ps = state.companion.proxy_server.blocking_write();
+                *ps = Some(state.proxy_server.clone());
+                drop(ps);
+                let mut cr = state.companion.cli_registry.blocking_write();
+                *cr = Some(state.registry.clone());
+                drop(cr);
+                let mut sm = state.companion.session_manager.blocking_write();
+                *sm = Some(state.session_manager.clone());
+                drop(sm);
+                let mut qa = state.companion.quickapps.blocking_write();
+                *qa = Some(state.quickapps.clone());
+                drop(qa);
+            }
+
             if let Some(window) = app.get_webview_window("main") {
                 if let Ok(Some(monitor)) = window.primary_monitor() {
                     let size = monitor.size();
@@ -186,14 +251,20 @@ fn main() {
                             let _ = window.show();
                             let _ = window.unminimize();
                             let _ = window.set_focus();
+                            let _ = window.emit("app-window-visibility", true);
                         }
                     }
                     "hide" => {
                         if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("app-window-visibility", false);
+                            close_web_ai(app);
                             let _ = window.hide();
                         }
                     }
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        cleanup_for_exit(app);
+                        app.exit(0);
+                    }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -205,11 +276,14 @@ fn main() {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             if window.is_visible().unwrap_or(false) {
+                                let _ = window.emit("app-window-visibility", false);
+                                close_web_ai(app);
                                 let _ = window.hide();
                             } else {
                                 let _ = window.show();
                                 let _ = window.unminimize();
                                 let _ = window.set_focus();
+                                let _ = window.emit("app-window-visibility", true);
                             }
                         }
                     }
@@ -232,7 +306,14 @@ fn main() {
                     .kind(tauri_plugin_dialog::MessageDialogKind::Info)
                     .buttons(tauri_plugin_dialog::MessageDialogButtons::YesNo)
                     .show(move |result| {
-                        if result { let _ = w.hide(); } else { w.app_handle().exit(0); }
+                        if result {
+                            let _ = w.emit("app-window-visibility", false);
+                            close_web_ai(w.app_handle());
+                            let _ = w.hide();
+                        } else {
+                            cleanup_for_exit(w.app_handle());
+                            w.app_handle().exit(0);
+                        }
                     });
             }
         })

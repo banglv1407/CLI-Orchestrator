@@ -1,8 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
+  CatalogResponse,
   CliDefinition,
+  CompanionConfigUpdate,
+  CompanionConfigView,
+  CompanionMessage,
   CreateSessionRequest,
+  FeatureEntry,
+  HelpDetail,
   ProjectTag,
+  SafeAppContext,
   SessionInfo,
   StopCliRequest,
   UpsertCliRequest,
@@ -287,6 +294,10 @@ export function proxyGetLogs(): Promise<ProxyLogEntry[]> {
   return invoke('proxy_get_logs');
 }
 
+export function proxyGetRecentLogs(limit = 10): Promise<ProxyLogEntry[]> {
+  return invoke('proxy_get_recent_logs', { limit });
+}
+
 export function proxyGetUsage(id: string): Promise<ProxyBackendUsage> {
   return invoke('proxy_get_usage', { id });
 }
@@ -342,6 +353,14 @@ export interface ResourceUsage {
   memoryMb: number;
   memoryPercent: number;
   childCount: number;
+  treeMemoryBytes: number;
+  treeMemoryMb: number;
+  treePrivateBytes: number;
+  uiMemoryBytes: number;
+  uiMemoryMb: number;
+  uiPrivateBytes: number;
+  processCount: number;
+  webviewCount: number;
 }
 
 export interface ProcessDetail {
@@ -477,11 +496,15 @@ export interface MonitorLogSourceCandidate {
 }
 
 export interface MonitorLogChunkEvent {
-  streamId: string;
-  monitorId: string;
   sequence: number;
   stream: 'stdout' | 'stderr' | 'system';
   text: string;
+}
+
+export interface MonitorLogBatchEvent {
+  streamId: string;
+  monitorId: string;
+  lines: MonitorLogChunkEvent[];
 }
 
 export interface MonitorLogStateEvent {
@@ -497,6 +520,27 @@ export interface MonitorKillResult {
   stopped: number[];
   stillListening: number[];
   forceAvailable: boolean;
+}
+
+// ── Target Connection Monitor ───────────────────────────────────────
+
+export interface TcpConnection {
+  protocol: string;
+  localAddr: string;
+  localPort: number;
+  remoteAddr: string;
+  remotePort: number;
+  state: string;
+  pid?: number | null;
+  processName?: string | null;
+}
+
+export function dashboardGetTargetConnections(target: string): Promise<TcpConnection[]> {
+  return invoke('dashboard_get_target_connections', { target });
+}
+
+export function dashboardGetAllConnections(): Promise<TcpConnection[]> {
+  return invoke('dashboard_get_all_connections');
 }
 
 export function dashboardListMonitors(): Promise<MonitorConfig[]> {
@@ -542,4 +586,54 @@ export function dashboardKillProcesses(
   sudoPassword?: string,
 ): Promise<MonitorKillResult> {
   return invoke('dashboard_kill_processes', { request: { monitorId, processes, mode, sudoPassword } });
+}
+
+// ── Companion ───────────────────────────────────────────────────
+
+export function companionGetCatalog(): Promise<CatalogResponse> {
+  return invoke('companion_get_catalog');
+}
+
+export function companionHelpSearch(query: string): Promise<FeatureEntry[]> {
+  return invoke('companion_help_search', { query });
+}
+
+export function companionGetHelp(featureId: string): Promise<HelpDetail> {
+  return invoke('companion_get_help', { featureId });
+}
+
+export function companionGetSafeContext(): Promise<SafeAppContext> {
+  return invoke('companion_get_safe_context');
+}
+
+export function companionSend(message: string): Promise<{ runId: string }> {
+  return invoke('companion_send', { message });
+}
+
+export function companionCancel(runId: string): Promise<void> {
+  return invoke('companion_cancel', { runId });
+}
+
+export function companionGetConfig(): Promise<CompanionConfigView> {
+  return invoke('companion_get_config');
+}
+
+export function companionSaveConfig(update: CompanionConfigUpdate): Promise<CompanionConfigView> {
+  return invoke('companion_save_config', { update });
+}
+
+export function companionGetHistory(): Promise<any[]> {
+  return invoke('companion_get_history');
+}
+
+export function companionClearHistory(): Promise<void> {
+  return invoke('companion_clear_history');
+}
+
+export function companionSetActionsEnabled(enabled: boolean): Promise<void> {
+  return invoke('companion_set_actions_enabled', { enabled });
+}
+
+export function companionImportLegacy(legacy: any): Promise<{ configImported: boolean; historyImported: number; errors: string[] }> {
+  return invoke('companion_import_legacy', { legacy });
 }

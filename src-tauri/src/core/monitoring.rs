@@ -362,6 +362,13 @@ impl MonitorManager {
         }
     }
 
+    pub async fn stop_all_streams(&self) {
+        let mut streams = self.streams.lock().await;
+        for (_, token) in streams.drain() {
+            token.cancel();
+        }
+    }
+
     async fn stop_streams_for_monitor(&self, monitor_id: &str) {
         let prefix = format!("{monitor_id}:");
         let mut streams = self.streams.lock().await;

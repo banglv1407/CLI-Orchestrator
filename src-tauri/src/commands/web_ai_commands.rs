@@ -1,6 +1,7 @@
-use crate::core::web_ai_config::{is_url_allowed, WebAiConfig, WebAiProfile};
+use crate::{app_state::AppState, core::web_ai_config::{is_url_allowed, WebAiConfig, WebAiProfile}};
+use std::sync::atomic::Ordering;
 use tauri::webview::WebviewBuilder;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, State, WebviewUrl};
 
 #[derive(serde::Deserialize)]
 pub struct WebAiRect {
@@ -23,12 +24,18 @@ pub async fn web_ai_save_profiles(config: WebAiConfig) -> Result<(), String> {
 #[tauri::command]
 pub async fn web_ai_spawn_profile(
     app: AppHandle,
+    state: State<'_, AppState>,
     profile: WebAiProfile,
     rect: WebAiRect,
 ) -> Result<(), String> {
+    let generation = state.web_ai_generation.fetch_add(1, Ordering::SeqCst) + 1;
+    let _operation = state.web_ai_operation.lock().await;
     if let Some(existing) = app.get_webview("web-ai-viewer") {
         let _ = existing.close();
         tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+    }
+    if state.web_ai_generation.load(Ordering::SeqCst) != generation {
+        return Ok(());
     }
 
     let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
@@ -92,7 +99,9 @@ pub async fn web_ai_set_visible(app: AppHandle, visible: bool) -> Result<(), Str
 }
 
 #[tauri::command]
-pub async fn web_ai_close(app: AppHandle) -> Result<(), String> {
+pub async fn web_ai_close(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    state.web_ai_generation.fetch_add(1, Ordering::SeqCst);
+    let _operation = state.web_ai_operation.lock().await;
     if let Some(webview) = app.get_webview("web-ai-viewer") {
         let _ = webview.close();
     }

@@ -155,6 +155,12 @@ impl ProxyState {
     pub async fn get_logs(&self) -> Vec<ProxyLogEntry> {
         self.logs.lock().await.clone()
     }
+
+    pub async fn get_recent_logs(&self, limit: usize) -> Vec<ProxyLogEntry> {
+        let logs = self.logs.lock().await;
+        let start = logs.len().saturating_sub(limit);
+        logs[start..].to_vec()
+    }
 }
 
 async fn rotate_failed_backend(state: &Arc<ProxyState>, backend_name: &str) {

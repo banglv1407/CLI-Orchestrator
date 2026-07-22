@@ -1,7 +1,9 @@
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 
 use crate::{
     commands::api_proxy::{ApiProxyState, SharedApiProxyState},
+    companion::manager::CompanionManager,
     core::{
         cli_registry::CliRegistry,
         monitoring::MonitorManager,
@@ -24,6 +26,9 @@ pub struct AppState {
     pub monitoring: Arc<MonitorManager>,
     pub ssh_server_manager: Arc<std::sync::Mutex<crate::core::ssh_server::SshServerManager>>,
     pub builtin_llm: Arc<tokio::sync::Mutex<crate::builtin_llm::engine::BuiltinLlmEngine>>,
+    pub companion: Arc<CompanionManager>,
+    pub web_ai_generation: AtomicU64,
+    pub web_ai_operation: tokio::sync::Mutex<()>,
 }
 
 impl AppState {
@@ -58,19 +63,27 @@ impl AppState {
         }
         let builtin_llm = Arc::new(tokio::sync::Mutex::new(builtin_llm_engine));
 
+        let session_manager = Arc::new(SessionManager::new());
+
+        let companion_db_path = registry.data_dirs().root_dir.join("companion.db");
+        let companion = Arc::new(CompanionManager::new(&companion_db_path)?);
+
         Ok(Self {
-            registry,
+            registry: registry.clone(),
             project_store,
-            session_manager: Arc::new(SessionManager::new()),
-            quickapps,
+            session_manager: session_manager.clone(),
+            quickapps: quickapps.clone(),
             api_proxy: Arc::new(ApiProxyState::new()),
-            proxy_server,
+            proxy_server: proxy_server.clone(),
             logger,
             monitoring,
             ssh_server_manager: Arc::new(std::sync::Mutex::new(
                 crate::core::ssh_server::SshServerManager::new(),
             )),
             builtin_llm,
+            companion,
+            web_ai_generation: AtomicU64::new(0),
+            web_ai_operation: tokio::sync::Mutex::new(()),
         })
     }
 }

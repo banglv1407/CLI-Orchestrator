@@ -21,19 +21,16 @@ type SettingsSection =
   | 'navigation'
   | 'proxy'
   | 'remote'
-  | 'logs'
-  | 'agents';
+  | 'logs';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string; desc: string }[] = [
   { id: 'appearance', label: 'Appearance', icon: '🎨', desc: 'Theme and visuals configuration' },
   { id: 'mythical-pet', label: 'Mythical Pet', icon: '🐉', desc: 'Interact with your desktop companions' },
   { id: 'ai-companion', label: 'AI Companion', icon: '🤖', desc: 'Configure cloud LLM endpoints and settings' },
   { id: 'local-llm', label: 'Local LLM', icon: '🧠', desc: 'Manage offline inference fallbacks' },
-  { id: 'local-llm', label: 'Built-in LLM', icon: '🧠', desc: 'Local AI model management' },
   { id: 'proxy', label: 'CliProxyAI', icon: '🔀', desc: 'Durable API proxy usage and endpoints' },
   { id: 'remote', label: 'SSH Connections', icon: '🖥️', desc: 'Manage remote terminal connections' },
   { id: 'logs', label: 'System Logs', icon: '📋', desc: 'View orchestration command and server logs' },
-  { id: 'agents', label: 'Agents', icon: '🤖', desc: 'Manage agent binaries and per-agent config.yaml' },
   { id: 'navigation', label: 'Navigation', icon: '↕️', desc: 'Customize sidebar item layout ordering' },
 ];
 

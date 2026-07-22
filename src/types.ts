@@ -234,4 +234,133 @@ export interface WebAiRect {
   h: number;
 }
 
+// ── Companion types ──────────────────────────────────────────────
 
+export interface FeatureEntry {
+  featureId: string;
+  title: string;
+  aliases: string[];
+  summary: string;
+  help: string;
+  availability: string;
+  viewId?: string;
+  settingsSection?: string;
+  backendCommands: string[];
+  toolExposure: 'knowledge-only' | 'read-tool' | 'action-tool' | 'unavailable';
+  limitations: string[];
+}
+
+export interface CatalogResponse {
+  features: FeatureEntry[];
+  compactIndex: string;
+}
+
+export interface HelpDetail {
+  featureId: string;
+  title: string;
+  help: string;
+  summary: string;
+  howToOpen: string;
+  availability: string;
+  limitations: string[];
+  toolExposure: string;
+  backendCommands: string[];
+}
+
+export interface SafeAppContext {
+  activeView: string | null;
+  selectedCli: string | null;
+  workspacePath: string | null;
+  projectTag: string | null;
+  activeSessions: number;
+  cliProfiles: string[];
+  proxyBackendNames: string[];
+  proxyRunning: boolean;
+  proxyPort: number | null;
+  sshProfiles: string[];
+  quickApps: string[];
+  builtinLlmLoaded: boolean;
+  actionsEnabled: boolean;
+}
+
+// ── Future Companion types (US-021+) ─────────────────────────────
+
+export interface CompanionConfigView {
+  baseUrl: string;
+  model: string;
+  apiKeyPresent: boolean;
+  streamEnabled: boolean;
+  customPrompt: string;
+  customHeaders: { name: string; masked: boolean }[];
+  actionsEnabled: boolean;
+}
+
+export interface CompanionConfigUpdate {
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+  streamEnabled?: boolean;
+  customPrompt?: string;
+  customHeaders?: Record<string, string>;
+  clearApiKey?: boolean;
+  clearCustomHeaders?: string[];
+  actionsEnabled?: boolean;
+}
+
+export type CompanionRunEventType =
+  | 'assistant_delta'
+  | 'tool_started'
+  | 'approval_required'
+  | 'tool_result'
+  | 'ui_effect'
+  | 'warning'
+  | 'error'
+  | 'done';
+
+export interface CompanionRunEvent {
+  runId: string;
+  seq: number;
+  type: CompanionRunEventType;
+  actionId?: string;
+  payload: unknown;
+}
+
+export interface CompanionMessage {
+  id: string;
+  runId: string;
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  status: 'pending' | 'streaming' | 'complete' | 'error';
+  timestamp: string;
+  toolCalls?: CompanionToolCall[];
+}
+
+export interface CompanionToolCall {
+  actionId: string;
+  toolId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  risk: ToolRisk;
+  approvalState: 'pending' | 'approved' | 'denied' | 'not_required';
+  result?: string;
+  verified?: boolean;
+}
+
+export type ToolRisk = 'none' | 'read' | 'config_write' | 'delete' | 'stop';
+
+export interface PendingAction {
+  actionId: string;
+  runId: string;
+  toolName: string;
+  description: string;
+  target: string;
+  diff: Record<string, unknown>;
+  risk: ToolRisk;
+  reason: string;
+}
+
+export interface CompanionUiEffect {
+  type: 'open_view' | 'open_settings' | 'focus_session';
+  targetId: string;
+  label: string;
+}

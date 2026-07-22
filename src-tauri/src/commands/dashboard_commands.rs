@@ -1,6 +1,6 @@
 //! Dashboard commands — resource monitoring, port management, and process log discovery.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
@@ -10,6 +10,7 @@ use futures_util::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::sync::mpsc;
 use zeroize::Zeroize;
 
 use crate::app_state::AppState;
@@ -38,6 +39,14 @@ pub struct ResourceUsage {
     pub memory_mb: f64,
     pub memory_percent: f64,
     pub child_count: u32,
+    pub tree_memory_bytes: u64,
+    pub tree_memory_mb: f64,
+    pub tree_private_bytes: u64,
+    pub ui_memory_bytes: u64,
+    pub ui_memory_mb: f64,
+    pub ui_private_bytes: u64,
+    pub process_count: u32,
+    pub webview_count: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -107,6 +116,16 @@ fn get_process_memory() -> ResourceUsage {
         1
     };
 
+    let (
+        tree_memory_bytes,
+        tree_private_bytes,
+        ui_memory_bytes,
+        ui_private_bytes,
+        process_count,
+        webview_count,
+    ) = get_process_tree_stats(unsafe {
+        windows_sys::Win32::System::Threading::GetCurrentProcessId()
+    });
     ResourceUsage {
         memory_bytes: ws,
         memory_mb: ws as f64 / (1024.0 * 1024.0),
@@ -116,7 +135,138 @@ fn get_process_memory() -> ResourceUsage {
             0.0
         },
         child_count: count_child_processes(),
+        tree_memory_bytes,
+        tree_memory_mb: tree_memory_bytes as f64 / (1024.0 * 1024.0),
+        tree_private_bytes,
+        ui_memory_bytes,
+        ui_memory_mb: ui_memory_bytes as f64 / (1024.0 * 1024.0),
+        ui_private_bytes,
+        process_count,
+        webview_count,
     }
+}
+
+#[cfg(target_os = "windows")]
+fn get_process_tree_stats(root_pid: u32) -> (u64, u64, u64, u64, u32, u32) {
+    use std::mem;
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+    use windows_sys::Win32::System::ProcessStatus::{
+        GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX,
+    };
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_READ,
+    };
+
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot as isize == -1 {
+        return (0, 0, 0, 0, 0, 0);
+    }
+    let mut children: HashMap<u32, Vec<(u32, String)>> = HashMap::new();
+    let mut root_name = String::new();
+    let mut root_parent_pid = 0u32;
+    let mut webview_roots = Vec::new();
+    let mut entry: PROCESSENTRY32W = unsafe { mem::zeroed() };
+    entry.dwSize = mem::size_of::<PROCESSENTRY32W>() as u32;
+    if unsafe { Process32FirstW(snapshot, &mut entry) } != 0 {
+        loop {
+            let name_len = entry
+                .szExeFile
+                .iter()
+                .position(|value| *value == 0)
+                .unwrap_or(entry.szExeFile.len());
+            let name = String::from_utf16_lossy(&entry.szExeFile[..name_len]);
+            if entry.th32ProcessID == root_pid {
+                root_name = name.clone();
+                root_parent_pid = entry.th32ParentProcessID;
+            }
+            children
+                .entry(entry.th32ParentProcessID)
+                .or_default()
+                .push((entry.th32ProcessID, name));
+            if unsafe { Process32NextW(snapshot, &mut entry) } == 0 {
+                break;
+            }
+        }
+    }
+    unsafe { windows_sys::Win32::Foundation::CloseHandle(snapshot) };
+
+    if root_parent_pid != 0 {
+        if let Some(siblings) = children.get(&root_parent_pid) {
+            webview_roots.extend(
+                siblings
+                    .iter()
+                    .filter(|(_, name)| name.eq_ignore_ascii_case("msedgewebview2.exe"))
+                    .cloned(),
+            );
+        }
+    }
+    let mut queue = VecDeque::from([(root_pid, root_name, false)]);
+    queue.extend(
+        webview_roots
+            .into_iter()
+            .map(|(pid, name)| (pid, name, true)),
+    );
+    let mut visited = HashSet::new();
+    let mut working_set = 0u64;
+    let mut private_bytes = 0u64;
+    let mut ui_working_set = 0u64;
+    let mut ui_private_bytes = 0u64;
+    let mut process_count = 0u32;
+    let mut webview_count = 0u32;
+    while let Some((pid, name, webview_owned)) = queue.pop_front() {
+        if !visited.insert(pid) {
+            continue;
+        }
+        process_count += 1;
+        if name.eq_ignore_ascii_case("msedgewebview2.exe") {
+            webview_count += 1;
+        }
+        let handle = unsafe {
+            OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ,
+                0,
+                pid,
+            )
+        };
+        if handle != 0 {
+            let mut counters: PROCESS_MEMORY_COUNTERS_EX = unsafe { mem::zeroed() };
+            counters.cb = mem::size_of::<PROCESS_MEMORY_COUNTERS_EX>() as u32;
+            if unsafe {
+                GetProcessMemoryInfo(
+                    handle,
+                    &mut counters as *mut PROCESS_MEMORY_COUNTERS_EX
+                        as *mut PROCESS_MEMORY_COUNTERS,
+                    counters.cb,
+                )
+            } != 0
+            {
+                working_set = working_set.saturating_add(counters.WorkingSetSize as u64);
+                private_bytes = private_bytes.saturating_add(counters.PrivateUsage as u64);
+                if pid == root_pid || webview_owned {
+                    ui_working_set = ui_working_set.saturating_add(counters.WorkingSetSize as u64);
+                    ui_private_bytes = ui_private_bytes.saturating_add(counters.PrivateUsage as u64);
+                }
+            }
+            unsafe { windows_sys::Win32::Foundation::CloseHandle(handle) };
+        }
+        if let Some(next) = children.remove(&pid) {
+            queue.extend(
+                next.into_iter()
+                    .map(|(child_pid, child_name)| (child_pid, child_name, webview_owned)),
+            );
+        }
+    }
+    (
+        working_set,
+        private_bytes,
+        ui_working_set,
+        ui_private_bytes,
+        process_count,
+        webview_count,
+    )
 }
 
 #[cfg(target_os = "windows")]
@@ -171,6 +321,14 @@ fn get_process_memory() -> ResourceUsage {
         memory_mb: memory_bytes as f64 / (1024.0 * 1024.0),
         memory_percent: 0.0,
         child_count: 0,
+        tree_memory_bytes: memory_bytes,
+        tree_memory_mb: memory_bytes as f64 / (1024.0 * 1024.0),
+        tree_private_bytes: 0,
+        ui_memory_bytes: memory_bytes,
+        ui_memory_mb: memory_bytes as f64 / (1024.0 * 1024.0),
+        ui_private_bytes: 0,
+        process_count: 1,
+        webview_count: 0,
     }
 }
 
@@ -649,18 +807,24 @@ fn tail_file(path: &std::path::Path, max_lines: usize, max_bytes: usize) -> Opti
 // ── Tauri commands ──────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn dashboard_get_resource_usage() -> ResourceUsage {
-    get_process_memory()
+pub async fn dashboard_get_resource_usage() -> Result<ResourceUsage, String> {
+    tokio::task::spawn_blocking(get_process_memory)
+        .await
+        .map_err(|error| format!("resource sampler failed: {error}"))
 }
 
 #[tauri::command]
-pub fn dashboard_probe_ports(ports: Vec<u16>) -> Vec<PortInfo> {
-    probe_ports_batch(&ports)
+pub async fn dashboard_probe_ports(ports: Vec<u16>) -> Result<Vec<PortInfo>, String> {
+    tokio::task::spawn_blocking(move || probe_ports_batch(&ports))
+        .await
+        .map_err(|error| format!("port probe failed: {error}"))
 }
 
 #[tauri::command]
-pub fn dashboard_probe_port(port: u16) -> PortInfo {
-    probe_port(port)
+pub async fn dashboard_probe_port(port: u16) -> Result<PortInfo, String> {
+    tokio::task::spawn_blocking(move || probe_port(port))
+        .await
+        .map_err(|error| format!("port probe failed: {error}"))
 }
 
 #[tauri::command]
@@ -753,12 +917,18 @@ pub struct LogStreamStarted {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LogChunkEvent {
-    stream_id: String,
-    monitor_id: String,
+struct LogLineEvent {
     sequence: u64,
     stream: String,
     text: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LogBatchEvent {
+    stream_id: String,
+    monitor_id: String,
+    lines: Vec<LogLineEvent>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -864,12 +1034,97 @@ pub async fn dashboard_probe_monitors(
         .into_iter()
         .filter(|monitor| selected.is_empty() || selected.contains(&monitor.id))
         .collect();
+    let (local_windows, remaining): (Vec<_>, Vec<_>) = monitors.into_iter().partition(|monitor| {
+        monitor.target_type == "local"
+            && local_os() == "windows"
+            && (monitor.target_os == "auto" || monitor.target_os == "windows")
+    });
     let manager = state.monitoring.clone();
-    Ok(stream::iter(monitors)
+    let mut snapshots = if local_windows.is_empty() {
+        Vec::new()
+    } else {
+        probe_local_windows_monitors(local_windows).await
+    };
+    snapshots.extend(stream::iter(remaining)
         .map(|monitor| probe_monitor(manager.clone(), monitor))
         .buffer_unordered(4)
-        .collect()
-        .await)
+        .collect::<Vec<_>>()
+        .await);
+    Ok(snapshots)
+}
+
+async fn probe_local_windows_monitors(monitors: Vec<MonitorConfig>) -> Vec<MonitorSnapshot> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct WindowsBatchProbe {
+        port: u16,
+        listening: bool,
+        #[serde(default)]
+        listeners: Vec<ProcessIdentity>,
+    }
+
+    let ports = monitors
+        .iter()
+        .map(|monitor| monitor.service_port)
+        .collect::<Vec<_>>();
+    let result = run_local_capture(
+        "windows",
+        &windows_probe_batch_script(&ports),
+        None,
+    )
+    .await
+    .and_then(|output| {
+        if output.exit_status != Some(0) {
+            return Err(format!(
+                "Windows port batch probe failed: {}",
+                output.stderr.trim()
+            ));
+        }
+        serde_json::from_str::<Vec<WindowsBatchProbe>>(output.stdout.trim())
+            .map_err(|error| format!("Failed to parse Windows port batch probe: {error}"))
+    });
+    let checked_at = chrono::Utc::now().to_rfc3339();
+    match result {
+        Ok(probes) => {
+            let mut by_port = probes
+                .into_iter()
+                .map(|probe| (probe.port, probe))
+                .collect::<HashMap<_, _>>();
+            monitors
+                .into_iter()
+                .map(|monitor| {
+                    let probe = by_port.remove(&monitor.service_port);
+                    let listening = probe.as_ref().map(|value| value.listening).unwrap_or(false);
+                    let listeners = probe
+                        .map(|value| dedupe_listeners(value.listeners))
+                        .unwrap_or_default();
+                    MonitorSnapshot {
+                        monitor_id: monitor.id,
+                        service_port: monitor.service_port,
+                        status: if listening { "listening" } else { "notListening" }.to_string(),
+                        target_os: "windows".to_string(),
+                        unverified_ssh: false,
+                        listeners,
+                        error: None,
+                        last_checked_at: checked_at.clone(),
+                    }
+                })
+                .collect()
+        }
+        Err(error) => monitors
+            .into_iter()
+            .map(|monitor| MonitorSnapshot {
+                monitor_id: monitor.id,
+                service_port: monitor.service_port,
+                status: "unreachable".to_string(),
+                target_os: "windows".to_string(),
+                unverified_ssh: false,
+                listeners: Vec::new(),
+                error: Some(sanitize_monitor_error(&error)),
+                last_checked_at: checked_at.clone(),
+            })
+            .collect(),
+    }
 }
 
 async fn probe_monitor(manager: Arc<MonitorManager>, monitor: MonitorConfig) -> MonitorSnapshot {
@@ -1011,6 +1266,63 @@ $items=@(foreach($processId in $ids) {{
   }}
 }})
 [pscustomobject]@{{port=$portNumber;listening=($ids.Count -gt 0);listeners=@($items)}} | ConvertTo-Json -Depth 5 -Compress"#
+    )
+}
+
+fn windows_probe_batch_script(ports: &[u16]) -> String {
+    let port_list = ports
+        .iter()
+        .map(u16::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        r#"$ErrorActionPreference='SilentlyContinue'
+$ports=@({port_list})
+$owners=@{{}}
+foreach($portNumber in $ports) {{ $owners[$portNumber]=@() }}
+if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {{
+  Get-NetTCPConnection -State Listen | ForEach-Object {{
+    $portNumber=[int]$_.LocalPort
+    if ($ports -contains $portNumber) {{ $owners[$portNumber]=@($owners[$portNumber])+[int]$_.OwningProcess }}
+  }}
+}} else {{
+  netstat -ano -p tcp | ForEach-Object {{
+    $parts=($_.Trim() -split '\s+')
+    if ($parts.Count -ge 5 -and $parts[3] -eq 'LISTENING') {{
+      $endpoint=$parts[1]
+      foreach($portNumber in $ports) {{
+        if ($endpoint -match (':'+$portNumber+'$')) {{ $owners[$portNumber]=@($owners[$portNumber])+[int]$parts[4] }}
+      }}
+    }}
+  }}
+}}
+$allIds=@($owners.Values | ForEach-Object {{ $_ }} | Sort-Object -Unique)
+$metadata=@{{}}
+foreach($processId in $allIds) {{
+  $p=Get-Process -Id $processId
+  $c=Get-CimInstance Win32_Process -Filter ('ProcessId='+$processId)
+  $start=''
+  $uptime=0
+  if ($p -and $p.StartTime) {{ $start=$p.StartTime.ToUniversalTime().Ticks.ToString(); $uptime=[math]::Max(0,[int]((Get-Date)-$p.StartTime).TotalSeconds) }}
+  $metadata[$processId]=[pscustomobject]@{{
+    pid=[int]$processId
+    startToken=$start
+    processName=if($p){{$p.ProcessName}}else{{'unknown'}}
+    exePath=if($c){{$c.ExecutablePath}}else{{$null}}
+    commandLine=if($c){{$c.CommandLine}}else{{$null}}
+    workingDir=$null
+    memoryBytes=if($p){{[uint64]$p.WorkingSet64}}else{{0}}
+    memoryMb=if($p){{[double]$p.WorkingSet64/1MB}}else{{0}}
+    cpuTimeSeconds=if($p){{[double]$p.CPU}}else{{0}}
+    uptimeSeconds=[uint64]$uptime
+  }}
+}}
+$results=@(foreach($portNumber in $ports) {{
+  $ids=@($owners[$portNumber] | Sort-Object -Unique)
+  $items=@(foreach($processId in $ids) {{ $metadata[$processId] }})
+  [pscustomobject]@{{port=[int]$portNumber;listening=($ids.Count -gt 0);listeners=@($items)}}
+}})
+ConvertTo-Json -InputObject @($results) -Depth 5 -Compress"#
     )
 }
 
@@ -1633,6 +1945,14 @@ pub async fn dashboard_start_log_stream(
     let is_custom = request.source.kind == "custom";
 
     tauri::async_runtime::spawn(async move {
+        let cleanup_manager = manager.clone();
+        let (log_sender, log_receiver) = mpsc::unbounded_channel();
+        let emit_task = tauri::async_runtime::spawn(emit_log_batches(
+            app.clone(),
+            task_stream_id.clone(),
+            task_monitor_id.clone(),
+            log_receiver,
+        ));
         let _ = emit_log_state(
             &app,
             &task_stream_id,
@@ -1650,6 +1970,7 @@ pub async fn dashboard_start_log_stream(
                 command,
                 stdin.take(),
                 token,
+                log_sender.clone(),
             )
             .await;
         } else {
@@ -1664,9 +1985,13 @@ pub async fn dashboard_start_log_stream(
                 stdin.take(),
                 is_custom,
                 token,
+                log_sender.clone(),
             )
             .await;
         }
+        drop(log_sender);
+        let _ = emit_task.await;
+        cleanup_manager.stop_stream(&task_stream_id).await;
     });
 
     Ok(LogStreamStarted {
@@ -1705,6 +2030,7 @@ async fn stream_local_logs(
     command: String,
     stdin: Option<Vec<u8>>,
     token: tokio_util::sync::CancellationToken,
+    log_sender: mpsc::UnboundedSender<LogLineEvent>,
 ) {
     let mut process = if os == "windows" {
         let mut process = tokio::process::Command::new("powershell.exe");
@@ -1769,7 +2095,7 @@ async fn stream_local_logs(
                 if let Some(lines) = stdout_lines.as_mut() { lines.next_line().await } else { std::future::pending().await }
             } => {
                 match line {
-                    Ok(Some(line)) => { sequence += 1; let _ = emit_log_chunk(&app, &stream_id, &monitor_id, sequence, "stdout", line); }
+                    Ok(Some(line)) => { sequence += 1; queue_log_line(&log_sender, sequence, "stdout", line); }
                     Ok(None) => { stdout_lines = None; }
                     Err(error) => { let _ = emit_log_state(&app, &stream_id, &monitor_id, "error", Some(error.to_string()), 0); break; }
                 }
@@ -1778,7 +2104,7 @@ async fn stream_local_logs(
                 if let Some(lines) = stderr_lines.as_mut() { lines.next_line().await } else { std::future::pending().await }
             } => {
                 match line {
-                    Ok(Some(line)) => { sequence += 1; let _ = emit_log_chunk(&app, &stream_id, &monitor_id, sequence, "stderr", line); }
+                    Ok(Some(line)) => { sequence += 1; queue_log_line(&log_sender, sequence, "stderr", line); }
                     Ok(None) => { stderr_lines = None; }
                     Err(error) => { let _ = emit_log_state(&app, &stream_id, &monitor_id, "error", Some(error.to_string()), 0); break; }
                 }
@@ -1804,6 +2130,7 @@ async fn stream_remote_logs(
     mut stdin: Option<Vec<u8>>,
     is_custom: bool,
     token: tokio_util::sync::CancellationToken,
+    log_sender: mpsc::UnboundedSender<LogLineEvent>,
 ) {
     let delays = [1u64, 2, 5, 10, 30];
     let mut sequence = 0u64;
@@ -1869,13 +2196,13 @@ async fn stream_remote_logs(
                         Some(russh::ChannelMsg::Data { data }) => {
                             for line in String::from_utf8_lossy(&data).lines() {
                                 sequence += 1;
-                                let _ = emit_log_chunk(&app, &stream_id, &monitor_id, sequence, "stdout", line.to_string());
+                                queue_log_line(&log_sender, sequence, "stdout", line.to_string());
                             }
                         }
                         Some(russh::ChannelMsg::ExtendedData { data, .. }) => {
                             for line in String::from_utf8_lossy(&data).lines() {
                                 sequence += 1;
-                                let _ = emit_log_chunk(&app, &stream_id, &monitor_id, sequence, "stderr", line.to_string());
+                                queue_log_line(&log_sender, sequence, "stderr", line.to_string());
                             }
                         }
                         Some(russh::ChannelMsg::ExitStatus { exit_status }) => ended_cleanly = exit_status == 0,
@@ -1903,14 +2230,10 @@ async fn stream_remote_logs(
             );
             return;
         }
-        let _ = emit_log_chunk(
-            &app,
-            &stream_id,
-            &monitor_id,
-            {
-                sequence += 1;
-                sequence
-            },
+        sequence += 1;
+        queue_log_line(
+            &log_sender,
+            sequence,
             "system",
             "── SSH log stream disconnected; reconnecting ──".to_string(),
         );
@@ -1926,25 +2249,63 @@ async fn stream_remote_logs(
     );
 }
 
-fn emit_log_chunk(
-    app: &AppHandle,
-    stream_id: &str,
-    monitor_id: &str,
+fn queue_log_line(
+    sender: &mpsc::UnboundedSender<LogLineEvent>,
     sequence: u64,
     stream: &str,
     text: String,
-) -> Result<(), String> {
-    app.emit(
-        "dashboard-log-chunk",
-        LogChunkEvent {
-            stream_id: stream_id.to_string(),
-            monitor_id: monitor_id.to_string(),
+) {
+    let _ = sender.send(LogLineEvent {
             sequence,
             stream: stream.to_string(),
             text,
-        },
-    )
-    .map_err(|error| error.to_string())
+    });
+}
+
+async fn emit_log_batches(
+    app: AppHandle,
+    stream_id: String,
+    monitor_id: String,
+    mut receiver: mpsc::UnboundedReceiver<LogLineEvent>,
+) {
+    const MAX_BATCH_LINES: usize = 100;
+    const MAX_BATCH_BYTES: usize = 64 * 1024;
+    let mut interval = tokio::time::interval(Duration::from_millis(100));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut lines = Vec::with_capacity(MAX_BATCH_LINES);
+    let mut bytes = 0usize;
+    loop {
+        let should_stop = tokio::select! {
+            _ = interval.tick() => false,
+            line = receiver.recv() => {
+                match line {
+                    Some(line) => {
+                        bytes = bytes.saturating_add(line.text.len());
+                        lines.push(line);
+                        false
+                    }
+                    None => true,
+                }
+            }
+        };
+        if !lines.is_empty()
+            && (should_stop || lines.len() >= MAX_BATCH_LINES || bytes >= MAX_BATCH_BYTES)
+        {
+            let batch = std::mem::take(&mut lines);
+            bytes = 0;
+            let _ = app.emit(
+                "dashboard-log-batch",
+                LogBatchEvent {
+                    stream_id: stream_id.clone(),
+                    monitor_id: monitor_id.clone(),
+                    lines: batch,
+                },
+            );
+        }
+        if should_stop {
+            break;
+        }
+    }
 }
 
 fn emit_log_state(
@@ -2117,9 +2478,196 @@ fn kill_command(os: &str, pids: &[u32], mode: &str) -> Result<String, String> {
     ))
 }
 
+// ── Target connection monitor ────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpConnection {
+    pub protocol: String,
+    pub local_addr: String,
+    pub local_port: u16,
+    pub remote_addr: String,
+    pub remote_port: u16,
+    pub state: String,
+    pub pid: Option<u32>,
+    pub process_name: Option<String>,
+}
+
+/// Parse `netstat -ano -p TCP` and return all TCP connections.
+fn parse_all_tcp_connections() -> Vec<TcpConnection> {
+    let output = {
+        let mut cmd = std::process::Command::new("netstat");
+        cmd.args(["-ano", "-p", "TCP"]);
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::null());
+        cmd_no_window(&mut cmd);
+        cmd.output()
+            .ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+    };
+    let stdout = output.unwrap_or_default();
+    let mut connections: Vec<TcpConnection> = Vec::new();
+
+    for line in stdout.lines().skip(4) {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() < 5 {
+            continue;
+        }
+
+        // Parse local address (e.g., "192.168.1.5:49876" or "[::1]:49876")
+        let local = fields[1];
+        let (local_ip, local_port) = parse_socket_addr(local);
+
+        // Parse remote address
+        let remote = fields[2];
+        let (remote_ip, remote_port) = parse_socket_addr(remote);
+
+        let state = fields[3].to_string();
+        let pid: Option<u32> = fields.get(4).and_then(|s| s.parse().ok());
+
+        let process_name = pid.and_then(|p| process_name_by_pid(p));
+
+        connections.push(TcpConnection {
+            protocol: fields[0].to_string(),
+            local_addr: local_ip.to_string(),
+            local_port,
+            remote_addr: remote_ip.to_string(),
+            remote_port,
+            state,
+            pid,
+            process_name,
+        });
+    }
+
+    connections
+}
+
+fn parse_socket_addr(addr: &str) -> (&str, u16) {
+    // Handle IPv6 format "[::1]:port"
+    if addr.starts_with('[') {
+        if let Some(bracket_end) = addr.find(']') {
+            let ip = &addr[1..bracket_end];
+            let port_str = &addr[bracket_end + 1..]; // includes the colon
+            let port = port_str
+                .trim_start_matches(':')
+                .parse::<u16>()
+                .unwrap_or(0);
+            return (ip, port);
+        }
+    }
+    // Standard IPv4 format "x.x.x.x:port"
+    if let Some(last_colon) = addr.rfind(':') {
+        let ip = &addr[..last_colon];
+        let port = addr[last_colon + 1..].parse::<u16>().unwrap_or(0);
+        return (ip, port);
+    }
+    (addr, 0)
+}
+
+/// Resolve a domain to IP addresses using `nslookup` (Windows) or `getent`/`host` (*nix).
+fn resolve_domain_to_ips(target: &str) -> Vec<String> {
+    // If it's already an IP, return it directly
+    if target
+        .chars()
+        .all(|c| c.is_ascii_digit() || c == '.')
+        && target.split('.').count() == 4
+    {
+        return vec![target.to_string()];
+    }
+
+    // Try nslookup (Windows)
+    let output = {
+        let mut cmd = std::process::Command::new("nslookup");
+        cmd.arg(target);
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::null());
+        cmd_no_window(&mut cmd);
+        cmd.output()
+            .ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+    };
+    let stdout = output.unwrap_or_default();
+
+    let mut ips: Vec<String> = Vec::new();
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("Address:") || trimmed.starts_with("Addresses:") {
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            for part in &parts[1..] {
+                let addr = part.trim_end_matches(',');
+                // Skip localhost-like addresses from nslookup header
+                if addr
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || c == '.')
+                    && !addr.starts_with("127.")
+                {
+                    ips.push(addr.to_string());
+                }
+            }
+        }
+    }
+
+    if ips.is_empty() {
+        // Fallback: if nslookup gave nothing, try the target as-is
+        ips.push(target.to_string());
+    }
+
+    ips
+}
+
+#[tauri::command]
+pub async fn dashboard_get_target_connections(target: String) -> Result<Vec<TcpConnection>, String> {
+    tokio::task::spawn_blocking(move || {
+        let ips = resolve_domain_to_ips(&target);
+        let all = parse_all_tcp_connections();
+        all.into_iter()
+            .filter(|conn| {
+                ips.iter()
+                    .any(|ip| conn.remote_addr == *ip || conn.local_addr == *ip)
+            })
+            .collect()
+    })
+    .await
+    .map_err(|error| format!("target connection scan failed: {error}"))
+}
+
+#[tauri::command]
+pub async fn dashboard_get_all_connections() -> Result<Vec<TcpConnection>, String> {
+    tokio::task::spawn_blocking(parse_all_tcp_connections)
+        .await
+        .map_err(|error| format!("connection scan failed: {error}"))
+}
+
 #[cfg(test)]
 mod target_monitoring_tests {
     use super::*;
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn resource_usage_includes_current_process_tree() {
+        let usage = get_process_memory();
+        assert!(usage.memory_bytes > 0);
+        assert!(usage.tree_memory_bytes >= usage.memory_bytes);
+        assert!(usage.process_count >= 1);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    async fn windows_batch_probe_returns_one_result_per_port() {
+        let output = run_local_capture(
+            "windows",
+            &windows_probe_batch_script(&[9, 10]),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.exit_status, Some(0), "{}", output.stderr);
+        let parsed: serde_json::Value = serde_json::from_str(output.stdout.trim()).unwrap();
+        let results = parsed.as_array().expect("batch probe must return an array");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0]["port"], 9);
+        assert_eq!(results[1]["port"], 10);
+    }
 
     fn identity(pid: u32, start_token: &str) -> ProcessIdentity {
         ProcessIdentity {

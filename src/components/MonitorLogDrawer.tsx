@@ -5,7 +5,7 @@ import {
   dashboardStartLogStream,
   dashboardStopLogStream,
   type MonitorConfig,
-  type MonitorLogChunkEvent,
+  type MonitorLogBatchEvent,
   type MonitorLogSource,
   type MonitorLogSourceCandidate,
   type MonitorLogStateEvent,
@@ -26,9 +26,12 @@ interface LogLine {
 
 const MAX_LINES = 5_000;
 const MAX_BYTES = 2 * 1024 * 1024;
+const RENDER_LINES = 500;
+const FLUSH_MS = 100;
+const PAUSED_COUNTER_MS = 250;
 
-function boundedAppend(lines: LogLine[], next: LogLine): LogLine[] {
-  const result = [...lines, next];
+function boundedAppend(lines: LogLine[], additions: LogLine[]): LogLine[] {
+  const result = additions.length ? lines.concat(additions) : lines;
   let bytes = result.reduce((total, line) => total + line.text.length * 2, 0);
   while (result.length > MAX_LINES || bytes > MAX_BYTES) {
     const removed = result.shift();
@@ -46,6 +49,11 @@ export function MonitorLogDrawer({ monitor, snapshot, onClose }: MonitorLogDrawe
   const [streamState, setStreamState] = useState<MonitorLogStateEvent['state']>('connecting');
   const [stateMessage, setStateMessage] = useState<string | null>(null);
   const [lines, setLines] = useState<LogLine[]>([]);
+  const linesRef = useRef<LogLine[]>([]);
+  const queuedLinesRef = useRef<LogLine[]>([]);
+  const pausedRef = useRef(false);
+  const pausedSinceRenderRef = useRef(0);
+  const lastPendingRenderRef = useRef(0);
   const [paused, setPaused] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [search, setSearch] = useState('');
@@ -86,21 +94,36 @@ export function MonitorLogDrawer({ monitor, snapshot, onClose }: MonitorLogDrawe
   }, [monitor, snapshot]);
 
   useEffect(() => {
-    const unlistenChunk = listen<MonitorLogChunkEvent>('dashboard-log-chunk', (event) => {
+    const unlistenChunk = listen<MonitorLogBatchEvent>('dashboard-log-batch', (event) => {
       if (event.payload.streamId !== streamIdRef.current) return;
-      setLines((current) => boundedAppend(current, event.payload));
-      if (paused) setPendingCount((count) => count + 1);
+      queuedLinesRef.current.push(...event.payload.lines);
     });
     const unlistenState = listen<MonitorLogStateEvent>('dashboard-log-state', (event) => {
       if (event.payload.streamId !== streamIdRef.current) return;
       setStreamState(event.payload.state);
       setStateMessage(event.payload.message || null);
     });
+    const flushTimer = window.setInterval(() => {
+      if (queuedLinesRef.current.length === 0) return;
+      const additions = queuedLinesRef.current.splice(0);
+      linesRef.current = boundedAppend(linesRef.current, additions);
+      if (!pausedRef.current) {
+        setLines(linesRef.current);
+        return;
+      }
+      pausedSinceRenderRef.current += additions.length;
+      const now = Date.now();
+      if (now - lastPendingRenderRef.current >= PAUSED_COUNTER_MS) {
+        lastPendingRenderRef.current = now;
+        setPendingCount(pausedSinceRenderRef.current);
+      }
+    }, FLUSH_MS);
     return () => {
+      window.clearInterval(flushTimer);
       void unlistenChunk.then((dispose) => dispose());
       void unlistenState.then((dispose) => dispose());
     };
-  }, [paused]);
+  }, []);
 
   useEffect(() => {
     if (paused) return;
@@ -113,7 +136,8 @@ export function MonitorLogDrawer({ monitor, snapshot, onClose }: MonitorLogDrawe
 
   const visibleLines = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return query ? lines.filter((line) => line.text.toLowerCase().includes(query)) : lines;
+    const filtered = query ? lines.filter((line) => line.text.toLowerCase().includes(query)) : lines;
+    return filtered.slice(-RENDER_LINES);
   }, [lines, search]);
 
   const start = async (source = selectedSource) => {
@@ -149,13 +173,19 @@ export function MonitorLogDrawer({ monitor, snapshot, onClose }: MonitorLogDrawe
 
   const togglePause = () => {
     setPaused((current) => {
-      if (current) setPendingCount(0);
-      return !current;
+      const next = !current;
+      pausedRef.current = next;
+      if (!next) {
+        pausedSinceRenderRef.current = 0;
+        setPendingCount(0);
+        setLines(linesRef.current);
+      }
+      return next;
     });
   };
 
   const copyAll = async () => {
-    await navigator.clipboard.writeText(lines.map((line) => line.text).join('\n'));
+    await navigator.clipboard.writeText(linesRef.current.map((line) => line.text).join('\n'));
   };
 
   return (
@@ -174,7 +204,7 @@ export function MonitorLogDrawer({ monitor, snapshot, onClose }: MonitorLogDrawe
         <div className="flex flex-wrap items-center gap-2 border-b border-cyber-line/30 bg-cyber-panel/30 px-4 py-2">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search current buffer" className="min-w-[180px] flex-1 rounded border border-cyber-line/50 bg-black/30 px-2.5 py-1.5 text-[10px] text-slate-200 outline-none focus:border-cyber-electric" />
           <button type="button" onClick={togglePause} className={`rounded border px-2.5 py-1.5 text-[9px] font-bold uppercase ${paused ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-cyber-line text-slate-400'}`}>{paused ? `Resume${pendingCount ? ` · ${pendingCount}` : ''}` : 'Pause'}</button>
-          <button type="button" onClick={() => setLines([])} className="rounded border border-cyber-line px-2.5 py-1.5 text-[9px] font-bold uppercase text-slate-400">Clear</button>
+          <button type="button" onClick={() => { linesRef.current = []; queuedLinesRef.current = []; setLines([]); setPendingCount(0); }} className="rounded border border-cyber-line px-2.5 py-1.5 text-[9px] font-bold uppercase text-slate-400">Clear</button>
           <button type="button" onClick={() => void copyAll()} className="rounded border border-cyber-line px-2.5 py-1.5 text-[9px] font-bold uppercase text-slate-400">Copy all</button>
         </div>
 
@@ -210,7 +240,7 @@ export function MonitorLogDrawer({ monitor, snapshot, onClose }: MonitorLogDrawe
             <div key={`${line.sequence}-${line.stream}`} className={`whitespace-pre-wrap break-words ${line.stream === 'stderr' ? 'text-red-300' : line.stream === 'system' ? 'text-amber-300' : 'text-slate-300'}`}>{line.text}</div>
           ))}
         </div>
-        <footer className="flex items-center justify-between border-t border-cyber-line/30 px-4 py-2 text-[8px] uppercase tracking-wider text-slate-600"><span>{lines.length.toLocaleString()} / {MAX_LINES.toLocaleString()} lines</span><span>Memory-only · 2 MiB cap</span></footer>
+        <footer className="flex items-center justify-between border-t border-cyber-line/30 px-4 py-2 text-[8px] uppercase tracking-wider text-slate-600"><span>{linesRef.current.length.toLocaleString()} / {MAX_LINES.toLocaleString()} lines · rendering {Math.min(visibleLines.length, RENDER_LINES)}</span><span>Memory-only · 2 MiB cap</span></footer>
       </aside>
     </div>
   );

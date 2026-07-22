@@ -4,7 +4,6 @@ import {
   webAiLoadProfiles,
   webAiSpawnProfile,
   webAiReposition,
-  webAiSetVisible,
   webAiClose
 } from '../lib/tauri';
 
@@ -13,6 +12,14 @@ export function WebAiPanel({ visible }: { visible: boolean }) {
   const [preferredId, setPreferredId] = useState<string | null>(null);
   const [activeProfile, setActiveProfile] = useState<WebAiProfile | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const launchTimerRef = useRef<number | null>(null);
+  const generationRef = useRef(0);
+  const operationRef = useRef<Promise<void>>(Promise.resolve());
+
+  const enqueue = (operation: () => Promise<void>) => {
+    operationRef.current = operationRef.current.catch(() => undefined).then(operation);
+    return operationRef.current;
+  };
 
   useEffect(() => {
     webAiLoadProfiles()
@@ -24,23 +31,29 @@ export function WebAiPanel({ visible }: { visible: boolean }) {
       })
       .catch((e) => console.error('Failed to load Web AI profiles:', e));
 
-    // No cleanup on unmount — session persists across tab switches
+    return () => {
+      generationRef.current += 1;
+      if (launchTimerRef.current !== null) window.clearTimeout(launchTimerRef.current);
+      void enqueue(webAiClose);
+    };
   }, []);
 
-  // Monitor visibility changes — hide/show the child webview
+  // A hidden panel is evicted. Profile data remains on disk for the next launch.
   useEffect(() => {
-    if (activeProfile) {
-      webAiSetVisible(visible).catch(console.error);
-    }
+    if (!visible && activeProfile) void enqueue(webAiClose);
   }, [visible, activeProfile]);
 
   // Track resizing and reposition the embedded child webview
   useEffect(() => {
     if (!containerRef.current || !activeProfile) return;
 
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const rect = entry.target.getBoundingClientRect();
+    let frame: number | null = null;
+    const reposition = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
         const layoutRect = {
           x: rect.left,
           y: rect.top,
@@ -48,31 +61,30 @@ export function WebAiPanel({ visible }: { visible: boolean }) {
           h: rect.height
         };
         webAiReposition(layoutRect).catch(console.error);
-      }
-    });
+      });
+    };
+    const observer = new ResizeObserver(reposition);
 
     observer.observe(containerRef.current);
     
     // Initial position
-    const rect = containerRef.current.getBoundingClientRect();
-    webAiReposition({
-      x: rect.left,
-      y: rect.top,
-      w: rect.width,
-      h: rect.height
-    }).catch(console.error);
+    reposition();
 
     return () => {
       observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
     };
   }, [activeProfile]);
 
   const handleLaunch = async (profile: WebAiProfile) => {
     try {
+      const generation = ++generationRef.current;
       setActiveProfile(profile);
       // Wait for React to mount the container, then spawn the child webview
-      setTimeout(async () => {
-        if (containerRef.current) {
+      if (launchTimerRef.current !== null) window.clearTimeout(launchTimerRef.current);
+      launchTimerRef.current = window.setTimeout(() => {
+        launchTimerRef.current = null;
+        if (generation === generationRef.current && containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
           const layoutRect = {
             x: rect.left,
@@ -80,7 +92,10 @@ export function WebAiPanel({ visible }: { visible: boolean }) {
             w: rect.width,
             h: rect.height
           };
-          await webAiSpawnProfile(profile, layoutRect);
+          void enqueue(async () => {
+            if (generation !== generationRef.current) return;
+            await webAiSpawnProfile(profile, layoutRect);
+          }).catch((error) => alert('Failed to launch profile: ' + String(error)));
         }
       }, 50);
     } catch (e: any) {
@@ -90,7 +105,12 @@ export function WebAiPanel({ visible }: { visible: boolean }) {
 
   const handleCloseSession = async () => {
     try {
-      await webAiClose();
+      generationRef.current += 1;
+      if (launchTimerRef.current !== null) {
+        window.clearTimeout(launchTimerRef.current);
+        launchTimerRef.current = null;
+      }
+      await enqueue(webAiClose);
       setActiveProfile(null);
     } catch (e) {
       console.error(e);

@@ -160,3 +160,356 @@ pre {
   animation: slideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+.mini-terminal-viewport .xterm-viewport,
+.mini-terminal-viewport .xterm-scrollable-element {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.mini-terminal-viewport .xterm-viewport::-webkit-scrollbar,
+.mini-terminal-viewport .xterm-scrollable-element::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Remote Server Monitor Widget
+   ═══════════════════════════════════════════════════════════════ */
+
+.remote-monitor-widget {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 210px;
+  background: rgba(15, 15, 25, 0.88);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  z-index: 90;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  animation: rmon-slide-in 0.3s ease;
+}
+
+@keyframes rmon-slide-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rmon-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.rmon-host {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rmon-toggle { font-size: 9px; opacity: 0.5; }
+
+.rmon-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #4ecdc4;
+  flex-shrink: 0;
+}
+
+.rmon-dot.pulse {
+  animation: rmon-pulse 2s infinite;
+}
+
+.rmon-dot.error {
+  background: #ff6b6b;
+  animation: rmon-pulse 1s infinite;
+}
+
+@keyframes rmon-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(78, 205, 196, 0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 5px rgba(78, 205, 196, 0); }
+}
+
+.rmon-body { padding: 4px 10px 10px; }
+
+.rmon-gauge { margin-bottom: 5px; }
+
+.rmon-gauge-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.rmon-gauge-track {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.rmon-gauge-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rmon-gauge-detail {
+  font-size: 9px;
+  opacity: 0.45;
+  margin-top: 1px;
+}
+
+.rmon-sparkline {
+  width: 100%;
+  height: 32px;
+  margin: 4px 0;
+  border-radius: 4px;
+}
+
+.rmon-meta {
+  font-size: 9px;
+  opacity: 0.45;
+  text-align: center;
+}
+
+.rmon-error, .rmon-loading {
+  text-align: center;
+  padding: 8px 0;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.rmon-error { color: #ff6b6b; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SSH Drag & Drop Upload Overlay
+   ═══════════════════════════════════════════════════════════════ */
+
+.ssh-drag-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(78, 205, 196, 0.08);
+  backdrop-filter: blur(3px);
+  border: 2px dashed rgba(78, 205, 196, 0.6);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  pointer-events: none;
+  animation: ssh-drag-fade-in 0.15s ease;
+}
+
+@keyframes ssh-drag-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ssh-drag-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #4ecdc4;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ssh-drag-icon {
+  font-size: 42px;
+  animation: ssh-drag-bounce 1.2s infinite ease-in-out;
+}
+
+@keyframes ssh-drag-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SSH File Transfer Dialog
+   ═══════════════════════════════════════════════════════════════ */
+
+.ssh-transfer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  animation: ssh-transfer-bg-in 0.2s ease;
+}
+
+@keyframes ssh-transfer-bg-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ssh-transfer-dialog {
+  background: rgba(20, 20, 35, 0.96);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 20px 22px;
+  width: 380px;
+  max-height: 70vh;
+  overflow-y: auto;
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  animation: ssh-transfer-dialog-in 0.25s ease;
+}
+
+@keyframes ssh-transfer-dialog-in {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.ssh-transfer-dialog h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.ssh-transfer-host {
+  font-size: 12px;
+  opacity: 0.5;
+  margin-bottom: 14px;
+}
+
+.ssh-transfer-files {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.ssh-transfer-file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.ssh-transfer-size { opacity: 0.4; font-size: 11px; }
+
+.ssh-transfer-label {
+  font-size: 11px;
+  opacity: 0.6;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ssh-transfer-input {
+  width: 100%;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.ssh-transfer-input:focus {
+  border-color: rgba(78, 205, 196, 0.5);
+}
+
+.ssh-transfer-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.ssh-transfer-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ssh-transfer-progress-fill.indeterminate {
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, #4ecdc4, #44bba4);
+  border-radius: 2px;
+  animation: ssh-progress-slide 1.5s infinite ease-in-out;
+}
+
+@keyframes ssh-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.ssh-transfer-error {
+  color: #ff6b6b;
+  font-size: 12px;
+  padding: 8px;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+.ssh-transfer-success {
+  color: #4ecdc4;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+  margin: 8px 0;
+}
+
+.ssh-transfer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.ssh-transfer-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.15s ease;
+}
+
+.ssh-transfer-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+.ssh-transfer-btn.primary {
+  background: rgba(78, 205, 196, 0.2);
+  border-color: rgba(78, 205, 196, 0.4);
+  color: #4ecdc4;
+}
+
+.ssh-transfer-btn.primary:hover {
+  background: rgba(78, 205, 196, 0.3);
+}
+
+.ssh-transfer-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

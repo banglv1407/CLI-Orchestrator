@@ -15,6 +15,7 @@ import type {
   UpsertCliRequest,
   FileEntry,
   SshConnection,
+  RemoteSystemStats,
   GitStatusEntry,
   QuickApp,
   RipgrepMatch,
@@ -28,6 +29,9 @@ import type {
   WebAiProfile,
   WebAiConfig,
   WebAiRect,
+  InstalledPetPack,
+  PetAssetPayload,
+  PetPackListResponse,
 } from '../types';
 
 export function listClis(): Promise<CliDefinition[]> {
@@ -147,6 +151,15 @@ export function createSshSession(connection: SshConnection): Promise<SessionInfo
 export function createRdpSession(connection: SshConnection): Promise<void> {
   return invoke('create_rdp_session', { connection });
 }
+
+export const getRemoteSystemStats = (connection: SshConnection) =>
+  invoke<RemoteSystemStats>('get_remote_system_stats', { connection });
+
+export const downloadSshFile = (connection: SshConnection, remotePath: string, localPath: string) =>
+  invoke('download_ssh_file', { connection, remotePath, localPath });
+
+export const uploadSshFile = (connection: SshConnection, localPath: string, remotePath: string) =>
+  invoke('upload_ssh_file', { connection, localPath, remotePath });
 
 export function openWorkspaceFolder(path: string): Promise<void> {
   return invoke('open_workspace_folder', { path });
@@ -306,8 +319,29 @@ export function proxyResetUsage(id: string): Promise<void> {
   return invoke('proxy_reset_usage', { id });
 }
 
+export interface RtkStatusResponse {
+  installed: boolean;
+  gain?: string;
+}
+
+export function rtkGetStatus(): Promise<RtkStatusResponse> {
+  return invoke('rtk_get_status');
+}
+
 export function getSystemLogs(limit?: number): Promise<SystemLogEntry[]> {
   return invoke('get_system_logs', { limit });
+}
+
+export function petListPacks(): Promise<PetPackListResponse> {
+  return invoke('pet_list_packs');
+}
+
+export function petInstallPack(sourceDir: string, replaceExisting: boolean): Promise<InstalledPetPack> {
+  return invoke('pet_install_pack', { sourceDir, replaceExisting });
+}
+
+export function petLoadAsset(packId: string, relativePath: string): Promise<PetAssetPayload> {
+  return invoke('pet_load_asset', { packId, relativePath });
 }
 
 export function getNotepad(): Promise<NotepadContent> {

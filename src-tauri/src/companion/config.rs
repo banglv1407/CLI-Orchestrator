@@ -17,6 +17,8 @@ pub struct CompanionConfig {
     pub custom_headers: HashMap<String, String>,
     #[serde(default)]
     pub actions_enabled: bool,
+    #[serde(default)]
+    pub reasoning_effort: Option<String>,
 }
 
 fn default_system_prompt() -> String {
@@ -35,6 +37,7 @@ impl Default for CompanionConfig {
             custom_prompt: default_system_prompt(),
             custom_headers: HashMap::new(),
             actions_enabled: false,
+            reasoning_effort: None,
         }
     }
 }
@@ -79,6 +82,7 @@ pub struct CompanionConfigView {
     pub custom_prompt: String,
     pub custom_headers: Vec<MaskedHeader>,
     pub actions_enabled: bool,
+    pub reasoning_effort: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,6 +109,7 @@ impl From<&CompanionConfig> for CompanionConfigView {
                 })
                 .collect(),
             actions_enabled: c.actions_enabled,
+            reasoning_effort: c.reasoning_effort.clone(),
         }
     }
 }
@@ -131,4 +136,6 @@ pub struct CompanionConfigUpdate {
     pub clear_custom_headers: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actions_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }

@@ -182,8 +182,9 @@ impl CompanionManager {
             run_state: Arc::new(Mutex::new(RunState::Idle)),
             pending_approval: Arc::new(Mutex::new(None)),
             http_client: reqwest::Client::builder()
-                .connect_timeout(Duration::from_secs(10))
-                .timeout(Duration::from_secs(180))
+                .no_proxy()
+                .connect_timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(300))
                 .build()
                 .map_err(|error| format!("failed to create Companion HTTP client: {error}"))?,
             proxy_server: Arc::new(RwLock::new(None)),
@@ -285,7 +286,7 @@ impl CompanionManager {
 
             let request = self
                 .http_client
-                .post(&format!("{}/chat/completions", config.base_url.trim_end_matches('/')))
+                .post(&crate::core::proxy_server::chat_completions_url(&config.base_url))
                 .header("Authorization", format!("Bearer {}", config.api_key))
                 .header("Content-Type", "application/json")
                 .json(&request_body);
@@ -510,6 +511,12 @@ impl CompanionManager {
             "stream": false
         });
 
+        if let Some(ref eff) = config.reasoning_effort {
+            if !eff.trim().is_empty() {
+                body["reasoning_effort"] = serde_json::json!(eff);
+            }
+        }
+
         if tools_enabled {
             let tool_defs: Vec<serde_json::Value> = self
                 .v1_tools()
@@ -619,6 +626,9 @@ impl CompanionManager {
                     max_retries,
                     headers: std::collections::HashMap::new(),
                     custom_user_agent: None,
+                    enable_rtk: false,
+                    enable_ponytail: false,
+                    reasoning_effort: None,
                 });
                 config.save().map_err(|e| format!("save: {}", e))?;
                 Ok(format!("Backend '{}' saved", name))
@@ -662,6 +672,7 @@ impl CompanionManager {
                     mode: crate::core::cli_registry::CliMode::Interactive,
                     env: std::collections::HashMap::new(),
                     default_working_dir, saved_directories: Vec::new(),
+                    enable_rtk: false,
                 }, None).map_err(|e| e.to_string())?;
                 Ok(format!("CLI profile '{}' saved", name))
             }

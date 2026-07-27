@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry } from '../types';
 import { loadApiHistory, clearApiHistory, type ApiHistoryEntry, METHOD_COLORS } from '../lib/api-history';
 import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled } from '../lib/mythical-pets';
+import { getContextMenuPosition } from '../lib/contextMenu';
 import { ProxyPanel } from './ProxyPanel';
 import { AIChatPanel } from './AIChatPanel';
 
@@ -21,7 +22,9 @@ import {
   listSshFilesRecursive,
   deleteFileOrDir,
   deleteSshFileOrDir,
+  downloadSshFile,
 } from '../lib/tauri';
+import { save } from '@tauri-apps/plugin-dialog';
 
 // --- SVG Icons ---
 
@@ -2037,6 +2040,40 @@ export function CliSidebar({
             >
               {rootPath ? (
                 <div className="flex flex-col h-full overflow-hidden">
+                  {/* Explorer Workspace Info Banner */}
+                  <div className="border-b border-cyber-line/50 bg-cyber-panel/60 p-3 flex flex-col gap-1.5 select-none shrink-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-xs">{isSshSession ? '🌐' : '🖥️'}</span>
+                        <span className="font-display text-[10px] uppercase font-bold tracking-wider text-cyber-neon truncate">
+                          {isSshSession
+                            ? `SSH: ${sshConnection?.user ? sshConnection.user + '@' : ''}${sshConnection?.host || sshConnectionName || 'Remote'}`
+                            : 'Local Workspace'}
+                        </span>
+                      </div>
+                      {isSshSession && (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-semibold bg-cyber-electric/15 text-cyber-electric border border-cyber-electric/30">
+                          Port {sshConnection?.port || 22}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-1 text-[10px] font-mono text-slate-400 bg-cyber-base/60 px-2 py-1 rounded border border-cyber-line/30">
+                      <span className="truncate flex-1 text-slate-300" title={rootPath}>
+                        {rootPath}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(rootPath);
+                        }}
+                        className="text-slate-500 hover:text-cyber-electric transition p-0.5"
+                        title="Copy workspace path"
+                      >
+                        📋
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Panel 1: Workspace Files */}
                   <div className={`flex flex-col overflow-hidden ${workspaceFilesExpanded ? 'flex-1 min-h-[100px]' : 'shrink-0'}`}>
                     <button
@@ -2539,7 +2576,10 @@ export function CliSidebar({
       {/* ── Chat Input Right Click Context Menu ── */}
       {inputContextMenu?.open && (
         <div
-          style={{ top: `${inputContextMenu.y}px`, left: `${inputContextMenu.x}px` }}
+          style={(() => {
+            const pos = getContextMenuPosition(inputContextMenu.x, inputContextMenu.y, 210, 120);
+            return { top: `${pos.y}px`, left: `${pos.x}px` };
+          })()}
           className="fixed z-[300] w-52 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
           onClick={(e) => e.stopPropagation()}
         >
@@ -2563,7 +2603,10 @@ export function CliSidebar({
       {/* ── File Explorer Right-click Context Menu ── */}
       {fileContextMenu && (
         <div
-          style={{ top: `${fileContextMenu.y}px`, left: `${fileContextMenu.x}px` }}
+          style={(() => {
+            const pos = getContextMenuPosition(fileContextMenu.x, fileContextMenu.y, 200, 160);
+            return { top: `${pos.y}px`, left: `${pos.x}px` };
+          })()}
           className="fixed z-[150] w-48 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
           onClick={(e) => e.stopPropagation()}
         >
@@ -2589,6 +2632,30 @@ export function CliSidebar({
               className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
             >
               📂 Reveal in Explorer
+            </button>
+          )}
+          {/* Download option for SSH remote files */}
+          {fileContextMenu.target.connection && !fileContextMenu.target.isDir && (
+            <button
+              type="button"
+              onClick={async () => {
+                const conn = fileContextMenu.target.connection;
+                const filePath = fileContextMenu.target.path;
+                const fileName = fileContextMenu.target.name;
+                setFileContextMenu(null);
+                if (!conn) return;
+                try {
+                  const localPath = await save({ defaultPath: fileName });
+                  if (localPath) {
+                    await downloadSshFile(conn, filePath, localPath);
+                  }
+                } catch (e) {
+                  console.error('Download failed:', e);
+                }
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
+            >
+              ⬇️ Download to Local
             </button>
           )}
           {fileContextMenu.target.canDelete && (

@@ -7,6 +7,7 @@ pub mod project_store;
 pub mod proxy_server;
 pub mod proxy_usage_db;
 pub mod quickapp_registry;
+pub mod rtk_sanitizer;
 pub mod ssh_server;
 pub mod stream_assembler;
 pub mod system_log;

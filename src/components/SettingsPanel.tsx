@@ -1,11 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { AppTheme, BuiltinLlmConfig, BuiltinLlmStatus, LlmConfig, WebAiProfile, WebAiConfig } from '../types';
-import { webAiLoadProfiles, webAiSaveProfiles, webAiClearData } from '../lib/tauri';
-import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled } from '../lib/mythical-pets';
+import { petInstallPack, pickFolder, webAiLoadProfiles, webAiSaveProfiles, webAiClearData } from '../lib/tauri';
+import {
+  getActivePetId,
+  setActivePetId,
+  getPetDiagnostics,
+  getPetDefaultTuning,
+  getPetEnabled,
+  getPetSpecialsEnabled,
+  getRegisteredPets,
+  refreshPetRegistry,
+  resolvePetAssetUrl,
+  resetPetTuning,
+  setPetEnabled,
+  setPetSpecialsEnabled,
+  setPetTuning,
+  type MythicalPet,
+} from '../lib/mythical-pets';
 import { ProxyPanel } from './ProxyPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
 import { SystemLogPanel } from './SystemLogPanel';
+import { PetPreviewStage } from './MythicalPet';
+
+function PetPickerThumbnail({ pet }: { pet: MythicalPet }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    const source = pet.thumbnail ?? pet.animations.idle.sheet;
+    resolvePetAssetUrl(pet, source)
+      .then((url) => new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = url;
+      }))
+      .then((image) => {
+        if (disposed) return;
+        const canvas = canvasRef.current;
+        const context = canvas?.getContext('2d');
+        if (!canvas || !context) return;
+        context.clearRect(0, 0, 56, 56);
+        context.imageSmoothingEnabled = false;
+        if (pet.thumbnail) {
+          context.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight, 4, 4, 48, 48);
+        } else {
+          const clip = pet.animations.idle;
+          context.drawImage(
+            image,
+            0,
+            0,
+            clip.frameWidth,
+            clip.frameHeight,
+            4,
+            4,
+            48,
+            48,
+          );
+        }
+      })
+      .catch(() => {
+        // The picker still shows the pet name and a local-pack diagnostic.
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [pet]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={56}
+      height={56}
+      className="h-14 w-14 shrink-0 rounded-lg bg-slate-950/50"
+      style={{ imageRendering: 'pixelated' }}
+      aria-hidden="true"
+    />
+  );
+}
 
 interface SettingsPanelProps {
   theme: AppTheme;
@@ -59,6 +132,97 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
   // Pet state
   const [petId, setPetIdLocal] = useState(getActivePetId);
   const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
+  const [petSpecials, setPetSpecialsLocal] = useState(getPetSpecialsEnabled);
+  const [pets, setPets] = useState(getRegisteredPets);
+  const [petDiagnostics, setPetDiagnostics] = useState(getPetDiagnostics);
+  const [petImporting, setPetImporting] = useState(false);
+  const [petImportError, setPetImportError] = useState<string | null>(null);
+  const [previewClip, setPreviewClip] = useState('idle');
+  const [previewReplay, setPreviewReplay] = useState(0);
+
+  useEffect(() => {
+    let disposed = false;
+    refreshPetRegistry().then((registered) => {
+      if (!disposed) {
+        setPets(registered);
+        setPetDiagnostics(getPetDiagnostics());
+      }
+    });
+    const onRegistry = () => {
+      setPets(getRegisteredPets());
+      setPetDiagnostics(getPetDiagnostics());
+    };
+    window.addEventListener('mythical-pet-registry-change', onRegistry);
+    return () => {
+      disposed = true;
+      window.removeEventListener('mythical-pet-registry-change', onRegistry);
+    };
+  }, []);
+
+  const selectedPet = pets.find((candidate) => candidate.id === petId) ?? pets[0];
+  const selectedPetDefaults = selectedPet
+    ? getPetDefaultTuning(selectedPet.id)
+    : undefined;
+  const selectedPetHasTuning = Boolean(
+    selectedPet
+    && selectedPetDefaults
+    && (
+      selectedPet.displaySize !== selectedPetDefaults.displaySize
+      || Math.abs(
+        selectedPet.speedMultiplier - selectedPetDefaults.speedMultiplier,
+      ) > 0.001
+    ),
+  );
+
+  const updateSelectedPetTuning = (
+    update: Partial<Pick<MythicalPet, 'displaySize' | 'speedMultiplier'>>,
+  ) => {
+    if (!selectedPet) return;
+    setPetTuning(selectedPet.id, {
+      displaySize: update.displaySize ?? selectedPet.displaySize,
+      speedMultiplier:
+        update.speedMultiplier ?? selectedPet.speedMultiplier,
+    });
+    setPreviewReplay((value) => value + 1);
+  };
+
+  const handleResetPetTuning = () => {
+    if (!selectedPet) return;
+    resetPetTuning(selectedPet.id);
+    setPreviewReplay((value) => value + 1);
+  };
+
+  useEffect(() => {
+    setPreviewClip('idle');
+    setPreviewReplay((value) => value + 1);
+  }, [petId]);
+
+  const handleImportPetPack = async () => {
+    setPetImportError(null);
+    const sourceDir = await pickFolder();
+    if (!sourceDir) return;
+    setPetImporting(true);
+    try {
+      try {
+        await petInstallPack(sourceDir, false);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('already installed')) throw error;
+        const replace = window.confirm(
+          'This pet pack is already installed. Replace it with the selected folder?',
+        );
+        if (!replace) return;
+        await petInstallPack(sourceDir, true);
+      }
+      const registered = await refreshPetRegistry();
+      setPets(registered);
+      setPetDiagnostics(getPetDiagnostics());
+    } catch (error) {
+      setPetImportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPetImporting(false);
+    }
+  };
 
   // Cloud AI Companion state
   const [llmConfig, setLlmConfig] = useState<LlmConfig>({
@@ -394,12 +558,40 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
           {/* Mythical Pet Section */}
           {activeSection === 'mythical-pet' && (
             <div className="space-y-4">
-              <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">Mythical Pet</h3>
+              <div className="flex items-center justify-between border-b border-cyber-line/20 pb-2">
+                <div>
+                  <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 font-bold">Animated Pets</h3>
+                  <p className="mt-1 text-[10px] text-slate-500">Built-in companions and private local pet packs</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleImportPetPack}
+                  disabled={petImporting}
+                  className="rounded-lg border border-cyber-neon/60 bg-cyber-neon/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-cyber-neon transition hover:bg-cyber-neon/20 disabled:cursor-wait disabled:opacity-50"
+                >
+                  {petImporting ? 'Importing…' : 'Import Folder'}
+                </button>
+              </div>
+              {petImportError && (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-[11px] text-red-300">
+                  {petImportError}
+                </div>
+              )}
+              {petDiagnostics.length > 0 && (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                  {petDiagnostics.map((diagnostic) => (
+                    <div key={`${diagnostic.directory}:${diagnostic.error}`}>
+                      <span className="font-semibold">{diagnostic.directory}:</span>{' '}
+                      {diagnostic.error}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="space-y-3">
-                <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200 transition hover:border-cyber-neon/80 cursor-pointer">
+                <div className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200">
                   <div>
                     <span className="font-semibold">Enable Pet Overlay</span>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Show animated avatar pet flying on screen</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Show the selected animated pet across CLX</p>
                   </div>
                   <button
                     type="button"
@@ -413,12 +605,31 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                   >
                     <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition ${petEnabled ? 'left-5' : 'left-0.5'}`} />
                   </button>
-                </label>
-                {petEnabled && (
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200">
+                  <div>
+                    <span className="font-semibold">Automatic Special Moves</span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Play a non-repeating signature move every 25–45 seconds</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !petSpecials;
+                      setPetSpecialsLocal(next);
+                      setPetSpecialsEnabled(next);
+                      window.dispatchEvent(new CustomEvent('mythical-pet-change', { detail: { specialsEnabled: next } }));
+                    }}
+                    className={`w-10 h-5 rounded-full transition relative ${petSpecials ? 'bg-cyber-neon' : 'bg-slate-600'}`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition ${petSpecials ? 'left-5' : 'left-0.5'}`} />
+                  </button>
+                </div>
+                {petEnabled && selectedPet && (
+                  <>
                   <div className="rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-4">
                     <p className="text-xs text-slate-400 mb-3 font-semibold uppercase tracking-wider">Select Pet</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {ALL_PETS.map((p) => (
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                      {pets.map((p) => (
                         <button
                           key={p.id}
                           type="button"
@@ -434,16 +645,129 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className="text-xl">{p.id === 'dragon' ? '🐉' : p.id === 'phoenix' ? '🔥' : p.id === 'qilin' ? '🦄' : '🪽'}</span>
-                            <div>
-                              <div className="font-semibold">{p.name}</div>
-                              <div className="text-[10px] text-slate-500 mt-0.5">{p.nameVn}</div>
+                            <PetPickerThumbnail pet={p} />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-semibold">{p.name}</div>
+                              <div className="mt-0.5 truncate text-[10px] text-slate-500">{p.nameVn || p.packName}</div>
+                              <span className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider ${
+                                p.source === 'local'
+                                  ? 'border-violet-400/40 bg-violet-400/10 text-violet-300'
+                                  : 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
+                              }`}>
+                                {p.source === 'local' ? 'Local Pack' : 'Built-in'}
+                              </span>
                             </div>
                           </div>
                         </button>
                       ))}
                     </div>
                   </div>
+                  <div className="space-y-4 rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">Pet Tuning</p>
+                        <p className="mt-1 text-[10px] text-slate-500">Saved separately for {selectedPet.name}; preview and live overlay update immediately.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleResetPetTuning}
+                        disabled={!selectedPetHasTuning}
+                        className="rounded border border-cyber-line/60 px-2.5 py-1 text-[10px] text-slate-300 transition hover:border-cyber-neon hover:text-cyber-neon disabled:cursor-not-allowed disabled:opacity-35"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <label className="block space-y-2">
+                      <span className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        <span>Size</span>
+                        <span className="font-mono text-cyber-neon">{selectedPet.displaySize}px</span>
+                      </span>
+                      <input
+                        type="range"
+                        min="20"
+                        max="160"
+                        step="1"
+                        value={selectedPet.displaySize}
+                        onChange={(event) => updateSelectedPetTuning({
+                          displaySize: Number(event.target.value),
+                        })}
+                        className="h-1 w-full cursor-pointer appearance-none rounded bg-cyber-line accent-cyber-neon"
+                      />
+                      <span className="flex justify-between text-[9px] text-slate-600">
+                        <span>20px</span>
+                        <span>160px</span>
+                      </span>
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        <span>Speed</span>
+                        <span className="font-mono text-cyber-neon">{selectedPet.speedMultiplier.toFixed(1)}×</span>
+                      </span>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2"
+                        step="0.1"
+                        value={selectedPet.speedMultiplier}
+                        onChange={(event) => updateSelectedPetTuning({
+                          speedMultiplier: Number(event.target.value),
+                        })}
+                        className="h-1 w-full cursor-pointer appearance-none rounded bg-cyber-line accent-cyber-neon"
+                      />
+                      <span className="flex justify-between text-[9px] text-slate-600">
+                        <span>0.5×</span>
+                        <span>2.0×</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div className="space-y-3 rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">Move Preview</p>
+                        <p className="mt-1 text-[10px] text-slate-500">Isolated 320×220 stage; the live overlay is not interrupted.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewReplay((value) => value + 1)}
+                        className="rounded border border-cyber-line/60 px-2 py-1 text-[10px] text-slate-300 transition hover:border-cyber-neon hover:text-cyber-neon"
+                      >
+                        Replay
+                      </button>
+                    </div>
+                    <PetPreviewStage
+                      pet={selectedPet}
+                      clipId={previewClip}
+                      replayToken={previewReplay}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: 'idle', label: 'Idle' },
+                        { id: 'travel', label: 'Travel' },
+                        { id: 'blink', label: 'Blink' },
+                        ...selectedPet.moves.map((move) => ({
+                          id: move.clip,
+                          label: move.label,
+                        })),
+                      ].map((clipOption) => (
+                        <button
+                          key={clipOption.id}
+                          type="button"
+                          onClick={() => {
+                            setPreviewClip(clipOption.id);
+                            setPreviewReplay((value) => value + 1);
+                          }}
+                          className={`rounded-full border px-3 py-1.5 text-[10px] font-semibold transition ${
+                            previewClip === clipOption.id
+                              ? 'border-cyber-neon bg-cyber-neon/10 text-cyber-neon'
+                              : 'border-cyber-line/50 text-slate-400 hover:border-cyber-electric/70 hover:text-slate-200'
+                          }`}
+                        >
+                          {clipOption.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  </>
                 )}
               </div>
             </div>

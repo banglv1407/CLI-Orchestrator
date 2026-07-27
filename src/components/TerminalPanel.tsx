@@ -6,7 +6,10 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import type { CliOutputEvent, CliStatusEvent, SessionInfo, SshConnection, AppTheme, FileEntry, RipgrepMatch } from '../types';
-import { listAllFilesRecursive, listSshFilesRecursive, ripgrepSearch } from '../lib/tauri';
+import { listAllFilesRecursive, listSshFilesRecursive, ripgrepSearch, downloadSshFile } from '../lib/tauri';
+import { RemoteMonitorWidget } from './RemoteMonitorWidget';
+import { SshFileTransferDialog } from './SshFileTransferDialog';
+import { save } from '@tauri-apps/plugin-dialog';
 import { QuickAppsPanel } from './QuickAppsPanel';
 import { ApiClientPanel } from './ApiClientPanel';
 import { ProxyPanel } from './ProxyPanel';
@@ -17,6 +20,7 @@ import { DashboardPanel } from './DashboardPanel';
 import { WebAiPanel } from './WebAiPanel';
 import { useUiActive } from '../hooks/useUiActive';
 import { copyTerminalSelection, getTerminalSelectionText, type TerminalCopyMode } from '../lib/terminalClipboard';
+import { getContextMenuPosition } from '../lib/contextMenu';
 
 function FileIcon() {
   return (
@@ -201,6 +205,37 @@ export function TerminalPanel({
   const mentionListRef = useRef<HTMLDivElement | null>(null);
   const rgListRef = useRef<HTMLDivElement | null>(null);
 
+  // ── SSH File Transfer & Drag-Drop State ──
+  const [transferDialog, setTransferDialog] = useState<{
+    mode: 'upload' | 'download';
+    files?: { name: string; path: string; size?: number }[];
+    remotePath?: string;
+  } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const sessionsRef = useRef(sessions);
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+
+  const sshConnectionsRef = useRef(sshConnections);
+  useEffect(() => {
+    sshConnectionsRef.current = sshConnections;
+  }, [sshConnections]);
+
+  // Helper: get the SshConnection object for the currently visible SSH session
+  const getActiveSSHConnection = useCallback((): SshConnection | null => {
+    const session = sessionsRef.current.find(s => s.id === visibleSessionIdRef.current);
+    if (!session?.cliName.startsWith('SSH:')) return null;
+    const connName = session.cliName.replace(/^SSH:\s*/, '');
+    return sshConnectionsRef.current.find(c => c.name === connName || c.host === connName) || null;
+  }, []);
+
+  const isActiveSessionSSH = useCallback((): boolean => {
+    const session = sessionsRef.current.find(s => s.id === visibleSessionIdRef.current);
+    return !!session?.cliName.startsWith('SSH:');
+  }, []);
+
   const openSearch = useCallback(() => {
     setSearchVisible(true);
     setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -265,6 +300,16 @@ export function TerminalPanel({
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const initializedRef = useRef<Record<string, boolean>>({});
   const containerToSessionRef = useRef<WeakMap<Element, string>>(new WeakMap());
+
+  useEffect(() => {
+    const handleFocusActiveTerminal = () => {
+      if (activeSessionId && terminalRefs.current[activeSessionId]?.term) {
+        terminalRefs.current[activeSessionId].term.focus();
+      }
+    };
+    window.addEventListener('focus-active-terminal', handleFocusActiveTerminal);
+    return () => window.removeEventListener('focus-active-terminal', handleFocusActiveTerminal);
+  }, [activeSessionId]);
   // Accumulate ALL raw terminal output so we can replay it into mini terminals after DOM moves
   const mainOutputHistory = useRef<Record<string, string[]>>({});
   const mainOutputHistoryBytes = useRef<Record<string, number>>({});
@@ -721,7 +766,6 @@ export function TerminalPanel({
   const replayHistoryIntoMiniTerm = useCallback((sessionId: string, miniTerm: Terminal) => {
     const history = mainOutputHistory.current[sessionId];
     if (!history || history.length === 0) return;
-    if (hasAlternateScreenOutput(history)) return;
     try {
       for (const chunk of history) {
         miniTerm.write(chunk);
@@ -743,9 +787,7 @@ export function TerminalPanel({
     const { miniTerm } = createFreshMiniTerminal(handle);
     miniTerm.open(mountNode);
 
-    const miniViewport = (mountNode.querySelector('.xterm-scrollable-element') as HTMLElement | null)
-      ?? (mountNode.querySelector('.xterm-viewport') as HTMLElement | null);
-    if (miniViewport) miniViewport.style.overflowY = 'hidden';
+    mountNode.classList.add('mini-terminal-viewport');
 
     replayHistoryIntoMiniTerm(sessionId, miniTerm);
 
@@ -1012,11 +1054,7 @@ export function TerminalPanel({
           }
           return false;
         }
-        if (event.ctrlKey && event.key === 'p') {
-          if (event.type === 'keydown') {
-            const evt = new CustomEvent('trigger-command-palette');
-            window.dispatchEvent(evt);
-          }
+        if (event.ctrlKey && (event.key === 'p' || event.key === 'P')) {
           return false;
         }
         if (event.ctrlKey && event.key === 'f') {
@@ -1215,11 +1253,13 @@ export function TerminalPanel({
       const { miniTerm } = createFreshMiniTerminal(handle);
       miniTerm.open(mountNode);
 
-      const miniViewport = (mountNode.querySelector('.xterm-scrollable-element') as HTMLElement | null)
-        ?? (mountNode.querySelector('.xterm-viewport') as HTMLElement | null);
-      if (miniViewport) {
-        miniViewport.style.overflowY = 'hidden';
+      if (handle.term.cols > 0 && handle.term.rows > 0) {
+        try {
+          miniTerm.resize(handle.term.cols, handle.term.rows);
+        } catch (_e) {}
       }
+
+      mountNode.classList.add('mini-terminal-viewport');
 
       // Replay accumulated output history into the fresh terminal
       replayHistoryIntoMiniTerm(session.id, miniTerm);
@@ -1369,6 +1409,50 @@ export function TerminalPanel({
       unlistenStatus?.();
     };
   }, []);
+
+  // Listen to Tauri native window drag & drop events for OS file drops
+  useEffect(() => {
+    let unlistenDrop: (() => void) | undefined;
+    let unlistenOver: (() => void) | undefined;
+    let unlistenLeave: (() => void) | undefined;
+
+    const setupTauriDragDrop = async () => {
+      try {
+        unlistenDrop = await listen<{ paths: string[] }>('tauri://drag-drop', (event) => {
+          setDragOver(false);
+          if (!isActiveSessionSSH()) return;
+          const rawPaths = event.payload?.paths || [];
+          if (rawPaths.length > 0) {
+            const files = rawPaths.map((p) => ({
+              name: p.split(/[/\\]/).pop() || p,
+              path: p,
+            }));
+            setTransferDialog({ mode: 'upload', files });
+          }
+        });
+
+        unlistenOver = await listen('tauri://drag-over', () => {
+          if (isActiveSessionSSH()) {
+            setDragOver(true);
+          }
+        });
+
+        unlistenLeave = await listen('tauri://drag-leave', () => {
+          setDragOver(false);
+        });
+      } catch (e) {
+        console.error('Failed to setup Tauri drag-drop listeners:', e);
+      }
+    };
+
+    setupTauriDragDrop();
+
+    return () => {
+      unlistenDrop?.();
+      unlistenOver?.();
+      unlistenLeave?.();
+    };
+  }, [isActiveSessionSSH]);
 
   useEffect(() => {
     if (!visibleSessionId) {
@@ -1551,6 +1635,37 @@ export function TerminalPanel({
             <div 
               className="relative flex-1 min-h-0 bg-[#0a0f1f] flex flex-col justify-between"
               onContextMenu={(e) => visibleSessionId && handleContextMenu(e, visibleSessionId)}
+              onDragOver={(e) => {
+                if (!isActiveSessionSSH()) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.dataTransfer) {
+                  e.dataTransfer.dropEffect = 'copy';
+                }
+                setDragOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragOver(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragOver(false);
+                if (!isActiveSessionSSH()) return;
+                const fileList = Array.from(e.dataTransfer.files || []);
+                const files = fileList
+                  .map((f) => ({
+                    name: f.name,
+                    path: (f as any).path || (f as any).webkitRelativePath || f.name,
+                    size: f.size,
+                  }))
+                  .filter((f) => !!f.path);
+                if (files.length > 0) {
+                  setTransferDialog({ mode: 'upload', files });
+                }
+              }}
             >
               {/* ── Terminal Search Overlay ── */}
               {searchVisible && !openedFile && (
@@ -1837,6 +1952,36 @@ export function TerminalPanel({
                   </div>
                 )}
 
+                {/* SSH Drag-drop upload overlay */}
+                {dragOver && (
+                  <div className="ssh-drag-overlay">
+                    <div className="ssh-drag-content">
+                      <span className="ssh-drag-icon">📤</span>
+                      <span>Drop files to upload to server</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Remote server monitoring widget — bottom right, only for SSH sessions */}
+                {activeMainView === 'terminal' && !openedFile && (
+                  <RemoteMonitorWidget
+                    connection={getActiveSSHConnection()}
+                    visible={isActiveSessionSSH()}
+                  />
+                )}
+
+                {/* SSH File Transfer Dialog */}
+                {transferDialog && getActiveSSHConnection() && (
+                  <SshFileTransferDialog
+                    mode={transferDialog.mode}
+                    connection={getActiveSSHConnection()!}
+                    files={transferDialog.files}
+                    remotePath={transferDialog.remotePath}
+                    defaultRemoteDir={sessions.find(s => s.id === visibleSessionIdRef.current)?.workingDir || '~/'}
+                    onClose={() => setTransferDialog(null)}
+                  />
+                )}
+
                 {/* File viewer overlay — rendered on top of terminals when a file is open */}
                 {openedFile && (
                   <div className="absolute inset-0 flex flex-col overflow-hidden bg-[#0a0f1f] z-10">
@@ -2083,25 +2228,31 @@ export function TerminalPanel({
                           {/* Terminal area — flex-1, no overlay */}
                           <div className="flex-1 relative min-h-0">
                             {/* Live scaled view */}
-                            <div 
-                              style={{ 
-                                transform: `scale(${thumbSizes.scale})`, 
-                                width: '640px', 
-                                height: '400px',
-                              }}
-                              className="absolute origin-top-left pointer-events-none inset-0"
-                            >
-                              <div
-                                ref={(node) => {
-                                  miniContainerRefs.current[session.id] = node;
-                                  if (node) {
-                                    containerToSessionRef.current.set(node, session.id);
-                                    if (rightPanelVisible) ensureMiniTerminal(session, node);
-                                  }
-                                }}
-                                className="h-full w-full"
-                              />
-                            </div>
+                            {(() => {
+                              const mainRows = terminalRefs.current[session.id]?.term?.rows || 24;
+                              const vHeight = Math.max(400, Math.round(mainRows * 17.5));
+                              return (
+                                <div 
+                                  style={{ 
+                                    transform: `scale(${thumbSizes.scale})`, 
+                                    width: '640px', 
+                                    height: `${vHeight}px`,
+                                  }}
+                                  className="absolute origin-bottom-left bottom-0 left-0 pointer-events-none mini-terminal-viewport"
+                                >
+                                  <div
+                                    ref={(node) => {
+                                      miniContainerRefs.current[session.id] = node;
+                                      if (node) {
+                                        containerToSessionRef.current.set(node, session.id);
+                                        if (rightPanelVisible) ensureMiniTerminal(session, node);
+                                      }
+                                    }}
+                                    className="h-full w-full"
+                                  />
+                                </div>
+                              );
+                            })()}
 
                             {/* Quick Close button */}
                             <button
@@ -2250,25 +2401,31 @@ export function TerminalPanel({
                         {/* Terminal area — flex-1, no overlay */}
                         <div className="flex-1 relative min-h-0">
                           {/* Live scaled view */}
-                          <div 
-                            style={{ 
-                              transform: `scale(${thumbSizes.scale})`, 
-                              width: '640px', 
-                              height: '400px',
-                            }}
-                            className="absolute origin-top-left pointer-events-none inset-0"
-                          >
-                            <div
-                              ref={(node) => {
-                                miniContainerRefs.current[session.id] = node;
-                                if (node) {
-                                  containerToSessionRef.current.set(node, session.id);
-                                  if (rightPanelVisible) ensureMiniTerminal(session, node);
-                                }
-                              }}
-                              className="h-full w-full"
-                            />
-                          </div>
+                          {(() => {
+                            const mainRows = terminalRefs.current[session.id]?.term?.rows || 24;
+                            const vHeight = Math.max(400, Math.round(mainRows * 17.5));
+                            return (
+                              <div 
+                                style={{ 
+                                  transform: `scale(${thumbSizes.scale})`, 
+                                  width: '640px', 
+                                  height: `${vHeight}px`,
+                                }}
+                                className="absolute origin-bottom-left bottom-0 left-0 pointer-events-none mini-terminal-viewport"
+                              >
+                                <div
+                                  ref={(node) => {
+                                    miniContainerRefs.current[session.id] = node;
+                                    if (node) {
+                                      containerToSessionRef.current.set(node, session.id);
+                                      if (rightPanelVisible) ensureMiniTerminal(session, node);
+                                    }
+                                  }}
+                                  className="h-full w-full"
+                                />
+                              </div>
+                            );
+                          })()}
 
                           {/* Quick Close button */}
                           <button
@@ -2312,7 +2469,10 @@ export function TerminalPanel({
       {/* Cyberpunk Right-click Context Menu — lifted state from Dashboard */}
       {contextMenu && (
         <div
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          style={(() => {
+            const pos = getContextMenuPosition(contextMenu.x, contextMenu.y, 220, 260);
+            return { top: `${pos.y}px`, left: `${pos.x}px` };
+          })()}
           className="fixed z-[100] w-52 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
           onClick={(e) => e.stopPropagation()}
         >
@@ -2324,28 +2484,29 @@ export function TerminalPanel({
             const selectedText = (terminalSelection || pageSelection).trim();
             if (selectedText) {
               const copyMode = async (mode: TerminalCopyMode) => {
-                if (!sessionTerminal) return;
+                if (!sessionTerminal) {
+                  try { await navigator.clipboard.writeText(selectedText); } catch {}
+                  return;
+                }
                 const text = getTerminalSelectionText(sessionTerminal, mode);
                 if (mode === 'code' && text === '') return;
                 try {
                   await navigator.clipboard.writeText(text);
-                } catch {
-                  /* swallow; UI just won't show a confirmation */
-                }
+                } catch {}
               };
               return (
                 <>
                   <button
                     type="button"
                     onClick={() => { void copyMode('exact'); setContextMenu(null); }}
-                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition"
+                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition cursor-pointer"
                   >
                     📋 Copy
                   </button>
                   <button
                     type="button"
                     onClick={() => { void copyMode('code'); setContextMenu(null); }}
-                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition"
+                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition cursor-pointer"
                   >
                     🧩 Copy as code
                   </button>
@@ -2356,9 +2517,20 @@ export function TerminalPanel({
                       window.dispatchEvent(event);
                       setContextMenu(null);
                     }}
-                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition"
+                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition cursor-pointer"
                   >
-                    💡 Giải thích
+                    💡 Giải thích bằng AI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const event = new CustomEvent('rewrite-text', { detail: selectedText });
+                      window.dispatchEvent(event);
+                      setContextMenu(null);
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition cursor-pointer"
+                  >
+                    ✨ Tối ưu văn bản
                   </button>
                   <div className="my-1 border-t border-cyber-line/50" />
                 </>
@@ -2370,13 +2542,46 @@ export function TerminalPanel({
           {contextMenu.sessionId && (
             <button
               type="button"
+              onClick={async () => {
+                try {
+                  const text = await navigator.clipboard.readText();
+                  if (contextMenu.sessionId) {
+                    onSendInput(contextMenu.sessionId, text);
+                  }
+                } catch (err) {
+                  console.error('Clipboard paste failed:', err);
+                }
+                setContextMenu(null);
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+            >
+              📋 Paste
+            </button>
+          )}
+
+          {contextMenu.sessionId && (
+            <button
+              type="button"
               onClick={() => {
                 refreshMainTerminal(contextMenu.sessionId!);
                 setContextMenu(null);
               }}
-              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition"
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition cursor-pointer"
             >
-              🔄 Refresh
+              🔄 Refresh Terminal
+            </button>
+          )}
+
+          {contextMenu.workingDir && (
+            <button
+              type="button"
+              onClick={() => {
+                void invoke('open_workspace_folder', { path: contextMenu.workingDir! });
+                setContextMenu(null);
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+            >
+              📂 Reveal in Explorer
             </button>
           )}
 
@@ -2385,12 +2590,60 @@ export function TerminalPanel({
               type="button"
               onClick={() => {
                 void navigator.clipboard.writeText(contextMenu.sessionId!);
+                setContextMenu(null);
               }}
-              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
             >
               📋 Copy Session ID
             </button>
           )}
+          {contextMenu.sessionId && (() => {
+            const ctxSession = sessions.find(s => s.id === contextMenu.sessionId);
+            const isSSH = !!ctxSession?.cliName.startsWith('SSH:');
+            if (!isSSH) return null;
+            return (
+              <>
+                <div className="my-1 border-t border-cyber-line/50" />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const remotePath = prompt('Enter remote file path to download:');
+                    if (remotePath) {
+                      setTransferDialog({ mode: 'download', remotePath });
+                    }
+                    setContextMenu(null);
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+                >
+                  ⬇️ Download File from Server
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    // Use native file picker via Tauri dialog
+                    try {
+                      const { open } = await import('@tauri-apps/plugin-dialog');
+                      const selected = await open({ multiple: true });
+                      if (selected) {
+                        const paths = Array.isArray(selected) ? selected : [selected];
+                        const files = paths.map(p => ({
+                          name: p.split(/[/\\]/).pop() || p,
+                          path: p,
+                        }));
+                        setTransferDialog({ mode: 'upload', files });
+                      }
+                    } catch (e) {
+                      console.error('File picker failed:', e);
+                    }
+                    setContextMenu(null);
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+                >
+                  ⬆️ Upload File to Server
+                </button>
+              </>
+            );
+          })()}
 
           {contextMenu.sessionId && (
             <>
@@ -2399,8 +2652,9 @@ export function TerminalPanel({
                 type="button"
                 onClick={() => {
                   onStopSession(contextMenu.sessionId!);
+                  setContextMenu(null);
                 }}
-                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 font-bold transition"
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 font-bold transition cursor-pointer"
               >
                 ❌ Stop / Close Session
               </button>

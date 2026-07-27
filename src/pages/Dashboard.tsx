@@ -298,6 +298,11 @@ export function Dashboard() {
         e.preventDefault();
         setShowNotepad((v) => !v);
       }
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'Space' || e.key === ' ' || e.key === 'Space')) {
+        e.preventDefault();
+        setActiveMainView('terminal');
+        window.dispatchEvent(new CustomEvent('focus-active-terminal'));
+      }
     };
     
     const customPaletteHandler = () => {
@@ -985,14 +990,7 @@ export function Dashboard() {
   );
 
   return (
-    <main
-      className="flex h-screen bg-cyber-base bg-grid text-slate-100"
-      onContextMenu={(e) => {
-        // Find workingDir from active session for context menu
-        const activeSess = sessions.find((s) => s.id === activeSessionId);
-        handleContextMenu(e, activeSessionId, activeSess?.workingDir ?? null);
-      }}
-    >
+    <main className="flex h-screen bg-cyber-base bg-grid text-slate-100">
       <CliSidebar
         clis={clis}
         sessions={displaySessions}
@@ -1128,85 +1126,7 @@ export function Dashboard() {
         activeMainView={activeMainView}
       />
 
-      {/* ── Global Right-click Context Menu ── */}
-      {contextMenu && (
-        <div
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-          className="fixed z-[100] w-52 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* New submenu */}
-          <div className="relative group">
-            <div className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon transition cursor-pointer">
-              ✨ New
-              <span className="ml-auto text-[9px] text-slate-500">▶</span>
-            </div>
-            <div className="absolute left-[98%] top-0 hidden group-hover:block w-44 rounded-lg border border-cyber-neon/30 bg-cyber-panel/95 p-1 shadow-2xl backdrop-blur-md z-[101]">
-              <button
-                type="button"
-                onClick={handleNewFile}
-                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/25 hover:text-cyber-electric transition"
-              >
-                📄 File...
-              </button>
-              <button
-                type="button"
-                onClick={handleNewDirectory}
-                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/25 hover:text-cyber-electric transition"
-              >
-                📁 Directory...
-              </button>
-            </div>
-          </div>
 
-          <div className="my-1 border-t border-cyber-line/50" />
-
-          {contextMenu.workingDir && (
-            <button
-              type="button"
-              onClick={() => {
-                void invoke('open_workspace_folder', { path: contextMenu.workingDir! });
-              }}
-              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/25 hover:text-cyber-electric transition"
-            >
-              📁 Reveal in Explorer
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={async () => {
-              try { const text = await navigator.clipboard.readText(); if (activeSessionId) handleSendTerminalInput(activeSessionId, text); } catch {}
-              setContextMenu(null);
-            }}
-            className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
-          >
-            📋 Paste
-          </button>
-
-          <div className="my-1 border-t border-cyber-line/50" />
-
-          {selectedText.trim() && (
-            <>
-              <div className="my-1 border-t border-cyber-line/50" />
-              <button
-                type="button"
-                onClick={() => handleOptimizeSelection('rewrite')}
-                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition"
-              >
-                ✨ Optimize Selection
-              </button>
-              <button
-                type="button"
-                onClick={() => handleOptimizeSelection('suggest')}
-                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition"
-              >
-                💻 Fix/Suggest Command
-              </button>
-            </>
-          )}
-        </div>
-      )}
 
       {/* ── New File / Directory Modal ── */}
       {newFileModal?.open && (

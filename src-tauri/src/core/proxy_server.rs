@@ -30,7 +30,26 @@ pub struct ProxyBackend {
     pub max_retries: u32,
     pub headers: HashMap<String, String>,
     pub custom_user_agent: Option<String>,
+    #[serde(default)]
+    pub enable_rtk: bool,
+    #[serde(default)]
+    pub enable_ponytail: bool,
+    #[serde(default)]
+    pub reasoning_effort: Option<String>,
 }
+
+pub const PONYTAIL_SYSTEM_PROMPT: &str = r#"
+[PONYTAIL DECISION LADDER - LAZY SENIOR DEV MODE]
+Before writing code, stop at the first rung that holds:
+1. Does this need to exist? -> No: skip it (YAGNI).
+2. Already in codebase? -> Reuse existing helpers, types, or patterns.
+3. Stdlib does it? -> Use standard library.
+4. Native platform feature? -> Use native features (e.g., <input type="date"> instead of datepicker).
+5. Installed dependency? -> Use existing dependency before adding new ones.
+6. Can it be one line? -> Write one line.
+7. Only then: write the minimum code that works.
+Safety rule: Lazy, not negligent. Never sacrifice security, data-loss protection, or validation.
+"#;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -359,7 +378,46 @@ fn build_upstream_body(
 ) -> serde_json::Value {
     let mut body = request.extra.clone();
     body.insert("model".to_string(), serde_json::json!(backend.model));
-    body.insert("messages".to_string(), serde_json::json!(request.messages));
+
+    let mut messages = if backend.enable_rtk {
+        request
+            .messages
+            .iter()
+            .map(|m| {
+                let mut sanitized = m.clone();
+                sanitized.content =
+                    crate::core::rtk_sanitizer::RtkSanitizer::sanitize_message_content(&m.content);
+                sanitized
+            })
+            .collect::<Vec<_>>()
+    } else {
+        request.messages.clone()
+    };
+
+    if backend.enable_ponytail {
+        let mut has_system = false;
+        for msg in &mut messages {
+            if msg.role == "system" {
+                has_system = true;
+                if let serde_json::Value::String(ref mut text) = msg.content {
+                    *text = format!("{}\n\n{}", PONYTAIL_SYSTEM_PROMPT.trim(), text);
+                }
+                break;
+            }
+        }
+        if !has_system {
+            messages.insert(
+                0,
+                ChatMessage {
+                    role: "system".to_string(),
+                    content: serde_json::Value::String(PONYTAIL_SYSTEM_PROMPT.trim().to_string()),
+                    extra: serde_json::Map::new(),
+                },
+            );
+        }
+    }
+
+    body.insert("messages".to_string(), serde_json::json!(messages));
     body.insert("stream".to_string(), serde_json::json!(request.stream));
     body.insert(
         "temperature".to_string(),
@@ -369,10 +427,15 @@ fn build_upstream_body(
         "max_tokens".to_string(),
         serde_json::json!(request.max_tokens.unwrap_or(4096)),
     );
+    if let Some(ref eff) = backend.reasoning_effort {
+        if !eff.trim().is_empty() {
+            body.insert("reasoning_effort".to_string(), serde_json::json!(eff));
+        }
+    }
     serde_json::Value::Object(body)
 }
 
-fn chat_completions_url(base_url: &str) -> String {
+pub fn chat_completions_url(base_url: &str) -> String {
     let base_url = base_url.trim_end_matches('/');
     if base_url.ends_with("/chat/completions") {
         base_url.to_string()
@@ -559,7 +622,12 @@ async fn handle_chat_completion(
         }
     }
 
-    let client = Client::new();
+    let client = Client::builder()
+        .no_proxy()
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .unwrap_or_else(|_| Client::new());
 
     let has_stream_options = request.extra.contains_key("stream_options");
 
@@ -1173,5 +1241,39 @@ mod tests {
         let logs = state.get_logs().await;
         assert_eq!(logs.len(), 1);
         assert!(logs[0].success);
+    }
+
+    #[test]
+    fn test_proxy_backend_enable_rtk_deserialization() {
+        let json_data = serde_json::json!({
+            "name": "OpenAI RTK",
+            "url": "https://api.openai.com/v1",
+            "apiKey": "sk-123",
+            "model": "gpt-4o",
+            "weight": 1,
+            "maxRetries": 2,
+            "headers": {},
+            "enableRtk": true
+        });
+
+        let backend: ProxyBackend = serde_json::from_value(json_data).unwrap();
+        assert!(backend.enable_rtk);
+    }
+
+    #[test]
+    fn test_proxy_backend_enable_ponytail_deserialization() {
+        let json_data = serde_json::json!({
+            "name": "OpenAI Ponytail",
+            "url": "https://api.openai.com/v1",
+            "apiKey": "sk-123",
+            "model": "gpt-4o",
+            "weight": 1,
+            "maxRetries": 2,
+            "headers": {},
+            "enablePonytail": true
+        });
+
+        let backend: ProxyBackend = serde_json::from_value(json_data).unwrap();
+        assert!(backend.enable_ponytail);
     }
 }

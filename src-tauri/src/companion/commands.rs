@@ -257,6 +257,9 @@ pub async fn companion_save_config(
     if let Some(v) = update.actions_enabled {
         config.actions_enabled = v;
     }
+    if let Some(v) = update.reasoning_effort {
+        config.reasoning_effort = if v.trim().is_empty() { None } else { Some(v) };
+    }
 
     config.save()?;
     Ok(CompanionConfigView::from(&*config))

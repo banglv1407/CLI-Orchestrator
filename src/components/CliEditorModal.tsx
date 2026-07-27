@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CliDefinition } from '../types';
 
 interface CliEditorModalProps {
@@ -13,6 +13,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
   const [command, setCommand] = useState('');
   const [defaultWorkingDir, setDefaultWorkingDir] = useState('');
   const [argsText, setArgsText] = useState('');
+  const [enableRtk, setEnableRtk] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -25,6 +26,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
     setCommand(initialCli?.command ?? '');
     setDefaultWorkingDir(initialCli?.defaultWorkingDir ?? '');
     setArgsText((initialCli?.args ?? []).join('\n'));
+    setEnableRtk(initialCli?.enableRtk ?? false);
     setError(null);
     setSaving(false);
   }, [initialCli, isOpen]);
@@ -85,9 +87,22 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
             <textarea
               value={argsText}
               onChange={(event) => setArgsText(event.target.value)}
-              className="mt-1 h-28 w-full resize-none rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
+              className="mt-1 h-24 w-full resize-none rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
               placeholder="code\n{prompt}"
             />
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={enableRtk}
+              onChange={(event) => setEnableRtk(event.target.checked)}
+              className="rounded border-cyber-line bg-cyber-base text-cyber-neon focus:ring-cyber-neon accent-cyber-neon"
+            />
+            <span className="text-xs text-slate-200 font-medium flex items-center gap-1">
+              ⚡ <span className="text-cyber-electric font-semibold">Enable RTK Token Compression</span>
+              <span className="text-[10px] text-slate-400 font-normal">(Auto wrap command with rtk)</span>
+            </span>
           </label>
         </div>
 
@@ -129,6 +144,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
                 args,
                 env: initialCli?.env ?? {},
                 savedDirectories: initialCli?.savedDirectories ?? [],
+                enableRtk,
               };
 
               void onSubmit({

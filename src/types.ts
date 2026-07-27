@@ -15,6 +15,7 @@ export interface CliDefinition {
   env?: Record<string, string>;
   defaultWorkingDir?: string;
   savedDirectories?: CliSavedDirectory[];
+  enableRtk?: boolean;
 }
 
 export interface SessionInfo {
@@ -106,6 +107,7 @@ export interface LlmConfig {
   headers: Record<string, string>;
   systemPrompt: string;
   stream: boolean;
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | '' | null;
 }
 
 export interface LlmChatMessage {
@@ -130,6 +132,17 @@ export interface SshConnection {
   rdpShareDrives?: boolean;
   workingDir?: string;
 }
+
+export interface RemoteSystemStats {
+  cpuUsage: number;
+  memoryUsed: number;
+  memoryTotal: number;
+  diskUsed: number;
+  diskTotal: number;
+  loadAverage: number;
+  uptimeSeconds: number;
+}
+
 export interface ProxyBackend {
   id?: string;
   name: string;
@@ -140,6 +153,9 @@ export interface ProxyBackend {
   maxRetries: number;
   headers: Record<string, string>;
   customUserAgent?: string;
+  enableRtk?: boolean;
+  enablePonytail?: boolean;
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | '' | null;
 }
 
 export interface ProxyBackendUsage {
@@ -293,6 +309,7 @@ export interface CompanionConfigView {
   customPrompt: string;
   customHeaders: { name: string; masked: boolean }[];
   actionsEnabled: boolean;
+  reasoningEffort?: string;
 }
 
 export interface CompanionConfigUpdate {
@@ -305,6 +322,7 @@ export interface CompanionConfigUpdate {
   clearApiKey?: boolean;
   clearCustomHeaders?: string[];
   actionsEnabled?: boolean;
+  reasoningEffort?: string;
 }
 
 export type CompanionRunEventType =
@@ -363,4 +381,71 @@ export interface CompanionUiEffect {
   type: 'open_view' | 'open_settings' | 'focus_session';
   targetId: string;
   label: string;
+}
+
+// ── Animated pet packs ─────────────────────────────────────────────────────
+
+export type PetMoveKind =
+  | 'blink'
+  | 'teleport'
+  | 'beam'
+  | 'clone'
+  | 'orb-lunge'
+  | 'web-shot'
+  | 'web-zip';
+
+export interface PetAnimationClip {
+  sheet: string;
+  frameWidth: number;
+  frameHeight: number;
+  frameCount: number;
+  fps: number;
+  looped: boolean;
+}
+
+export interface PetMoveDefinition {
+  id: string;
+  label: string;
+  kind: PetMoveKind;
+  clip: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+}
+
+export interface PetPackPetDefinition {
+  id: string;
+  name: string;
+  nameVn: string;
+  thumbnail?: string;
+  displaySize: number;
+  speedMultiplier: number;
+  glowColor: string;
+  animations: Record<string, PetAnimationClip>;
+  moves: PetMoveDefinition[];
+}
+
+export interface PetPackManifestV1 {
+  schemaVersion: 1;
+  id: string;
+  name: string;
+  pets: PetPackPetDefinition[];
+}
+
+export interface InstalledPetPack {
+  manifest: PetPackManifestV1;
+}
+
+export interface PetPackDiagnostic {
+  directory: string;
+  error: string;
+}
+
+export interface PetPackListResponse {
+  packs: InstalledPetPack[];
+  errors: PetPackDiagnostic[];
+}
+
+export interface PetAssetPayload {
+  mimeType: 'image/png';
+  dataBase64: string;
 }

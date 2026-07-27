@@ -15,6 +15,7 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
   const [systemPrompt, setSystemPrompt] = useState(config.systemPrompt);
   const [headersJson, setHeadersJson] = useState(JSON.stringify(config.headers, null, 2));
   const [stream, setStream] = useState(config.stream ?? false);
+  const [reasoningEffort, setReasoningEffort] = useState<string>(config.reasoningEffort || '');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Sync state with prop config when modal opens
@@ -26,6 +27,7 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
       setSystemPrompt(config.systemPrompt);
       setHeadersJson(JSON.stringify(config.headers, null, 2));
       setStream(config.stream ?? false);
+      setReasoningEffort(config.reasoningEffort || '');
       setErrorMsg(null);
     }
   }, [isOpen, config]);
@@ -62,6 +64,7 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
       systemPrompt: systemPrompt.trim(),
       headers,
       stream,
+      reasoningEffort: (reasoningEffort as any) || undefined,
     });
     onClose();
   };
@@ -132,6 +135,24 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
                 className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
+              Reasoning Effort
+            </label>
+            <select
+              value={reasoningEffort}
+              onChange={(e) => setReasoningEffort(e.target.value)}
+              className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 outline-none transition focus:border-cyber-neon"
+            >
+              <option value="">Default (None)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+              <option value="max">max</option>
+            </select>
           </div>
 
           <div>

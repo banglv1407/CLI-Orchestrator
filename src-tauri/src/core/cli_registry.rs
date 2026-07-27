@@ -61,6 +61,8 @@ pub struct CliDefinition {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub saved_directories: Vec<CliSavedDirectory>,
+    #[serde(default, rename = "enableRtk", alias = "enable_rtk")]
+    pub enable_rtk: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -371,6 +373,7 @@ impl CliRegistry {
                 env: HashMap::new(),
                 default_working_dir: None,
                 saved_directories: Vec::new(),
+                enable_rtk: false,
             },
             CliDefinition {
                 name: "gemini".to_string(),
@@ -380,6 +383,7 @@ impl CliRegistry {
                 env: HashMap::new(),
                 default_working_dir: None,
                 saved_directories: Vec::new(),
+                enable_rtk: false,
             },
             CliDefinition {
                 name: "codex".to_string(),
@@ -389,6 +393,7 @@ impl CliRegistry {
                 env: HashMap::new(),
                 default_working_dir: None,
                 saved_directories: Vec::new(),
+                enable_rtk: false,
             },
             CliDefinition {
                 name: "aider".to_string(),
@@ -398,6 +403,7 @@ impl CliRegistry {
                 env: HashMap::new(),
                 default_working_dir: None,
                 saved_directories: Vec::new(),
+                enable_rtk: false,
             },
             CliDefinition {
                 name: "claude-code".to_string(),
@@ -407,6 +413,7 @@ impl CliRegistry {
                 env: HashMap::new(),
                 default_working_dir: None,
                 saved_directories: Vec::new(),
+                enable_rtk: false,
             },
             CliDefinition {
                 name: "opencode".to_string(),
@@ -416,6 +423,7 @@ impl CliRegistry {
                 env: HashMap::new(),
                 default_working_dir: None,
                 saved_directories: Vec::new(),
+                enable_rtk: false,
             },
         ]
     }

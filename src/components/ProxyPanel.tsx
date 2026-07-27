@@ -51,6 +51,9 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
   const [nName, setNName] = useState(''); const [nUrl, setNUrl] = useState('');
   const [nKey, setNKey] = useState(''); const [nModel, setNModel] = useState('');
   const [nUa, setNUa] = useState('');
+  const [nEnableRtk, setNEnableRtk] = useState(false);
+  const [nEnablePonytail, setNEnablePonytail] = useState(false);
+  const [nReasoningEffort, setNReasoningEffort] = useState<string>('');
   const [usageMap, setUsageMap] = useState<Record<string, ProxyBackendUsage>>({});
   const [resetConfirmId, setResetConfirmId] = useState<string | null>(null);
 
@@ -106,8 +109,8 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
     }
   }, []);
 
-  const resetForm = () => { setNName('');setNUrl('');setNKey('');setNModel('');setNUa('');setShowAdd(false);setEditingIdx(null); };
-  const loadBackend = (b: ProxyBackend, idx: number) => { setNName(b.name);setNUrl(b.url);setNKey(b.apiKey);setNModel(b.model);setNUa(b.customUserAgent||'');setShowAdd(false);setEditingIdx(idx); };
+  const resetForm = () => { setNName('');setNUrl('');setNKey('');setNModel('');setNUa('');setNReasoningEffort('');setNEnableRtk(false);setNEnablePonytail(false);setShowAdd(false);setEditingIdx(null); };
+  const loadBackend = (b: ProxyBackend, idx: number) => { setNName(b.name);setNUrl(b.url);setNKey(b.apiKey);setNModel(b.model);setNUa(b.customUserAgent||'');setNReasoningEffort(b.reasoningEffort||'');setNEnableRtk(b.enableRtk||false);setNEnablePonytail(b.enablePonytail||false);setShowAdd(false);setEditingIdx(idx); };
 
   const refresh = useCallback(async () => {
     const errs: string[] = [];
@@ -144,15 +147,38 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
           ...backends[editingIdx],
           name:nName, url:nUrl, apiKey:nKey, model:nModel,
           customUserAgent: nUa || undefined,
+          enableRtk: nEnableRtk,
+          enablePonytail: nEnablePonytail,
+          reasoningEffort: (nReasoningEffort as any) || undefined,
         };
         await proxySaveConfig({...config, backends});
       } else {
-        await proxyAddBackend({name:nName,url:nUrl,apiKey:nKey,model:nModel,weight:1,maxRetries:2,headers:{},customUserAgent:nUa||undefined});
+        await proxyAddBackend({
+          name:nName,url:nUrl,apiKey:nKey,model:nModel,weight:1,maxRetries:2,headers:{},
+          customUserAgent:nUa||undefined,enableRtk:nEnableRtk,enablePonytail:nEnablePonytail,
+          reasoningEffort:(nReasoningEffort as any)||undefined,
+        });
       }
       resetForm(); await refresh();
     }
     catch(e: any) { setError(String(e)); }
-  }, [nName,nUrl,nKey,nModel,nUa,editingIdx,config,refresh]);
+  }, [nName,nUrl,nKey,nModel,nUa,nEnableRtk,nEnablePonytail,nReasoningEffort,editingIdx,config,refresh]);
+
+  const duplicateBackend = useCallback(async (b: ProxyBackend) => {
+    if (!config) return;
+    try {
+      const newName = `${b.name} (Copy)`;
+      const newBackend: ProxyBackend = {
+        ...b,
+        id: undefined,
+        name: newName,
+      };
+      await proxyAddBackend(newBackend);
+      await refresh();
+    } catch (e: any) {
+      setError(String(e));
+    }
+  }, [config, refresh]);
 
   const rmBackend = useCallback(async (name: string) => { try { await proxyRemoveBackend(name); await refresh(); } catch(e: any) { setError(String(e)); } }, [refresh]);
 
@@ -286,6 +312,44 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                       <input value={nKey} onChange={e=>setNKey(e.target.value)} placeholder="API Key" type="password" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
                       <input value={nModel} onChange={e=>setNModel(e.target.value)} placeholder="Model identifier (e.g. gpt-4o)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
                       <input value={nUa} onChange={e=>setNUa(e.target.value)} placeholder="User-Agent (optional, e.g. CliProxyAI/1.0)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <select
+                        value={nReasoningEffort}
+                        onChange={e => setNReasoningEffort(e.target.value)}
+                        className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"
+                      >
+                        <option value="">Reasoning Effort: Default (None)</option>
+                        <option value="low">Reasoning Effort: low</option>
+                        <option value="medium">Reasoning Effort: medium</option>
+                        <option value="high">Reasoning Effort: high</option>
+                        <option value="xhigh">Reasoning Effort: xhigh</option>
+                        <option value="max">Reasoning Effort: max</option>
+                      </select>
+                      
+                      <label className="col-span-2 flex items-center gap-2 cursor-pointer pt-1">
+                        <input
+                          type="checkbox"
+                          checked={nEnableRtk}
+                          onChange={e => setNEnableRtk(e.target.checked)}
+                          className="rounded border-cyber-line bg-cyber-base text-cyber-neon focus:ring-cyber-neon accent-cyber-neon"
+                        />
+                        <span className="text-xs text-slate-200 font-medium flex items-center gap-1">
+                          ⚡ <span className="text-cyber-electric font-semibold">Enable RTK Token Compression</span>
+                          <span className="text-[10px] text-slate-400 font-normal">(Cắt 60–90% token output command)</span>
+                        </span>
+                      </label>
+
+                      <label className="col-span-2 flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={nEnablePonytail}
+                          onChange={e => setNEnablePonytail(e.target.checked)}
+                          className="rounded border-cyber-line bg-cyber-base text-cyber-neon focus:ring-cyber-neon accent-cyber-neon"
+                        />
+                        <span className="text-xs text-slate-200 font-medium flex items-center gap-1">
+                          👱‍♂️ <span className="text-purple-300 font-semibold">Enable Ponytail Anti-Bloat</span>
+                          <span className="text-[10px] text-slate-400 font-normal">(Lazy Senior Dev System Prompt Injector)</span>
+                        </span>
+                      </label>
                     </div>
                     <div className="flex gap-2 justify-end">
                       <button onClick={resetForm} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">Cancel</button>
@@ -319,7 +383,24 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                     >
                       <span className="text-[10px] text-slate-600 font-mono w-5">{i+1}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm text-slate-200 font-semibold truncate">{b.name}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-slate-200 font-semibold truncate">{b.name}</div>
+                          {b.enableRtk && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-0.5" title="RTK Token Compression Enabled">
+                              ⚡ RTK
+                            </span>
+                          )}
+                          {b.enablePonytail && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-0.5" title="Ponytail Anti-Bloat Enabled">
+                              👱‍♂️ Ponytail
+                            </span>
+                          )}
+                          {b.reasoningEffort && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-0.5" title={`Reasoning Effort: ${b.reasoningEffort}`}>
+                              🧠 {b.reasoningEffort}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-slate-500 truncate">{b.model} @ {b.url}</div>
                         {b.customUserAgent && <div className="text-[10px] text-cyber-neon/60 truncate">UA: {b.customUserAgent}</div>}
                         
@@ -372,6 +453,9 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                           min={1}
                           max={10}
                         />
+                        <button onClick={() => duplicateBackend(b)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyber-electric transition p-1" title="Duplicate Backend">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v9.25c0 .621-.504 1.125-1.125 1.125Z"/></svg>
+                        </button>
                         <button onClick={()=>loadBackend(b,i)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyber-neon transition p-1" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.86 3.49a2.2 2.2 0 1 1 3.11 3.11L8 18.57l-4 1 1-4 11.86-12.08Z"/></svg></button>
                         {b.id && (
                           <button onClick={()=>setResetConfirmId(b.id!)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-amber-400 transition p-1" title="Reset Usage">

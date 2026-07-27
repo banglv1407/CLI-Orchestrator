@@ -340,6 +340,7 @@ fn shell_cli_definition() -> CliDefinition {
             env: HashMap::new(),
             default_working_dir: None,
             saved_directories: Vec::new(),
+            enable_rtk: false,
         };
     }
 
@@ -354,6 +355,7 @@ fn shell_cli_definition() -> CliDefinition {
             env: HashMap::new(),
             default_working_dir: None,
             saved_directories: Vec::new(),
+            enable_rtk: false,
         };
     }
 }
@@ -1506,6 +1508,173 @@ pub async fn save_ssh_server_config(
         .map_err(|e| format!("Failed to serialize SSH config: {}", e))?;
     std::fs::write(&path, data).map_err(|e| format!("Failed to write SSH config file: {}", e))?;
     Ok(())
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteSystemStats {
+    pub cpu_usage: f64,
+    pub memory_used: u64,
+    pub memory_total: u64,
+    pub disk_used: u64,
+    pub disk_total: u64,
+    pub load_average: f64,
+    pub uptime_seconds: f64,
+}
+
+#[tauri::command]
+pub async fn get_remote_system_stats(
+    connection: SshConnection,
+) -> Result<RemoteSystemStats, String> {
+    let stats_cmd = r#"printf "CPU:%s\n" "$(top -bn1 2>/dev/null | grep -i 'cpu(s)' | awk '{print $2+$4}' || echo '-1')"; printf "MEM_TOTAL:%s\n" "$(free -b 2>/dev/null | awk '/^Mem:/{print $2}' || echo '0')"; printf "MEM_USED:%s\n" "$(free -b 2>/dev/null | awk '/^Mem:/{print $3}' || echo '0')"; printf "DISK_TOTAL:%s\n" "$(df -B1 / 2>/dev/null | awk 'NR==2{print $2}' || echo '0')"; printf "DISK_USED:%s\n" "$(df -B1 / 2>/dev/null | awk 'NR==2{print $3}' || echo '0')"; printf "LOAD:%s\n" "$(cat /proc/loadavg 2>/dev/null | awk '{print $1}' || echo '0')"; printf "UPTIME:%s\n" "$(cat /proc/uptime 2>/dev/null | awk '{print $1}' || echo '0')""#;
+
+    let output = tokio::task::spawn_blocking({
+        let conn = connection.clone();
+        move || run_ssh_command(&conn, stats_cmd, None)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+    .map_err(|e| format!("SSH stats failed: {}", e))?;
+
+    let mut stats = RemoteSystemStats {
+        cpu_usage: 0.0,
+        memory_used: 0,
+        memory_total: 0,
+        disk_used: 0,
+        disk_total: 0,
+        load_average: 0.0,
+        uptime_seconds: 0.0,
+    };
+
+    for line in output.lines() {
+        let line = line.trim();
+        if let Some(val) = line.strip_prefix("CPU:") {
+            stats.cpu_usage = val.trim().parse().unwrap_or(0.0);
+        } else if let Some(val) = line.strip_prefix("MEM_TOTAL:") {
+            stats.memory_total = val.trim().parse().unwrap_or(0);
+        } else if let Some(val) = line.strip_prefix("MEM_USED:") {
+            stats.memory_used = val.trim().parse().unwrap_or(0);
+        } else if let Some(val) = line.strip_prefix("DISK_TOTAL:") {
+            stats.disk_total = val.trim().parse().unwrap_or(0);
+        } else if let Some(val) = line.strip_prefix("DISK_USED:") {
+            stats.disk_used = val.trim().parse().unwrap_or(0);
+        } else if let Some(val) = line.strip_prefix("LOAD:") {
+            stats.load_average = val.trim().parse().unwrap_or(0.0);
+        } else if let Some(val) = line.strip_prefix("UPTIME:") {
+            stats.uptime_seconds = val.trim().parse().unwrap_or(0.0);
+        }
+    }
+
+    Ok(stats)
+}
+
+fn run_scp_command(
+    connection: &SshConnection,
+    source: &str,
+    destination: &str,
+    upload: bool,
+) -> Result<(), String> {
+    use std::fs;
+    use std::process::{Command, Stdio};
+
+    let mut cmd = Command::new("scp");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    let temp_askpass = if connection.auth_mode.as_deref() == Some("password") {
+        if let Some(ref pwd) = connection.password {
+            let temp_path =
+                std::env::temp_dir().join(format!("askpass_{}.bat", uuid::Uuid::new_v4().simple()));
+            let batch_content = format!("@echo off\necho {}", pwd);
+            if let Err(e) = fs::write(&temp_path, &batch_content) {
+                return Err(format!("Failed to create temporary askpass script: {}", e));
+            }
+            Some(temp_path)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    if let Some(ref askpass_path) = temp_askpass {
+        cmd.env("SSH_ASKPASS", askpass_path.to_string_lossy().to_string());
+        cmd.env("SSH_ASKPASS_REQUIRE", "force");
+        cmd.env("DISPLAY", "d");
+    }
+
+    cmd.arg("-o").arg("StrictHostKeyChecking=no");
+    cmd.arg("-o").arg("ConnectTimeout=30");
+    cmd.arg("-P").arg(connection.port.to_string());
+
+    if connection.auth_mode.as_deref() == Some("key") {
+        if let Some(ref path) = connection.key_path {
+            cmd.arg("-i").arg(path);
+        }
+    }
+
+    let remote_spec = format!(
+        "{}@{}:{}",
+        connection.user,
+        connection.host,
+        if upload { destination } else { source }
+    );
+
+    if upload {
+        cmd.arg(source);
+        cmd.arg(&remote_spec);
+    } else {
+        cmd.arg(&remote_spec);
+        cmd.arg(destination);
+    }
+
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let output = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to execute scp: {}", e))?
+        .wait_with_output()
+        .map_err(|e| format!("SCP process error: {}", e))?;
+
+    if let Some(ref askpass_path) = temp_askpass {
+        let _ = fs::remove_file(askpass_path);
+    }
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn download_ssh_file(
+    connection: SshConnection,
+    remote_path: String,
+    local_path: String,
+) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        run_scp_command(&connection, &remote_path, &local_path, false)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
+#[tauri::command]
+pub async fn upload_ssh_file(
+    connection: SshConnection,
+    local_path: String,
+    remote_path: String,
+) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        run_scp_command(&connection, &local_path, &remote_path, true)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
 }
 
 #[cfg(test)]

@@ -793,17 +793,6 @@ export function CliSidebar({
     }
   };
 
-  // Listen for pet click → open Web AI
-  useEffect(() => {
-    const handler = () => {
-      window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'web-ai' }));
-      setIsSidebarCollapsed(true);
-      localStorage.setItem('ai-cli-sidebar-collapsed', 'true');
-    };
-    window.addEventListener('mythical-pet-click', handler);
-    return () => window.removeEventListener('mythical-pet-click', handler);
-  }, []);
-
   // Listen for opening a specific sidebar tab (e.g. ai-chat from Command Palette)
   useEffect(() => {
     const handler = (e: Event) => {

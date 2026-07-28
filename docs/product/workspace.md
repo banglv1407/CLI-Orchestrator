@@ -26,3 +26,13 @@ list for the active local project or SSH session.
 - User ordering may change the order within either group but cannot move a
   pinned item into the primary group.
 
+## File Viewer Contract
+
+- Opening a local or SSH UTF-8 text file displays the complete content without
+  truncation.
+- Edit and Git diff views own their vertical scrolling; viewing a long file
+  must not scroll the application window.
+- Opening a different file starts at the top, and the final line remains
+  reachable above any terminal tray or editor padding.
+- Images, PDFs, binary formats, large-file pagination, and multi-file editor
+  tabs are outside the current viewer contract.

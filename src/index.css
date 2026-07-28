@@ -156,6 +156,58 @@ pre {
   }
 }
 
+.pet-shatter-effect {
+  pointer-events: none;
+  animation-name: pet-shatter-fade;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+.pet-shatter-shard {
+  pointer-events: none;
+  animation-name: pet-shatter-shard;
+  animation-timing-function: cubic-bezier(0.18, 0.7, 0.25, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes pet-shatter-fade {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  58% {
+    opacity: 0.82;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pet-shatter-shard {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  14% {
+    opacity: 0.78;
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate(var(--pet-shard-x), var(--pet-shard-y))
+      rotate(var(--pet-shard-rotation));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-shatter-effect,
+  .pet-shatter-shard {
+    animation-timing-function: linear;
+  }
+}
+
 .animate-slide-up {
   animation: slideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

@@ -204,6 +204,17 @@ export function TerminalPanel({
   const rgInputRef = useRef<HTMLInputElement | null>(null);
   const mentionListRef = useRef<HTMLDivElement | null>(null);
   const rgListRef = useRef<HTMLDivElement | null>(null);
+  const fileEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileDiffScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!openedFile || isFileLoading) return;
+    const frame = requestAnimationFrame(() => {
+      fileEditorRef.current?.scrollTo({ top: 0, left: 0 });
+      fileDiffScrollRef.current?.scrollTo({ top: 0, left: 0 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isFileLoading, openedFile?.path]);
 
   // ── SSH File Transfer & Drag-Drop State ──
   const [transferDialog, setTransferDialog] = useState<{
@@ -2065,7 +2076,7 @@ export function TerminalPanel({
                     </div>
 
                     {/* Editor body */}
-                    <div className="flex-1 overflow-hidden relative">
+                    <div className="relative min-h-0 flex-1 overflow-hidden">
                       {isFileLoading ? (
                         <div className="flex h-full items-center justify-center text-xs text-slate-500 italic">
                           Loading file content…
@@ -2081,7 +2092,11 @@ export function TerminalPanel({
                             Loading diff…
                           </div>
                         ) : (
-                          <div className="h-full w-full overflow-y-auto bg-cyber-base/80 p-4 font-mono text-xs leading-relaxed select-text scrollbar-thin text-slate-300">
+                          <div
+                            key={`diff-${openedFile.path}`}
+                            ref={fileDiffScrollRef}
+                            className="h-full min-h-0 w-full overflow-auto bg-cyber-base/80 p-4 pb-10 font-mono text-xs leading-relaxed text-slate-300 scrollbar-thin select-text"
+                          >
                             {gitDiffContent ? (
                               gitDiffContent.split('\n').map((line, idx) => {
                                 let lineClass = 'text-slate-400 pl-2';
@@ -2107,6 +2122,8 @@ export function TerminalPanel({
                         )
                       ) : (
                         <textarea
+                          key={`editor-${openedFile.path}`}
+                          ref={fileEditorRef}
                           value={fileContent}
                           onChange={(e) => setFileContent(e.target.value)}
                           onKeyDown={(e) => {
@@ -2131,7 +2148,7 @@ export function TerminalPanel({
                             }
                           }}
                           spellCheck={false}
-                          className="h-full w-full resize-none bg-cyber-base/80 p-4 font-mono text-[13px] leading-relaxed text-slate-200 outline-none placeholder-slate-600 scrollbar-thin selection:bg-cyber-neon/30"
+                          className="h-full min-h-0 w-full resize-none overflow-auto bg-cyber-base/80 p-4 pb-10 font-mono text-[13px] leading-relaxed text-slate-200 outline-none placeholder-slate-600 scrollbar-thin selection:bg-cyber-neon/30"
                           style={{ caretColor: 'var(--color-cyber-neon, #39ff14)' }}
                         />
                       )}

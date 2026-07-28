@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import type { PetMoveDefinition } from '../types';
 import {
   BUILTIN_PETS,
   getActivePetId,
   getPetById,
   getPetEnabled,
-  getPetSpecialsEnabled,
   getResolvedActivePet,
   refreshPetRegistry,
   resolvePetAssetUrl,
@@ -14,13 +20,19 @@ import {
 
 const SPEED_MIN = 8;
 const SPEED_MAX = 18;
-const DIRECTION_MS = 5000;
-const IDLE_MIN_MS = 2200;
-const IDLE_MAX_MS = 5000;
-const SPECIAL_MIN_MS = 25_000;
-const SPECIAL_MAX_MS = 45_000;
-const BLINK_MIN_MS = 10_000;
-const BLINK_MAX_MS = 18_000;
+const DIRECTION_MS = 2000;
+const IDLE_MIN_MS = 6600;
+const IDLE_MAX_MS = 15_000;
+const ACTION_DURATION_MULTIPLIER = 2;
+const ACTION_MIN_MS = 1800;
+const SHATTER_DURATION_MS = 1200;
+const SHATTER_REDUCED_MOTION_MS = 250;
+const SHATTER_RADIUS = 180;
+const SHATTER_KINDS = new Set<PetMoveDefinition['kind']>([
+  'beam',
+  'orb-lunge',
+  'web-shot',
+]);
 const ACTOR_CANVAS = 192;
 const EFFECT_MAX = 320;
 
@@ -42,6 +54,24 @@ interface SpecialRuntime {
   anchorX: number;
   anchorY: number;
   relocated: boolean;
+  shatterTriggered: boolean;
+}
+
+interface ShatterShard {
+  points: string;
+  dx: number;
+  dy: number;
+  rotation: number;
+}
+
+interface ShatterEffect {
+  id: number;
+  x: number;
+  y: number;
+  color: string;
+  durationMs: number;
+  cracks: string[];
+  shards: ShatterShard[];
 }
 
 interface LiveRuntime {
@@ -56,12 +86,12 @@ interface LiveRuntime {
   frameIndex: number;
   lastFrameAt: number;
   lastTickAt: number;
-  nextSpecialAt: number;
-  nextBlinkAt: number;
   lastMoveId: string;
   clipId: string;
   special: SpecialRuntime | null;
   specialLoading: boolean;
+  actionRequested: boolean;
+  queuedAction: boolean;
 }
 
 function randomBetween(min: number, max: number) {
@@ -99,6 +129,110 @@ function quadratic(
 function clipDuration(pet: MythicalPet, clipId: string) {
   const clip = pet.animations[clipId] ?? pet.animations.idle;
   return (clip.frameCount / (clip.fps * pet.speedMultiplier)) * 1000;
+}
+
+function actionDuration(pet: MythicalPet, clipId: string) {
+  return Math.max(
+    ACTION_MIN_MS,
+    clipDuration(pet, clipId) * ACTION_DURATION_MULTIPLIER,
+  );
+}
+
+function chooseRelocationTarget(
+  x: number,
+  y: number,
+  displaySize: number,
+) {
+  const margin = Math.max(48, displaySize / 2);
+  const minX = margin;
+  const maxX = Math.max(minX, window.innerWidth - margin);
+  const minY = margin;
+  const maxY = Math.max(minY, window.innerHeight - margin);
+  const midX = window.innerWidth / 2;
+  const midY = window.innerHeight / 2;
+
+  const xRange = x <= midX
+    ? [Math.max(midX, minX), maxX]
+    : [minX, Math.min(midX, maxX)];
+  const yRange = y <= midY
+    ? [Math.max(midY, minY), maxY]
+    : [minY, Math.min(midY, maxY)];
+
+  let targetX = randomBetween(xRange[0], Math.max(xRange[0], xRange[1]));
+  let targetY = randomBetween(yRange[0], Math.max(yRange[0], yRange[1]));
+  const minimumDistance = Math.min(
+    Math.hypot(maxX - minX, maxY - minY),
+    Math.hypot(window.innerWidth, window.innerHeight) * 0.25,
+  );
+
+  if (Math.hypot(targetX - x, targetY - y) < minimumDistance) {
+    const corners = [
+      { x: minX, y: minY },
+      { x: minX, y: maxY },
+      { x: maxX, y: minY },
+      { x: maxX, y: maxY },
+    ];
+    const farthest = corners.reduce((best, candidate) => (
+      Math.hypot(candidate.x - x, candidate.y - y)
+        > Math.hypot(best.x - x, best.y - y)
+        ? candidate
+        : best
+    ));
+    targetX = farthest.x;
+    targetY = farthest.y;
+  }
+
+  return { x: targetX, y: targetY };
+}
+
+function createShatterEffect(
+  id: number,
+  x: number,
+  y: number,
+  color: string,
+  reducedMotion: boolean,
+): ShatterEffect {
+  const crackCount = reducedMotion ? 8 : 12;
+  const cracks = Array.from({ length: crackCount }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / crackCount + randomBetween(-0.14, 0.14);
+    const length = SHATTER_RADIUS * randomBetween(0.55, 1);
+    const bendAngle = angle + randomBetween(-0.22, 0.22);
+    const bendLength = length * randomBetween(0.38, 0.58);
+    const bendX = x + Math.cos(bendAngle) * bendLength;
+    const bendY = y + Math.sin(bendAngle) * bendLength;
+    const endX = x + Math.cos(angle) * length;
+    const endY = y + Math.sin(angle) * length;
+    return `M ${x} ${y} L ${bendX} ${bendY} L ${endX} ${endY}`;
+  });
+  const shards = reducedMotion
+    ? []
+    : Array.from({ length: 8 }, (_, index) => {
+        const angle = (Math.PI * 2 * index) / 8 + randomBetween(-0.2, 0.2);
+        const distance = randomBetween(25, 70);
+        const centerX = x + Math.cos(angle) * distance;
+        const centerY = y + Math.sin(angle) * distance;
+        const size = randomBetween(7, 16);
+        return {
+          points: [
+            `${centerX},${centerY - size}`,
+            `${centerX + size * 0.8},${centerY + size * 0.7}`,
+            `${centerX - size * 0.65},${centerY + size * 0.45}`,
+          ].join(' '),
+          dx: Math.cos(angle) * randomBetween(25, 55),
+          dy: Math.sin(angle) * randomBetween(25, 55) + randomBetween(10, 30),
+          rotation: randomBetween(-80, 80),
+        };
+      });
+
+  return {
+    id,
+    x,
+    y,
+    color,
+    durationMs: reducedMotion ? SHATTER_REDUCED_MOTION_MS : SHATTER_DURATION_MS,
+    cracks,
+    shards,
+  };
 }
 
 function frameDrawSize(pet: MythicalPet, frameWidth: number) {
@@ -180,12 +314,12 @@ function initialRuntime(): LiveRuntime {
     frameIndex: 0,
     lastFrameAt: 0,
     lastTickAt: 0,
-    nextSpecialAt: now + randomBetween(SPECIAL_MIN_MS, SPECIAL_MAX_MS),
-    nextBlinkAt: now + randomBetween(BLINK_MIN_MS, BLINK_MAX_MS),
     lastMoveId: '',
     clipId: 'travel',
     special: null,
     specialLoading: false,
+    actionRequested: false,
+    queuedAction: false,
   };
 }
 
@@ -195,7 +329,7 @@ function chooseMove(pet: MythicalPet, previous: string) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
+export function MythicalPet() {
   const actorRef = useRef<HTMLCanvasElement>(null);
   const cloneLeftRef = useRef<HTMLCanvasElement>(null);
   const cloneRightRef = useRef<HTMLCanvasElement>(null);
@@ -207,9 +341,10 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
   const runtimeRef = useRef<LiveRuntime>(initialRuntime());
   const clipCacheRef = useRef(new Map<string, LoadedClip>());
   const clipPromisesRef = useRef(new Map<string, Promise<LoadedClip>>());
+  const shatterIdRef = useRef(0);
   const [enabled, setEnabled] = useState(getPetEnabled);
-  const [specialsEnabled, setSpecialsEnabled] = useState(getPetSpecialsEnabled);
   const [pet, setPet] = useState<MythicalPet>(getResolvedActivePet);
+  const [shatterEffect, setShatterEffect] = useState<ShatterEffect | null>(null);
   const reducedMotionRef = useRef(false);
 
   const resetEffects = useCallback(() => {
@@ -273,17 +408,12 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
       const detail = (event as CustomEvent<{
         id?: string;
         enabled?: boolean;
-        specialsEnabled?: boolean;
       }>).detail;
       if (detail.id) setPet(getPetById(detail.id) ?? BUILTIN_PETS[0]);
       if (typeof detail.enabled === 'boolean') setEnabled(detail.enabled);
-      if (typeof detail.specialsEnabled === 'boolean') {
-        setSpecialsEnabled(detail.specialsEnabled);
-      }
     };
     const onStorage = () => {
       setEnabled(getPetEnabled());
-      setSpecialsEnabled(getPetSpecialsEnabled());
       setPet(getPetById(getActivePetId()) ?? BUILTIN_PETS[0]);
     };
     const onRegistry = () => {
@@ -313,8 +443,9 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
     runtime.vy = randomVelocity(pet.speedMultiplier);
     runtime.special = null;
     runtime.specialLoading = false;
-    runtime.nextSpecialAt = performance.now()
-      + randomBetween(SPECIAL_MIN_MS, SPECIAL_MAX_MS);
+    runtime.actionRequested = false;
+    runtime.queuedAction = false;
+    setShatterEffect(null);
     resetEffects();
     void ensureClip(pet, 'idle');
     void ensureClip(pet, 'travel');
@@ -322,8 +453,19 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
   }, [ensureClip, pet, resetEffects]);
 
   useEffect(() => {
+    if (!shatterEffect) return;
+    const timeout = window.setTimeout(() => {
+      setShatterEffect((current) => (
+        current?.id === shatterEffect.id ? null : current
+      ));
+    }, shatterEffect.durationMs);
+    return () => window.clearTimeout(timeout);
+  }, [shatterEffect]);
+
+  useEffect(() => {
     if (!enabled) {
       cancelAnimationFrame(animationRef.current);
+      setShatterEffect(null);
       resetEffects();
       return;
     }
@@ -355,13 +497,17 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
       void ensureClip(pet, clipId);
     };
 
-    const beginSpecial = async (move: PetMoveDefinition, now: number) => {
+    const beginSpecial = async (move: PetMoveDefinition) => {
       if (runtime.specialLoading || runtime.special) return;
       runtime.specialLoading = true;
       const loaded = await ensureClip(pet, move.clip);
       runtime.specialLoading = false;
       if (disposed || loaded.failed || pet.id !== (getPetById(pet.id)?.id ?? pet.id)) {
-        runtime.nextSpecialAt = now + randomBetween(SPECIAL_MIN_MS, SPECIAL_MAX_MS);
+        runtime.lastMoveId = move.id;
+        if (runtime.queuedAction) {
+          runtime.queuedAction = false;
+          runtime.actionRequested = true;
+        }
         return;
       }
       const direction = runtime.facing;
@@ -369,19 +515,25 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
       const roomRight = window.innerWidth - runtime.x - 80;
       const preferred = direction === 1 ? roomRight : roomLeft;
       const travel = clamp(preferred, 120, 280) * direction;
-      const targetX = clamp(runtime.x + travel, 72, window.innerWidth - 72);
-      const targetY = clamp(
+      let targetX = clamp(runtime.x + travel, 72, window.innerWidth - 72);
+      let targetY = clamp(
         runtime.y + randomBetween(-90, 90),
         72,
         window.innerHeight - 72,
       );
+      if (move.kind === 'teleport' || move.kind === 'blink') {
+        const relocation = chooseRelocationTarget(
+          runtime.x,
+          runtime.y,
+          pet.displaySize,
+        );
+        targetX = relocation.x;
+        targetY = relocation.y;
+      }
       runtime.special = {
         move,
         startedAt: performance.now(),
-        durationMs: Math.max(
-          700 / pet.speedMultiplier,
-          clipDuration(pet, move.clip),
-        ),
+        durationMs: actionDuration(pet, move.clip),
         startX: runtime.x,
         startY: runtime.y,
         targetX,
@@ -393,9 +545,14 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
         ),
         anchorY: clamp(runtime.y - randomBetween(120, 220), 18, window.innerHeight - 40),
         relocated: false,
+        shatterTriggered: false,
       };
       runtime.lastMoveId = move.id;
       changeState('special', move.clip, performance.now(), runtime.special.durationMs);
+    };
+
+    const beginFallbackBlink = (now: number) => {
+      changeState('blink', 'blink', now, actionDuration(pet, 'blink'));
     };
 
     const positionCanvas = (
@@ -439,6 +596,22 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
       const primary = special.move.primaryColor ?? pet.glowColor;
       const secondary = special.move.secondaryColor ?? '#ffffff';
       resetEffects();
+
+      if (
+        SHATTER_KINDS.has(special.move.kind)
+        && progress >= 0.68
+        && !special.shatterTriggered
+      ) {
+        special.shatterTriggered = true;
+        shatterIdRef.current += 1;
+        setShatterEffect(createShatterEffect(
+          shatterIdRef.current,
+          special.targetX,
+          special.targetY,
+          primary,
+          reducedMotionRef.current,
+        ));
+      }
 
       switch (special.move.kind) {
         case 'teleport': {
@@ -521,11 +694,11 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
             }
           }
           if (progress > 0.48) {
-            runtime.x = clamp(
-              special.startX + runtime.facing * 110 * eased,
-              72,
-              window.innerWidth - 72,
-            );
+            const lungeProgress = easeInOut((progress - 0.48) / 0.52);
+            runtime.x = special.startX
+              + (special.targetX - special.startX) * lungeProgress;
+            runtime.y = special.startY
+              + (special.targetY - special.startY) * lungeProgress;
           }
           break;
         }
@@ -562,8 +735,11 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
           break;
         }
         case 'blink':
-          runtime.x = special.startX
-            + (special.targetX - special.startX) * eased;
+          if (progress >= 0.48 && !special.relocated) {
+            runtime.x = special.targetX;
+            runtime.y = special.targetY;
+            special.relocated = true;
+          }
           return Math.abs(Math.cos(progress * Math.PI));
       }
       return 1;
@@ -575,27 +751,19 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
         ? Math.min((now - runtime.lastTickAt) / 1000, 0.1)
         : 1 / 60;
       runtime.lastTickAt = now;
-      const elapsed = now - runtime.stateStartedAt;
+      let elapsed = now - runtime.stateStartedAt;
 
       if (
-        specialsEnabled
-        && !reducedMotionRef.current
-        && pet.moves.length
-        && now >= runtime.nextSpecialAt
+        runtime.actionRequested
+        && !runtime.specialLoading
+        && !runtime.special
         && (runtime.state === 'idle' || runtime.state === 'travel')
       ) {
+        runtime.actionRequested = false;
         const movement = chooseMove(pet, runtime.lastMoveId);
-        if (movement) void beginSpecial(movement, now);
-        runtime.nextSpecialAt = now
-          + randomBetween(SPECIAL_MIN_MS, SPECIAL_MAX_MS);
-      }
-
-      if (
-        now >= runtime.nextBlinkAt
-        && (runtime.state === 'idle' || runtime.state === 'travel')
-      ) {
-        changeState('blink', 'blink', now, clipDuration(pet, 'blink'));
-        runtime.nextBlinkAt = now + randomBetween(BLINK_MIN_MS, BLINK_MAX_MS);
+        if (movement) void beginSpecial(movement);
+        else beginFallbackBlink(now);
+        elapsed = now - runtime.stateStartedAt;
       }
 
       if (runtime.state === 'idle' && elapsed >= runtime.stateDurationMs) {
@@ -606,32 +774,43 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
         runtime.x += runtime.vx * delta;
         runtime.y += runtime.vy * delta;
         if (elapsed >= runtime.stateDurationMs) {
-          if (Math.random() < 0.3) {
-            changeState(
-              'idle',
-              'idle',
-              now,
-              randomBetween(IDLE_MIN_MS, IDLE_MAX_MS),
-            );
-          } else {
-            runtime.vx = randomVelocity(pet.speedMultiplier);
-            runtime.vy = randomVelocity(pet.speedMultiplier);
-            changeState('travel', 'travel', now, DIRECTION_MS);
-          }
+          changeState(
+            'idle',
+            'idle',
+            now,
+            randomBetween(IDLE_MIN_MS, IDLE_MAX_MS),
+          );
         }
       } else if (runtime.state === 'blink') {
-        runtime.x += runtime.vx * delta * 4;
-        runtime.y += runtime.vy * delta * 4;
         if (elapsed >= runtime.stateDurationMs) {
-          changeState('travel', 'travel', now, DIRECTION_MS);
+          if (runtime.queuedAction) {
+            runtime.queuedAction = false;
+            runtime.actionRequested = true;
+          }
+          changeState(
+            'idle',
+            'idle',
+            now,
+            randomBetween(IDLE_MIN_MS, IDLE_MAX_MS),
+          );
         }
       } else if (runtime.state === 'special' && runtime.special) {
         if (now - runtime.special.startedAt >= runtime.special.durationMs) {
           runtime.special = null;
           resetEffects();
-          changeState('recover', 'idle', now, 320);
+          if (runtime.queuedAction) {
+            runtime.queuedAction = false;
+            runtime.actionRequested = true;
+            changeState('idle', 'idle', now, IDLE_MAX_MS);
+          } else {
+            changeState('recover', 'idle', now, 320);
+          }
         }
       } else if (runtime.state === 'recover' && elapsed >= runtime.stateDurationMs) {
+        if (runtime.queuedAction) {
+          runtime.queuedAction = false;
+          runtime.actionRequested = true;
+        }
         changeState(
           'idle',
           'idle',
@@ -669,7 +848,13 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
       if (runtime.vx < -2) runtime.facing = -1;
 
       const clip = pet.animations[runtime.clipId] ?? pet.animations.idle;
-      const frameInterval = 1000 / (clip.fps * pet.speedMultiplier);
+      const baseFrameInterval = 1000 / (clip.fps * pet.speedMultiplier);
+      const isActionState = runtime.state === 'special' || runtime.state === 'blink';
+      const frameInterval = isActionState
+        ? clip.looped
+          ? baseFrameInterval * ACTION_DURATION_MULTIPLIER
+          : runtime.stateDurationMs / Math.max(1, clip.frameCount)
+        : baseFrameInterval;
       if (now - runtime.lastFrameAt >= frameInterval) {
         runtime.frameIndex = clip.looped
           ? (runtime.frameIndex + 1) % clip.frameCount
@@ -714,6 +899,7 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
     const onVisibility = () => {
       if (document.hidden) {
         cancelAnimationFrame(animationRef.current);
+        setShatterEffect(null);
       } else {
         start();
       }
@@ -721,6 +907,7 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
     const onResize = () => {
       runtime.x = clamp(runtime.x, 48, window.innerWidth - 48);
       runtime.y = clamp(runtime.y, 48, window.innerHeight - 48);
+      setShatterEffect(null);
     };
 
     document.addEventListener('visibilitychange', onVisibility);
@@ -731,11 +918,25 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
       cancelAnimationFrame(animationRef.current);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('resize', onResize);
+      setShatterEffect(null);
       resetEffects();
     };
-  }, [enabled, ensureClip, pet, resetEffects, specialsEnabled]);
+  }, [enabled, ensureClip, pet, resetEffects]);
 
-  const handleClick = useCallback(() => onOpenChat(), [onOpenChat]);
+  const handleClick = useCallback(() => {
+    const runtime = runtimeRef.current;
+    if (
+      runtime.actionRequested
+      || runtime.specialLoading
+      || runtime.state === 'special'
+      || runtime.state === 'blink'
+      || runtime.state === 'recover'
+    ) {
+      runtime.queuedAction = true;
+      return;
+    }
+    runtime.actionRequested = true;
+  }, []);
 
   if (!enabled) return null;
 
@@ -772,6 +973,45 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
           filter="url(#pet-effect-glow)"
           style={{ visibility: 'hidden' }}
         />
+        {shatterEffect && (
+          <g
+            key={shatterEffect.id}
+            className="pet-shatter-effect"
+            style={{ animationDuration: `${shatterEffect.durationMs}ms` }}
+            aria-hidden="true"
+          >
+            {shatterEffect.cracks.map((path, index) => (
+              <path
+                key={`crack-${index}`}
+                d={path}
+                fill="none"
+                stroke={index % 2 === 0 ? '#f8fafc' : shatterEffect.color}
+                strokeWidth={index % 3 === 0 ? 2.2 : 1.2}
+                strokeLinecap="round"
+                opacity={0.9}
+                filter="url(#pet-effect-glow)"
+              />
+            ))}
+            {shatterEffect.shards.map((shard, index) => (
+              <polygon
+                key={`shard-${index}`}
+                points={shard.points}
+                fill={index % 2 === 0 ? '#ffffff' : shatterEffect.color}
+                fillOpacity={index % 2 === 0 ? 0.18 : 0.2}
+                stroke={index % 2 === 0 ? '#f8fafc' : shatterEffect.color}
+                strokeWidth="1"
+                className="pet-shatter-shard"
+                style={{
+                  '--pet-shard-x': `${shard.dx}px`,
+                  '--pet-shard-y': `${shard.dy}px`,
+                  '--pet-shard-rotation': `${shard.rotation}deg`,
+                  animationDuration: `${shatterEffect.durationMs}ms`,
+                  transformOrigin: `${shatterEffect.x}px ${shatterEffect.y}px`,
+                } as CSSProperties}
+              />
+            ))}
+          </g>
+        )}
       </svg>
       {[cloneLeftRef, cloneRightRef, actorRef].map((ref, index) => (
         <canvas
@@ -793,8 +1033,8 @@ export function MythicalPet({ onOpenChat }: { onOpenChat: () => void }) {
         type="button"
         className="fixed left-0 top-0 pointer-events-auto cursor-pointer rounded-full bg-transparent border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-neon"
         onClick={handleClick}
-        aria-label={`Open AI with ${pet.name}`}
-        title={`${pet.name} · Click to open AI`}
+        aria-label={`Play an action with ${pet.name}`}
+        title={`${pet.name} · Click to play an action`}
       />
     </div>
   );

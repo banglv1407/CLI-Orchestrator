@@ -29,7 +29,7 @@ terminal behavior and long-running sessions.
   - Keep the four built-in mythical pets or import private local pet packs.
   - Preview idle, travel, blink, and signature moves without interrupting the live overlay.
   - Configure size and speed independently for every pet.
-  - Click the live pet to open the AI surface.
+  - Click the live pet to trigger a non-repeating signature action.
 - **Premium Aesthetics**: Choose between **Cyberpunk**, **Kawaii**, and light themes with configurable companion overlays.
 
 ## ✨ Animated Pets
@@ -69,7 +69,7 @@ Open **Settings → Animated Pets** to:
 - Enable or disable the live pet overlay.
 - Select a built-in or imported pet.
 - Import a folder containing `manifest.json`.
-- Enable automatic non-repeating special moves.
+- Trigger non-repeating special moves by clicking the live pet.
 - Preview every animation on an isolated 320×220 stage.
 - Tune each pet from `20–160px` and `0.5×–2.0×` speed.
 - Reset one pet to its manifest or built-in defaults.

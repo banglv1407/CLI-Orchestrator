@@ -1096,9 +1096,7 @@ export function Dashboard() {
         onSave={handleSaveSshConnection}
       />
       {/* Mythical Pet — flies across the entire app window */}
-      <MythicalPet onOpenChat={() => {
-        window.dispatchEvent(new CustomEvent('mythical-pet-click'));
-      }} />
+      <MythicalPet />
 
       {/* Notepad modal */}
       {showNotepad && <Notepad onClose={() => setShowNotepad(false)} />}

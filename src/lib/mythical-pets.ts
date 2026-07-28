@@ -358,7 +358,6 @@ export function getResolvedActivePet(): MythicalPet {
 
 const PET_KEY = 'clx-mythical-pet';
 const PET_ENABLED_KEY = 'clx-mythical-pet-enabled';
-const PET_SPECIALS_KEY = 'clx-mythical-pet-specials-enabled';
 
 export function getActivePetId(): string {
   try {
@@ -387,22 +386,6 @@ export function getPetEnabled(): boolean {
 export function setPetEnabled(value: boolean) {
   try {
     localStorage.setItem(PET_ENABLED_KEY, String(value));
-  } catch {
-    // Browser storage can be unavailable in restricted WebViews.
-  }
-}
-
-export function getPetSpecialsEnabled(): boolean {
-  try {
-    return localStorage.getItem(PET_SPECIALS_KEY) !== 'false';
-  } catch {
-    return true;
-  }
-}
-
-export function setPetSpecialsEnabled(value: boolean) {
-  try {
-    localStorage.setItem(PET_SPECIALS_KEY, String(value));
   } catch {
     // Browser storage can be unavailable in restricted WebViews.
   }

@@ -222,6 +222,7 @@ mod tests {
             env: HashMap::new(),
             default_working_dir: None,
             saved_directories: Vec::new(),
+            enable_rtk: false,
         }
     }
 
@@ -298,6 +299,7 @@ endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\node_
             env: HashMap::new(),
             default_working_dir: None,
             saved_directories: Vec::new(),
+            enable_rtk: false,
         };
         let resolved = ExecutionEngine::resolve_command(&cli, "write tests", None);
 

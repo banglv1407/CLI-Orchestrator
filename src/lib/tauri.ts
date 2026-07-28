@@ -25,7 +25,7 @@ import type {
   ProxyLogEntry,
   ProxyStatus,
   SystemLogEntry,
-  NotepadContent,
+  NotepadState,
   WebAiProfile,
   WebAiConfig,
   WebAiRect,
@@ -344,11 +344,11 @@ export function petLoadAsset(packId: string, relativePath: string): Promise<PetA
   return invoke('pet_load_asset', { packId, relativePath });
 }
 
-export function getNotepad(): Promise<NotepadContent> {
+export function getNotepad(): Promise<NotepadState> {
   return invoke('get_notepad');
 }
 
-export function saveNotepad(content: NotepadContent): Promise<void> {
+export function saveNotepad(content: NotepadState): Promise<void> {
   return invoke('save_notepad', { content });
 }
 

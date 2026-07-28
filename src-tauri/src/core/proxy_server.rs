@@ -1031,6 +1031,9 @@ mod tests {
                 max_retries: 1,
                 headers: HashMap::new(),
                 custom_user_agent: Some("clx-test".to_string()),
+                enable_rtk: false,
+                enable_ponytail: false,
+                reasoning_effort: None,
             }],
         }));
         let proxy_app = Router::new()
@@ -1128,6 +1131,9 @@ mod tests {
                 max_retries: 1,
                 headers: HashMap::new(),
                 custom_user_agent: Some("clx-test".to_string()),
+                enable_rtk: false,
+                enable_ponytail: false,
+                reasoning_effort: None,
             }],
         }));
         let proxy_app = Router::new()

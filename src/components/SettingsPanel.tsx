@@ -8,13 +8,11 @@ import {
   getPetDiagnostics,
   getPetDefaultTuning,
   getPetEnabled,
-  getPetSpecialsEnabled,
   getRegisteredPets,
   refreshPetRegistry,
   resolvePetAssetUrl,
   resetPetTuning,
   setPetEnabled,
-  setPetSpecialsEnabled,
   setPetTuning,
   type MythicalPet,
 } from '../lib/mythical-pets';
@@ -132,7 +130,6 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
   // Pet state
   const [petId, setPetIdLocal] = useState(getActivePetId);
   const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
-  const [petSpecials, setPetSpecialsLocal] = useState(getPetSpecialsEnabled);
   const [pets, setPets] = useState(getRegisteredPets);
   const [petDiagnostics, setPetDiagnostics] = useState(getPetDiagnostics);
   const [petImporting, setPetImporting] = useState(false);
@@ -604,24 +601,6 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                     className={`w-10 h-5 rounded-full transition relative ${petEnabled ? 'bg-cyber-neon' : 'bg-slate-600'}`}
                   >
                     <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition ${petEnabled ? 'left-5' : 'left-0.5'}`} />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200">
-                  <div>
-                    <span className="font-semibold">Automatic Special Moves</span>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Play a non-repeating signature move every 25–45 seconds</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !petSpecials;
-                      setPetSpecialsLocal(next);
-                      setPetSpecialsEnabled(next);
-                      window.dispatchEvent(new CustomEvent('mythical-pet-change', { detail: { specialsEnabled: next } }));
-                    }}
-                    className={`w-10 h-5 rounded-full transition relative ${petSpecials ? 'bg-cyber-neon' : 'bg-slate-600'}`}
-                  >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition ${petSpecials ? 'left-5' : 'left-0.5'}`} />
                   </button>
                 </div>
                 {petEnabled && selectedPet && (

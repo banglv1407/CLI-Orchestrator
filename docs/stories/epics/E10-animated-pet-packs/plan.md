@@ -14,11 +14,14 @@ Settings preview.
   preview.
 - `US-028`: local-only modern hero art pack produced through two visual approval
   gates.
+- `US-029`: click-driven action scheduling, calmer idle/travel timing,
+  relocation, and bounded impact shatter effects.
 
 ## Guardrails
 
 - Never bundle or commit private character art.
-- Keep click-to-open-AI and existing localStorage choices compatible.
+- Keep Web AI reachable from its activity and command-palette entry points.
+- Live pet effects remain pointer-transparent and use bounded vector geometry.
 - Reject pack paths outside the installed pack root.
 - Avoid a full-window raster canvas and bound decoded image caches.
 - Do not claim final art acceptance before both human review gates pass.

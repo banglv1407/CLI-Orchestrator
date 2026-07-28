@@ -1,8 +1,9 @@
 # Animated Pets
 
 CLX can display one optional animated pet above the desktop UI. Selecting or
-disabling a pet is persisted locally. Clicking the live pet continues to open
-the AI surface.
+disabling a pet is persisted locally. Clicking the live pet requests an
+animation action; Web AI remains available from the activity bar and command
+palette.
 
 ## Built-in Pets
 
@@ -32,15 +33,25 @@ special-move duration.
   anime pack uses 32 CSS pixels inside a 128x128 frame.
 - Common clips are idle, travel, and blink.
 - A pet may expose two signature moves from the engine's supported move kinds.
-- Automatic moves are enabled by default and run at a randomized 25-45 second
-  interval without repeating the same move twice.
+- Idle lasts 6.6-15 seconds. Travel lasts two seconds and always returns to
+  idle, so pets spend most of their time resting.
+- Signature moves and blink actions never start from a timer. A click chooses a
+  non-repeating signature move; pets without signature moves play their blink
+  clip in place.
+- Actions run at twice their native duration with a 1.8 second minimum. One
+  extra click may be queued while an action is active.
+- Teleport and blink moves relocate to a safe point in the opposite viewport
+  region while the actor is hidden.
+- Beam, orb-lunge, and web-shot moves render one bounded, pointer-transparent
+  glass-shatter effect at their impact point.
 - Hidden windows do not advance or catch up animations.
-- Reduced-motion preference disables automatic special moves.
+- Reduced-motion preference keeps click actions available but removes flying
+  shatter fragments and shortens the impact flash.
 - Special effects never receive pointer input or interact with terminal content.
 
-Settings provides the enabled toggle, selected pet, local-pack import, special
-move toggle, and an isolated preview stage. Clicking the live pet remains
-reserved for opening AI.
+Settings provides the enabled toggle, selected pet, local-pack import, and an
+isolated preview stage. There is no automatic-special-move toggle because live
+actions are click-driven.
 
 Each registered pet also exposes per-pet tuning in Settings:
 

@@ -205,9 +205,17 @@ export interface SystemLogEntry {
   message: string;
 }
 
-export interface NotepadContent {
+export interface NotepadTab {
+  id: string;
+  title: string;
   text: string;
   language: string;
+}
+
+export interface NotepadState {
+  schemaVersion: 2;
+  activeTabId: string;
+  tabs: NotepadTab[];
 }
 
 export interface BuiltinLlmConfig {

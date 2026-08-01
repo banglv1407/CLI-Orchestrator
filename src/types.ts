@@ -16,6 +16,7 @@ export interface CliDefinition {
   defaultWorkingDir?: string;
   savedDirectories?: CliSavedDirectory[];
   enableRtk?: boolean;
+  group?: string;
 }
 
 export interface SessionInfo {
@@ -81,6 +82,14 @@ export interface FileEntry {
   name: string;
   path: string;
   isDir: boolean;
+}
+
+export interface SpecialConfigFile {
+  id: string;
+  name: string;
+  path: string;
+  description: string;
+  group?: string;
 }
 
 export interface RipgrepMatch {
@@ -237,25 +246,20 @@ export interface BuiltinLlmStatus {
   enabled: boolean;
 }
 
-export interface WebAiProfile {
-  id: string;
-  name: string;
-  userAgent?: string;
-  partition: string;
-  defaultUrl: string;
-  allowNavigationRules: string[];
-}
-
-export interface WebAiConfig {
-  profiles: WebAiProfile[];
-  preferredProfileId?: string;
-}
-
-export interface WebAiRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+export interface SafeAppContext {
+  activeView: string | null;
+  selectedCli: string | null;
+  workspacePath: string | null;
+  projectTag: string | null;
+  activeSessions: number;
+  cliProfiles: string[];
+  proxyBackendNames: string[];
+  proxyRunning: boolean;
+  proxyPort: number | null;
+  sshProfiles: string[];
+  quickApps: string[];
+  builtinLlmLoaded: boolean;
+  actionsEnabled: boolean;
 }
 
 // ── Companion types ──────────────────────────────────────────────
@@ -290,24 +294,6 @@ export interface HelpDetail {
   toolExposure: string;
   backendCommands: string[];
 }
-
-export interface SafeAppContext {
-  activeView: string | null;
-  selectedCli: string | null;
-  workspacePath: string | null;
-  projectTag: string | null;
-  activeSessions: number;
-  cliProfiles: string[];
-  proxyBackendNames: string[];
-  proxyRunning: boolean;
-  proxyPort: number | null;
-  sshProfiles: string[];
-  quickApps: string[];
-  builtinLlmLoaded: boolean;
-  actionsEnabled: boolean;
-}
-
-// ── Future Companion types (US-021+) ─────────────────────────────
 
 export interface CompanionConfigView {
   baseUrl: string;
@@ -361,6 +347,8 @@ export interface CompanionMessage {
   toolCalls?: CompanionToolCall[];
 }
 
+export type ToolRisk = 'none' | 'read' | 'config_write' | 'delete' | 'stop';
+
 export interface CompanionToolCall {
   actionId: string;
   toolId: string;
@@ -371,8 +359,6 @@ export interface CompanionToolCall {
   result?: string;
   verified?: boolean;
 }
-
-export type ToolRisk = 'none' | 'read' | 'config_write' | 'delete' | 'stop';
 
 export interface PendingAction {
   actionId: string;
@@ -400,7 +386,10 @@ export type PetMoveKind =
   | 'clone'
   | 'orb-lunge'
   | 'web-shot'
-  | 'web-zip';
+  | 'web-zip'
+  | 'big-kamehameha'
+  | 'screen-clones'
+  | 'web-screen-split';
 
 export interface PetAnimationClip {
   sheet: string;
@@ -456,4 +445,52 @@ export interface PetPackListResponse {
 export interface PetAssetPayload {
   mimeType: 'image/png';
   dataBase64: string;
+}
+
+// ── Inline terminal command assistant ──────────────────────────────────────
+
+export type TerminalShellDialect = 'cmd' | 'powershell' | 'bash' | 'unknown';
+
+export interface TerminalCommandEnvironment {
+  sessionId: string;
+  eligible: boolean;
+  supported: boolean;
+  transport: 'local' | 'wsl' | 'ssh';
+  osFamily: 'windows' | 'linux';
+  distroId?: string;
+  distroVersion?: string;
+  distroFamily?: 'windows' | 'debian' | 'rhel';
+  packageManager?: 'apt' | 'dnf' | 'yum';
+  shellDialect: TerminalShellDialect;
+  shellExecutable?: string;
+  workingDirHint?: string;
+  confidence: 'high' | 'low';
+  reason?: string;
+}
+
+export interface TerminalEnvironmentOverride {
+  shellDialect: Exclude<TerminalShellDialect, 'unknown'>;
+  distroId?: string;
+  distroFamily?: 'windows' | 'debian' | 'rhel';
+  packageManager?: 'apt' | 'dnf' | 'yum';
+}
+
+export interface TerminalCommandSuggestion {
+  command: string;
+  shellDialect: Exclude<TerminalShellDialect, 'unknown'>;
+  source: 'companion' | 'proxy';
+  risk: 'normal' | 'elevated' | 'destructive';
+  validation: {
+    status: 'verified';
+    validator: 'cmd_strict' | 'powershell_ast' | 'bash_n';
+  };
+  environment: TerminalCommandEnvironment;
+}
+
+export interface TerminalCommandSuggestRequest {
+  requestId: string;
+  sessionId: string;
+  userRequest: string;
+  visibleLines: string[];
+  environmentOverride?: TerminalEnvironmentOverride;
 }

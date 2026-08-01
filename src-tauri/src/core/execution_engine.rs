@@ -223,6 +223,7 @@ mod tests {
             default_working_dir: None,
             saved_directories: Vec::new(),
             enable_rtk: false,
+            group: None,
         }
     }
 
@@ -300,6 +301,7 @@ endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\node_
             default_working_dir: None,
             saved_directories: Vec::new(),
             enable_rtk: false,
+            group: None,
         };
         let resolved = ExecutionEngine::resolve_command(&cli, "write tests", None);
 

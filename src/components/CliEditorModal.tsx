@@ -11,6 +11,7 @@ interface CliEditorModalProps {
 export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEditorModalProps) {
   const [name, setName] = useState('');
   const [command, setCommand] = useState('');
+  const [group, setGroup] = useState('');
   const [defaultWorkingDir, setDefaultWorkingDir] = useState('');
   const [argsText, setArgsText] = useState('');
   const [enableRtk, setEnableRtk] = useState(false);
@@ -24,6 +25,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
 
     setName(initialCli?.name ?? '');
     setCommand(initialCli?.command ?? '');
+    setGroup(initialCli?.group ?? 'Default');
     setDefaultWorkingDir(initialCli?.defaultWorkingDir ?? '');
     setArgsText((initialCli?.args ?? []).join('\n'));
     setEnableRtk(initialCli?.enableRtk ?? false);
@@ -69,6 +71,16 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
               onChange={(event) => setCommand(event.target.value)}
               className="mt-1 w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
               placeholder="qwen"
+            />
+          </label>
+
+          <label className="text-xs uppercase tracking-wider text-slate-400">
+            Group (Optional)
+            <input
+              value={group}
+              onChange={(event) => setGroup(event.target.value)}
+              className="mt-1 w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
+              placeholder="Default"
             />
           </label>
 
@@ -140,6 +152,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
                 name: trimmedName,
                 command: trimmedCommand,
                 mode: 'interactive',
+                group: group.trim() || undefined,
                 defaultWorkingDir: defaultWorkingDir.trim() || undefined,
                 args,
                 env: initialCli?.env ?? {},

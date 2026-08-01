@@ -26,14 +26,13 @@ import type {
   ProxyStatus,
   SystemLogEntry,
   NotepadState,
-  WebAiProfile,
-  WebAiConfig,
-  WebAiRect,
   InstalledPetPack,
   PetAssetPayload,
   PetPackListResponse,
+  TerminalCommandEnvironment,
+  TerminalCommandSuggestRequest,
+  TerminalCommandSuggestion,
 } from '../types';
-
 export function listClis(): Promise<CliDefinition[]> {
   return invoke('list_clis');
 }
@@ -80,6 +79,22 @@ export function createTerminalSession(request: CreateSessionRequest): Promise<Se
 
 export function sendCliInput(sessionId: string, input: string): Promise<void> {
   return invoke('send_cli_input', { request: { sessionId, input } });
+}
+
+export function terminalCommandDetectEnvironment(
+  sessionId: string,
+): Promise<TerminalCommandEnvironment> {
+  return invoke('terminal_command_detect_environment', { request: { sessionId } });
+}
+
+export function terminalCommandSuggest(
+  request: TerminalCommandSuggestRequest,
+): Promise<TerminalCommandSuggestion> {
+  return invoke('terminal_command_suggest', { request });
+}
+
+export function terminalCommandCancel(requestId: string): Promise<void> {
+  return invoke('terminal_command_cancel', { requestId });
 }
 
 export function stopCli(request: StopCliRequest): Promise<void> {
@@ -352,37 +367,8 @@ export function saveNotepad(content: NotepadState): Promise<void> {
   return invoke('save_notepad', { content });
 }
 
-export function webAiLoadProfiles(): Promise<WebAiConfig> {
-  return invoke('web_ai_load_profiles');
-}
-
-export function webAiSaveProfiles(config: WebAiConfig): Promise<void> {
-  return invoke('web_ai_save_profiles', { config });
-}
-
-export function webAiSpawnProfile(profile: WebAiProfile, rect: WebAiRect): Promise<void> {
-  return invoke('web_ai_spawn_profile', { profile, rect });
-}
-
-export function webAiReposition(rect: WebAiRect): Promise<void> {
-  return invoke('web_ai_reposition', { rect });
-}
-
-export function webAiSetVisible(visible: boolean): Promise<void> {
-  return invoke('web_ai_set_visible', { visible });
-}
-
-export function webAiClose(): Promise<void> {
-  return invoke('web_ai_close');
-}
-
-export function webAiClearData(): Promise<void> {
-  return invoke('web_ai_clear_data');
-}
-
-// ── Dashboard ───────────────────────────────────────────────────────
-
 export interface ResourceUsage {
+  cpuPercent: number;
   memoryBytes: number;
   memoryMb: number;
   memoryPercent: number;

@@ -341,6 +341,7 @@ fn shell_cli_definition() -> CliDefinition {
             default_working_dir: None,
             saved_directories: Vec::new(),
             enable_rtk: false,
+            group: None,
         };
     }
 
@@ -356,6 +357,7 @@ fn shell_cli_definition() -> CliDefinition {
             default_working_dir: None,
             saved_directories: Vec::new(),
             enable_rtk: false,
+            group: None,
         };
     }
 }
@@ -1036,7 +1038,7 @@ pub fn open_workspace_folder(path: String) -> Result<(), String> {
     open_folder(&p)
 }
 
-fn run_ssh_command(
+pub(crate) fn run_ssh_command(
     connection: &SshConnection,
     remote_command: &str,
     stdin_data: Option<&str>,

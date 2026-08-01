@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::AtomicU64;
+
 
 use crate::{
     commands::api_proxy::{ApiProxyState, SharedApiProxyState},
@@ -27,8 +27,6 @@ pub struct AppState {
     pub ssh_server_manager: Arc<std::sync::Mutex<crate::core::ssh_server::SshServerManager>>,
     pub builtin_llm: Arc<tokio::sync::Mutex<crate::builtin_llm::engine::BuiltinLlmEngine>>,
     pub companion: Arc<CompanionManager>,
-    pub web_ai_generation: AtomicU64,
-    pub web_ai_operation: tokio::sync::Mutex<()>,
 }
 
 impl AppState {
@@ -82,8 +80,6 @@ impl AppState {
             )),
             builtin_llm,
             companion,
-            web_ai_generation: AtomicU64::new(0),
-            web_ai_operation: tokio::sync::Mutex::new(()),
         })
     }
 }

@@ -63,6 +63,8 @@ pub struct CliDefinition {
     pub saved_directories: Vec<CliSavedDirectory>,
     #[serde(default, rename = "enableRtk", alias = "enable_rtk")]
     pub enable_rtk: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -374,6 +376,7 @@ impl CliRegistry {
                 default_working_dir: None,
                 saved_directories: Vec::new(),
                 enable_rtk: false,
+                group: Some("AI Models".to_string()),
             },
             CliDefinition {
                 name: "gemini".to_string(),
@@ -384,6 +387,7 @@ impl CliRegistry {
                 default_working_dir: None,
                 saved_directories: Vec::new(),
                 enable_rtk: false,
+                group: Some("AI Models".to_string()),
             },
             CliDefinition {
                 name: "codex".to_string(),
@@ -394,6 +398,7 @@ impl CliRegistry {
                 default_working_dir: None,
                 saved_directories: Vec::new(),
                 enable_rtk: false,
+                group: Some("AI Models".to_string()),
             },
             CliDefinition {
                 name: "aider".to_string(),
@@ -404,6 +409,7 @@ impl CliRegistry {
                 default_working_dir: None,
                 saved_directories: Vec::new(),
                 enable_rtk: false,
+                group: Some("Coding Assistants".to_string()),
             },
             CliDefinition {
                 name: "claude-code".to_string(),
@@ -414,6 +420,7 @@ impl CliRegistry {
                 default_working_dir: None,
                 saved_directories: Vec::new(),
                 enable_rtk: false,
+                group: Some("Coding Assistants".to_string()),
             },
             CliDefinition {
                 name: "opencode".to_string(),
@@ -424,6 +431,7 @@ impl CliRegistry {
                 default_working_dir: None,
                 saved_directories: Vec::new(),
                 enable_rtk: false,
+                group: Some("Coding Assistants".to_string()),
             },
         ]
     }

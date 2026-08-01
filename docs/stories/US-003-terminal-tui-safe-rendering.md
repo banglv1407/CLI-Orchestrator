@@ -25,7 +25,7 @@ overlays that can cover full-screen TUI content.
 - [x] CLX no longer writes session status lines into the xterm buffer.
 - [x] CLX no longer writes frontend-only connection metadata into the xterm buffer.
 - [x] The main terminal refresh path no longer replays raw ANSI history.
-- [x] Mini terminal history replay is skipped when alternate-screen output is detected.
+- [x] Mini terminals do not replay raw ANSI history; they mirror the parsed main buffer.
 - [x] Known nested TUI agent CLIs disable CLX inline `@` and `!` assist interception.
 - [x] Session metadata and top-right controls are less intrusive for known nested TUI agent CLIs.
 

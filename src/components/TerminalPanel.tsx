@@ -5,8 +5,27 @@ import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import type { CliOutputEvent, CliStatusEvent, SessionInfo, SshConnection, AppTheme, FileEntry, RipgrepMatch } from '../types';
-import { listAllFilesRecursive, listSshFilesRecursive, ripgrepSearch, downloadSshFile } from '../lib/tauri';
+import type {
+  CliOutputEvent,
+  CliStatusEvent,
+  SessionInfo,
+  SshConnection,
+  AppTheme,
+  FileEntry,
+  RipgrepMatch,
+  TerminalCommandEnvironment,
+  TerminalCommandSuggestion,
+  TerminalEnvironmentOverride,
+} from '../types';
+import {
+  listAllFilesRecursive,
+  listSshFilesRecursive,
+  ripgrepSearch,
+  downloadSshFile,
+  terminalCommandCancel,
+  terminalCommandDetectEnvironment,
+  terminalCommandSuggest,
+} from '../lib/tauri';
 import { RemoteMonitorWidget } from './RemoteMonitorWidget';
 import { SshFileTransferDialog } from './SshFileTransferDialog';
 import { save } from '@tauri-apps/plugin-dialog';
@@ -17,10 +36,14 @@ import { SystemLogPanel } from './SystemLogPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
 import { DashboardPanel } from './DashboardPanel';
-import { WebAiPanel } from './WebAiPanel';
 import { useUiActive } from '../hooks/useUiActive';
 import { copyTerminalSelection, getTerminalSelectionText, type TerminalCopyMode } from '../lib/terminalClipboard';
 import { getContextMenuPosition } from '../lib/contextMenu';
+import { isConfigFile, validateConfigSyntax, formatConfigContent } from '../lib/configFiles';
+import {
+  TerminalCommandPopup,
+  type TerminalCommandPopupPhase,
+} from './TerminalCommandPopup';
 
 function FileIcon() {
   return (
@@ -110,11 +133,28 @@ interface TerminalHandle {
 const INPUT_FLUSH_MS = 16;
 const MOUNT_DELAY_MS = 50;
 const MAX_TERMINAL_WRITE_QUEUE_BYTES = 2 * 1024 * 1024;
-const MAX_REPLAY_HISTORY_BYTES = 1024 * 1024;
-const MAX_REPLAY_HISTORY_CHUNKS = 1_000;
 const TERMINAL_FONT_FAMILY = 'Cascadia Mono, CaskaydiaCove Nerd Font, Fira Code, Consolas, "Segoe UI Symbol", monospace';
 const TUI_CLI_NAME_PATTERNS = ['codex', 'opencode', 'claude', 'gemini', 'aider'];
-const ALT_SCREEN_PATTERN = /\x1b\[\?(?:47|1047|1048|1049)h/;
+const MINI_TERMINAL_SYNC_MS = 16;
+const COMMAND_POPUP_WIDTH = 420;
+const COMMAND_POPUP_ESTIMATED_HEIGHT = 360;
+const DEFAULT_WINDOWS_BASH_OVERRIDE: TerminalEnvironmentOverride = {
+  shellDialect: 'bash',
+  distroId: 'windows',
+  distroFamily: 'windows',
+};
+
+function isTerminalCommandShortcut(event: KeyboardEvent): boolean {
+  if (!event.ctrlKey || !event.altKey) return false;
+  const key = event.key.toLowerCase();
+  return (
+    event.code === 'Slash' ||
+    event.code === 'NumpadDivide' ||
+    key === '?' ||
+    key === '/' ||
+    key === '¿'
+  );
+}
 
 function isNestedTuiCli(session?: SessionInfo | null) {
   if (!session) return false;
@@ -122,8 +162,109 @@ function isNestedTuiCli(session?: SessionInfo | null) {
   return TUI_CLI_NAME_PATTERNS.some((pattern) => name.includes(pattern));
 }
 
-function hasAlternateScreenOutput(chunks?: string[]) {
-  return chunks?.some((chunk) => ALT_SCREEN_PATTERN.test(chunk)) ?? false;
+function getDefaultEnvironmentOverride(
+  environment: TerminalCommandEnvironment,
+): TerminalEnvironmentOverride | undefined {
+  if (!environment.eligible || (environment.supported && environment.confidence === 'high')) {
+    return undefined;
+  }
+  if (environment.transport === 'local') {
+    return DEFAULT_WINDOWS_BASH_OVERRIDE;
+  }
+  const family = environment.distroFamily === 'rhel' ? 'rhel' : 'debian';
+  return {
+    shellDialect: 'bash',
+    distroId: family === 'rhel' ? 'rhel' : 'ubuntu',
+    distroFamily: family,
+    packageManager: family === 'rhel' ? 'dnf' : 'apt',
+  };
+}
+
+function buildMiniTerminalSnapshot(term: Terminal): string {
+  const buffer = term.buffer.active;
+  const startLine = Math.max(0, buffer.baseY);
+  const rowCount = Math.max(1, term.rows);
+  let snapshot = '\x1b[?25l\x1b[2J';
+
+  for (let row = 0; row < rowCount; row += 1) {
+    const text = buffer.getLine(startLine + row)?.translateToString(true) ?? '';
+    snapshot += `\x1b[${row + 1};1H${text}`;
+  }
+
+  return snapshot;
+}
+
+function getVisibleTerminalLines(term: Terminal): string[] {
+  const buffer = term.buffer.active;
+  const lines: string[] = [];
+  const end = Math.min(buffer.length, buffer.viewportY + term.rows);
+  for (let index = buffer.viewportY; index < end; index += 1) {
+    lines.push(buffer.getLine(index)?.translateToString(true) ?? '');
+  }
+  return lines.slice(-20);
+}
+
+function getCommandPopupPosition(
+  term: Terminal,
+  container: HTMLDivElement,
+): { left: number; top: number } {
+  const containerRect = container.getBoundingClientRect();
+  const screen = container.querySelector('.xterm-screen') as HTMLElement | null;
+  const screenRect = screen?.getBoundingClientRect() ?? containerRect;
+  const cellWidth = term.cols > 0 ? screenRect.width / term.cols : 8;
+  const cellHeight = term.rows > 0 ? screenRect.height / term.rows : 18;
+  const buffer = term.buffer.active;
+  const cursorScreenRow = Math.max(
+    0,
+    Math.min(term.rows - 1, buffer.baseY + buffer.cursorY - buffer.viewportY),
+  );
+  const anchorLeft = screenRect.left + buffer.cursorX * cellWidth;
+  const anchorBottom = screenRect.top + (cursorScreenRow + 1) * cellHeight;
+  const minLeft = containerRect.left + 8;
+  const maxLeft = Math.max(minLeft, containerRect.right - COMMAND_POPUP_WIDTH - 8);
+  const left = Math.min(Math.max(anchorLeft, minLeft), maxLeft);
+  const belowTop = anchorBottom + 6;
+  const aboveTop = anchorBottom - COMMAND_POPUP_ESTIMATED_HEIGHT - cellHeight;
+  const top =
+    belowTop + COMMAND_POPUP_ESTIMATED_HEIGHT <= containerRect.bottom - 8
+      ? belowTop
+      : Math.max(containerRect.top + 8, aboveTop);
+  return { left, top };
+}
+
+function isRecognizedEmptyPrompt(
+  term: Terminal,
+  shellDialect: TerminalCommandSuggestion['shellDialect'],
+): boolean {
+  if (term.buffer.active !== term.buffer.normal) return false;
+  const buffer = term.buffer.active;
+  const line =
+    buffer
+      .getLine(buffer.baseY + buffer.cursorY)
+      ?.translateToString(true, 0, buffer.cursorX)
+      .trimEnd() ?? '';
+  if (!line) return false;
+  if (shellDialect === 'powershell') {
+    return /^\s*PS(?:\s+[^>\r\n]*)?>\s*$/.test(line);
+  }
+  if (shellDialect === 'cmd') {
+    return /^\s*(?:[A-Za-z]:[\\/][^>\r\n]*|\\\\[^>\r\n]*)>\s*$/.test(line);
+  }
+  return /^\s*(?:\([^)]+\)\s*)?(?:(?:[\w.-]+@[\w.-]+(?::[^$#\r\n]*)?)|(?:ba)?sh-[\d.]+)?[$#]\s*$/.test(
+    line,
+  );
+}
+
+interface TerminalCommandPopupState {
+  sessionId: string;
+  phase: TerminalCommandPopupPhase;
+  position: { left: number; top: number };
+  environment: TerminalCommandEnvironment | null;
+  environmentOverride?: TerminalEnvironmentOverride;
+  requestText: string;
+  suggestion: TerminalCommandSuggestion | null;
+  error: string | null;
+  requestId?: string;
 }
 
 export function TerminalPanel({
@@ -201,11 +342,24 @@ export function TerminalPanel({
   const rgQueryRef = useRef('');
   const [rgResults, setRgResults] = useState<RipgrepMatch[]>([]);
   const [rgLoading, setRgLoading] = useState(false);
+  const [termDimensions, setTermDimensions] = useState<Record<string, { cols: number; rows: number }>>({});
   const rgInputRef = useRef<HTMLInputElement | null>(null);
   const mentionListRef = useRef<HTMLDivElement | null>(null);
   const rgListRef = useRef<HTMLDivElement | null>(null);
+  const [terminalCommandPopup, setTerminalCommandPopup] =
+    useState<TerminalCommandPopupState | null>(null);
+  const terminalCommandPopupRef = useRef<TerminalCommandPopupState | null>(null);
+  const terminalCommandActiveRef = useRef(false);
+  const terminalCommandInputRef = useRef<HTMLInputElement | null>(null);
+  const terminalCommandEpochRef = useRef(0);
   const fileEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const fileDiffScrollRef = useRef<HTMLDivElement | null>(null);
+  const lineNumbersRef = useRef<HTMLDivElement | null>(null);
+
+  const fileValidation = useMemo(() => {
+    if (!openedFile) return { valid: true };
+    return validateConfigSyntax(openedFile.name, fileContent);
+  }, [openedFile, fileContent]);
 
   useEffect(() => {
     if (!openedFile || isFileLoading) return;
@@ -308,6 +462,10 @@ export function TerminalPanel({
   const inputBuffers = useRef<Record<string, string>>({});
   const inputTimers = useRef<Record<string, number>>({});
   const pendingTerminalWrites = useRef<Record<string, string[]>>({});
+  const miniSyncTimers = useRef<Record<string, number>>({});
+  const miniSyncInFlight = useRef<Record<string, boolean>>({});
+  const miniSyncDirty = useRef<Record<string, boolean>>({});
+  const miniSyncGeneration = useRef<Record<string, number>>({});
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const initializedRef = useRef<Record<string, boolean>>({});
   const containerToSessionRef = useRef<WeakMap<Element, string>>(new WeakMap());
@@ -321,10 +479,6 @@ export function TerminalPanel({
     window.addEventListener('focus-active-terminal', handleFocusActiveTerminal);
     return () => window.removeEventListener('focus-active-terminal', handleFocusActiveTerminal);
   }, [activeSessionId]);
-  // Accumulate ALL raw terminal output so we can replay it into mini terminals after DOM moves
-  const mainOutputHistory = useRef<Record<string, string[]>>({});
-  const mainOutputHistoryBytes = useRef<Record<string, number>>({});
-
   // Context menu is now lifted to Dashboard — reuse its state
   // But keep local handleContextMenu for TerminalPanel internal wiring (disabled for now)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -378,9 +532,11 @@ export function TerminalPanel({
       };
 
       while (handle.writeQueue.length > 0) {
-        const chunk = handle.writeQueue.shift();
+        const chunks = handle.writeQueue.splice(0);
+        const chunk = chunks.join('');
         if (chunk) {
-          handle.writeQueueBytes = Math.max(0, handle.writeQueueBytes - chunk.length * 2);
+          const batchBytes = chunks.reduce((total, item) => total + item.length * 2, 0);
+          handle.writeQueueBytes = Math.max(0, handle.writeQueueBytes - batchBytes);
           // Refresh the cache from xterm's authoritative state right before
           // the write. `term.onScroll` keeps this in sync, but a write may
           // race the listener (xterm mutates ydisp synchronously inside the
@@ -390,9 +546,6 @@ export function TerminalPanel({
 
           await new Promise<void>((resolve) => {
             handle.term.write(chunk, () => resolve());
-            if (handle.miniTerm) {
-              handle.miniTerm.write(chunk);
-            }
           });
 
           // If the user was at the bottom, keep them there — they want to see
@@ -417,10 +570,7 @@ export function TerminalPanel({
       if (handle.isAtBottom) {
         handle.term.scrollToBottom();
       }
-      if (handle.miniTerm) {
-        // Mini terminal is read-only output; always follow.
-        handle.miniTerm.scrollToBottom();
-      }
+      scheduleMiniTerminalSync(sessionId);
 
       handle.isWriting = false;
 
@@ -599,6 +749,169 @@ export function TerminalPanel({
     setRgResults([]);
   }, []);
 
+  useEffect(() => {
+    terminalCommandPopupRef.current = terminalCommandPopup;
+    terminalCommandActiveRef.current = terminalCommandPopup !== null;
+  }, [terminalCommandPopup]);
+
+  const closeTerminalCommandPopup = useCallback(() => {
+    terminalCommandEpochRef.current += 1;
+    const current = terminalCommandPopupRef.current;
+    terminalCommandPopupRef.current = null;
+    terminalCommandActiveRef.current = false;
+    setTerminalCommandPopup(null);
+    if (current?.requestId) {
+      void terminalCommandCancel(current.requestId);
+    }
+    window.setTimeout(() => {
+      if (current?.sessionId) {
+        terminalRefs.current[current.sessionId]?.term.focus();
+      }
+    }, 0);
+  }, []);
+
+  const openTerminalCommandPopup = useCallback(
+    (session: SessionInfo, term: Terminal) => {
+      if (
+        session.id !== visibleSessionIdRef.current ||
+        isNestedTuiCli(session) ||
+        term.buffer.active !== term.buffer.normal
+      ) {
+        return;
+      }
+      const container = containerRefs.current[session.id];
+      if (!container) return;
+
+      closeSearch();
+      closeMention();
+      closeRg();
+      const epoch = terminalCommandEpochRef.current + 1;
+      terminalCommandEpochRef.current = epoch;
+      const initial: TerminalCommandPopupState = {
+        sessionId: session.id,
+        phase: 'detecting',
+        position: getCommandPopupPosition(term, container),
+        environment: null,
+        requestText: '',
+        suggestion: null,
+        error: null,
+      };
+      terminalCommandPopupRef.current = initial;
+      terminalCommandActiveRef.current = true;
+      setTerminalCommandPopup(initial);
+
+      void terminalCommandDetectEnvironment(session.id)
+        .then((environment) => {
+          if (terminalCommandEpochRef.current !== epoch) return;
+          setTerminalCommandPopup((current) => {
+            if (current?.sessionId !== session.id) return current;
+            const next: TerminalCommandPopupState = {
+              ...current,
+              phase: environment.eligible ? 'input' : 'error',
+              environment,
+              environmentOverride: getDefaultEnvironmentOverride(environment),
+              error: environment.eligible ? null : environment.reason ?? 'Unsupported session',
+            };
+            terminalCommandPopupRef.current = next;
+            return next;
+          });
+          if (environment.eligible) {
+            window.setTimeout(() => terminalCommandInputRef.current?.focus(), 0);
+          }
+        })
+        .catch((cause: unknown) => {
+          if (terminalCommandEpochRef.current !== epoch) return;
+          const message = cause instanceof Error ? cause.message : String(cause);
+          setTerminalCommandPopup((current) => {
+            if (current?.sessionId !== session.id) return current;
+            const next: TerminalCommandPopupState = {
+              ...current,
+              phase: 'error',
+              error: message,
+            };
+            terminalCommandPopupRef.current = next;
+            return next;
+          });
+        });
+    },
+    [closeMention, closeRg, closeSearch],
+  );
+
+  const generateTerminalCommand = useCallback(() => {
+    const current = terminalCommandPopupRef.current;
+    if (
+      !current ||
+      !current.environment?.eligible ||
+      !current.requestText.trim() ||
+      current.phase === 'generating'
+    ) {
+      return;
+    }
+    const handle = terminalRefs.current[current.sessionId];
+    if (!handle) return;
+    const requestId =
+      typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const next: TerminalCommandPopupState = {
+      ...current,
+      phase: 'generating',
+      suggestion: null,
+      error: null,
+      requestId,
+    };
+    terminalCommandPopupRef.current = next;
+    setTerminalCommandPopup(next);
+
+    void terminalCommandSuggest({
+      requestId,
+      sessionId: current.sessionId,
+      userRequest: current.requestText,
+      visibleLines: getVisibleTerminalLines(handle.term),
+      environmentOverride: current.environmentOverride,
+    })
+      .then((suggestion) => {
+        const active = terminalCommandPopupRef.current;
+        if (active?.requestId !== requestId) return;
+        const ready: TerminalCommandPopupState = {
+          ...active,
+          phase: 'ready',
+          suggestion,
+          error: null,
+          requestId: undefined,
+        };
+        terminalCommandPopupRef.current = ready;
+        setTerminalCommandPopup(ready);
+      })
+      .catch((cause: unknown) => {
+        const active = terminalCommandPopupRef.current;
+        if (active?.requestId !== requestId) return;
+        const message = cause instanceof Error ? cause.message : String(cause);
+        const failed: TerminalCommandPopupState = {
+          ...active,
+          phase: 'error',
+          error: message,
+          requestId: undefined,
+        };
+        terminalCommandPopupRef.current = failed;
+        setTerminalCommandPopup(failed);
+      });
+  }, []);
+
+  const copyTerminalCommand = useCallback(() => {
+    const command = terminalCommandPopupRef.current?.suggestion?.command;
+    if (command) void navigator.clipboard.writeText(command);
+  }, []);
+
+  const insertTerminalCommand = useCallback(() => {
+    const current = terminalCommandPopupRef.current;
+    if (!current?.suggestion) return;
+    const handle = terminalRefs.current[current.sessionId];
+    if (!handle || !isRecognizedEmptyPrompt(handle.term, current.suggestion.shellDialect)) return;
+    onSendInput(current.sessionId, current.suggestion.command);
+    closeTerminalCommandPopup();
+  }, [closeTerminalCommandPopup, onSendInput]);
+
   // ── Debounced Ripgrep search query execution ──
   useEffect(() => {
     if (!rgActive) return;
@@ -654,6 +967,44 @@ export function TerminalPanel({
   }, [rgSelectedIndex]);
 
   useEffect(() => {
+    const handleTerminalCommandShortcut = (event: KeyboardEvent) => {
+      if (
+        !isTerminalCommandShortcut(event) ||
+        terminalCommandActiveRef.current ||
+        searchVisibleRef.current ||
+        rgActiveRef.current ||
+        mentionActiveRef.current ||
+        activeMainView !== 'terminal' ||
+        openedFile !== null
+      ) {
+        return;
+      }
+
+      const sessionId = visibleSessionIdRef.current;
+      if (!sessionId) return;
+      const session = sessionsRef.current.find((item) => item.id === sessionId);
+      const handle = terminalRefs.current[sessionId];
+      const container = containerRefs.current[sessionId];
+      const eventTarget = event.target;
+      const activeElement = document.activeElement;
+      const terminalOwnsFocus =
+        !!container &&
+        ((eventTarget instanceof Node && container.contains(eventTarget)) ||
+          (activeElement instanceof Node && container.contains(activeElement)));
+      if (!session || !handle || !terminalOwnsFocus) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      openTerminalCommandPopup(session, handle.term);
+    };
+
+    // Capture before xterm/browser keyboard handling so Ctrl+Alt+? remains
+    // reliable on Windows layouts where Ctrl+Alt is reported as AltGraph.
+    window.addEventListener('keydown', handleTerminalCommandShortcut, true);
+    return () => window.removeEventListener('keydown', handleTerminalCommandShortcut, true);
+  }, [activeMainView, openedFile, openTerminalCommandPopup]);
+
+  useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'N') {
         e.preventDefault();
@@ -678,10 +1029,41 @@ export function TerminalPanel({
       if (e.key === 'Escape' && rgActive) {
         closeRg();
       }
+      if (e.key === 'Escape' && terminalCommandPopup) {
+        closeTerminalCommandPopup();
+      }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [triggerQuickSession, openSearch, closeSearch, searchVisible, mentionActive, closeMention, rgActive, closeRg]);
+  }, [
+    triggerQuickSession,
+    openSearch,
+    closeSearch,
+    searchVisible,
+    mentionActive,
+    closeMention,
+    rgActive,
+    closeRg,
+    terminalCommandPopup,
+    closeTerminalCommandPopup,
+  ]);
+
+  useEffect(() => {
+    if (
+      terminalCommandPopup &&
+      (activeMainView !== 'terminal' ||
+        openedFile !== null ||
+        terminalCommandPopup.sessionId !== visibleSessionId)
+    ) {
+      closeTerminalCommandPopup();
+    }
+  }, [
+    activeMainView,
+    closeTerminalCommandPopup,
+    openedFile,
+    terminalCommandPopup,
+    visibleSessionId,
+  ]);
 
   // ── Mention Selection via Custom Event ──
   useEffect(() => {
@@ -750,10 +1132,14 @@ export function TerminalPanel({
   // Track which DOM node each miniTerm was last opened on
   const lastMiniMountNode = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const createFreshMiniTerminal = useCallback((handle: TerminalHandle) => {
+  const createFreshMiniTerminal = useCallback((sessionId: string, handle: TerminalHandle) => {
     // Dispose old miniTerm completely
     handle.cleanupMiniScroll();
     try { handle.miniTerm?.dispose(); } catch (_e) { /* ignore if already disposed */ }
+    miniSyncInFlight.current[sessionId] = false;
+    miniSyncDirty.current[sessionId] = false;
+    miniSyncGeneration.current[sessionId] =
+      (miniSyncGeneration.current[sessionId] ?? 0) + 1;
 
     const newMiniTerm = new Terminal({
       cursorBlink: false,
@@ -774,19 +1160,56 @@ export function TerminalPanel({
     return { miniTerm: newMiniTerm };
   }, []);
 
-  const replayHistoryIntoMiniTerm = useCallback((sessionId: string, miniTerm: Terminal) => {
-    const history = mainOutputHistory.current[sessionId];
-    if (!history || history.length === 0) return;
+  const syncMiniTerminalFromMain = useCallback((sessionId: string): void => {
+    const handle = terminalRefs.current[sessionId];
+    const miniTerm = handle?.miniTerm;
+    if (!handle || !miniTerm || !miniTerm.element) return;
+    if (miniSyncInFlight.current[sessionId]) {
+      miniSyncDirty.current[sessionId] = true;
+      return;
+    }
+
     try {
-      for (const chunk of history) {
-        miniTerm.write(chunk);
+      if (
+        handle.term.cols > 0
+        && handle.term.rows > 0
+        && (miniTerm.cols !== handle.term.cols || miniTerm.rows !== handle.term.rows)
+      ) {
+        miniTerm.resize(handle.term.cols, handle.term.rows);
       }
-      miniTerm.scrollToBottom();
-      miniTerm.refresh(0, miniTerm.rows - 1);
+
+      const snapshot = buildMiniTerminalSnapshot(handle.term);
+      const generation = miniSyncGeneration.current[sessionId] ?? 0;
+      miniSyncInFlight.current[sessionId] = true;
+      miniTerm.write(snapshot, () => {
+        if ((miniSyncGeneration.current[sessionId] ?? 0) !== generation) return;
+        miniSyncInFlight.current[sessionId] = false;
+        if (terminalRefs.current[sessionId]?.miniTerm === miniTerm) {
+          try {
+            miniTerm.refresh(0, Math.max(0, miniTerm.rows - 1));
+          } catch (_e) {}
+        }
+        if (miniSyncDirty.current[sessionId]) {
+          miniSyncDirty.current[sessionId] = false;
+          syncMiniTerminalFromMain(sessionId);
+        }
+      });
     } catch (e) {
-      console.error('Failed to replay output to mini terminal:', e);
+      miniSyncInFlight.current[sessionId] = false;
+      console.error('Failed to sync mini terminal from main buffer:', e);
     }
   }, []);
+
+  const scheduleMiniTerminalSync = useCallback(
+    (sessionId: string, delay = MINI_TERMINAL_SYNC_MS) => {
+      if (miniSyncTimers.current[sessionId] !== undefined) return;
+      miniSyncTimers.current[sessionId] = window.setTimeout(() => {
+        delete miniSyncTimers.current[sessionId];
+        syncMiniTerminalFromMain(sessionId);
+      }, delay);
+    },
+    [syncMiniTerminalFromMain],
+  );
 
   const refreshMiniTerminalFromMain = useCallback((sessionId: string) => {
     const handle = terminalRefs.current[sessionId];
@@ -795,12 +1218,12 @@ export function TerminalPanel({
     if (!mountNode) return;
 
     // Dispose and recreate for a clean state
-    const { miniTerm } = createFreshMiniTerminal(handle);
+    const { miniTerm } = createFreshMiniTerminal(sessionId, handle);
     miniTerm.open(mountNode);
 
     mountNode.classList.add('mini-terminal-viewport');
 
-    replayHistoryIntoMiniTerm(sessionId, miniTerm);
+    scheduleMiniTerminalSync(sessionId, 0);
 
     setTimeout(() => {
       try {
@@ -808,7 +1231,7 @@ export function TerminalPanel({
         miniTerm.refresh(0, miniTerm.rows - 1);
       } catch (_e) {}
     }, MOUNT_DELAY_MS);
-  }, [createFreshMiniTerminal, replayHistoryIntoMiniTerm]);
+  }, [createFreshMiniTerminal, scheduleMiniTerminalSync]);
 
   const refreshMainTerminal = useCallback((sessionId: string) => {
     const handle = terminalRefs.current[sessionId];
@@ -945,6 +1368,52 @@ export function TerminalPanel({
       });
 
       term.attachCustomKeyEventHandler((event) => {
+        // ── Ctrl+Alt+? (command), Ctrl+Alt+1 (ripgrep), Ctrl+Alt+2 (mention) ──
+        if (event.ctrlKey && event.altKey) {
+          const key = event.key.toLowerCase();
+          const code = event.code;
+          if (isTerminalCommandShortcut(event)) {
+            if (event.type !== 'keydown') return false;
+            const activeSession = sessionsRef.current.find((item) => item.id === session.id);
+            if (
+              activeSession &&
+              !terminalCommandActiveRef.current &&
+              !searchVisibleRef.current &&
+              !rgActiveRef.current &&
+              !mentionActiveRef.current
+            ) {
+              openTerminalCommandPopup(activeSession, term);
+            }
+            return false;
+          }
+          if (key === '1' || code === 'Digit1') {
+            if (event.type !== 'keydown') return false;
+            const activeSession = sessions.find(s => s.id === session.id);
+            const allowInlineAssist = !isNestedTuiCli(activeSession);
+            if (allowInlineAssist && !rgActiveRef.current && !mentionActiveRef.current) {
+              const wd = activeSession?.workingDir;
+              const isSsh = !!activeSession?.cliName.startsWith('SSH: ');
+              if (wd && !isSsh) {
+                openRg(wd);
+              }
+            }
+            return false;
+          }
+          if (key === '2' || code === 'Digit2') {
+            if (event.type !== 'keydown') return false;
+            const activeSession = sessions.find(s => s.id === session.id);
+            const allowInlineAssist = !isNestedTuiCli(activeSession);
+            if (allowInlineAssist && !mentionActiveRef.current && !rgActiveRef.current) {
+              const wd = activeSession?.workingDir;
+              if (wd) {
+                const isSsh = !!activeSession?.cliName.startsWith('SSH: ');
+                openMention(wd, isSsh);
+              }
+            }
+            return false;
+          }
+        }
+
         // ── @ Mention intercepts (must be first) ──
         if (mentionActiveRef.current) {
           if (event.type !== 'keydown') return false; // block keyup too
@@ -1103,63 +1572,31 @@ export function TerminalPanel({
       };
       handle = terminalRefs.current[session.id];
 
-      // Initialize output history for this session
-      if (!mainOutputHistory.current[session.id]) {
-        mainOutputHistory.current[session.id] = [];
-        mainOutputHistoryBytes.current[session.id] = 0;
-      }
-
       term.onResize((dim) => {
         invoke('resize_cli', {
           request: { sessionId: session.id, rows: dim.rows, cols: dim.cols },
         }).catch(console.error);
-        // Keep miniTerm grid in sync — prevents ANSI escape misalignment
+        // Keep the mini grid aligned, then mirror the authoritative parsed
+        // main buffer instead of feeding it a partial ANSI/TUI stream.
         if (handle?.miniTerm) {
-          handle.miniTerm.resize(dim.cols, dim.rows);
+          try {
+            handle.miniTerm.resize(dim.cols, dim.rows);
+            scheduleMiniTerminalSync(session.id);
+          } catch (_e) {}
         }
+        setTermDimensions((prev) => {
+          if (prev[session.id]?.cols === dim.cols && prev[session.id]?.rows === dim.rows) return prev;
+          return { ...prev, [session.id]: { cols: dim.cols, rows: dim.rows } };
+        });
       });
 
       term.onData((data) => {
-        const activeSession = sessions.find(s => s.id === session.id);
-        const allowInlineAssist = !isNestedTuiCli(activeSession);
-
-        // Detect '@' trigger for file mention
-        if (allowInlineAssist && data === '@' && !mentionActiveRef.current && !rgActiveRef.current) {
-          const wd = activeSession?.workingDir;
-          if (wd) {
-            const isSsh = !!activeSession?.cliName.startsWith('SSH: ');
-            openMention(wd, isSsh);
-            // Still send the '@' to the terminal so user sees it
-            inputBuffers.current[session.id] = `${inputBuffers.current[session.id] ?? ''}${data}`;
-            if (!inputTimers.current[session.id]) {
-              inputTimers.current[session.id] = window.setTimeout(() => {
-                flushInput(session.id);
-              }, INPUT_FLUSH_MS);
-            }
-            return;
-          }
-        }
-
-        // Detect '!' trigger for ripgrep search
-        if (allowInlineAssist && data === '!' && !rgActiveRef.current && !mentionActiveRef.current) {
-          const wd = activeSession?.workingDir;
-          // Only support local sessions for ripgrep for now
-          const isSsh = !!activeSession?.cliName.startsWith('SSH: ');
-          if (wd && !isSsh) {
-            openRg(wd);
-            // Still send the '!' to the terminal so user sees it
-            inputBuffers.current[session.id] = `${inputBuffers.current[session.id] ?? ''}${data}`;
-            if (!inputTimers.current[session.id]) {
-              inputTimers.current[session.id] = window.setTimeout(() => {
-                flushInput(session.id);
-              }, INPUT_FLUSH_MS);
-            }
-            return;
-          }
-        }
-
         // When mention or ripgrep is active, don't send data to PTY
-        if (mentionActiveRef.current || rgActiveRef.current) {
+        if (
+          mentionActiveRef.current ||
+          rgActiveRef.current ||
+          terminalCommandActiveRef.current
+        ) {
           return;
         }
 
@@ -1175,15 +1612,27 @@ export function TerminalPanel({
       });
 
       if (pendingTerminalWrites.current[session.id]?.length) {
-        for (const chunk of pendingTerminalWrites.current[session.id]) {
-          term.write(chunk);
-        }
+        const pendingChunks = pendingTerminalWrites.current[session.id];
+        term.write(pendingChunks.join(''), () => scheduleMiniTerminalSync(session.id, 0));
         delete pendingTerminalWrites.current[session.id];
       }
 
       return handle;
     },
-    [flushInput, onSendInput, triggerQuickSession, openSearch, closeSearch, openMention, closeMention, sessions, openRg, closeRg],
+    [
+      flushInput,
+      onSendInput,
+      triggerQuickSession,
+      openSearch,
+      closeSearch,
+      openMention,
+      closeMention,
+      sessions,
+      openRg,
+      closeRg,
+      openTerminalCommandPopup,
+      scheduleMiniTerminalSync,
+    ],
   );
 
   const ensureTerminal = useCallback(
@@ -1261,7 +1710,7 @@ export function TerminalPanel({
       // DOM node changed (drag-and-drop or first mount) — dispose and recreate miniTerm entirely
       lastMiniMountNode.current[session.id] = mountNode;
 
-      const { miniTerm } = createFreshMiniTerminal(handle);
+      const { miniTerm } = createFreshMiniTerminal(session.id, handle);
       miniTerm.open(mountNode);
 
       if (handle.term.cols > 0 && handle.term.rows > 0) {
@@ -1272,8 +1721,9 @@ export function TerminalPanel({
 
       mountNode.classList.add('mini-terminal-viewport');
 
-      // Replay accumulated output history into the fresh terminal
-      replayHistoryIntoMiniTerm(session.id, miniTerm);
+      // Mirror the parsed main buffer. Replaying bounded raw ANSI history can
+      // start midway through an alternate-screen sequence and render blank.
+      scheduleMiniTerminalSync(session.id, 0);
 
       // Delayed refresh to allow DOM layout to settle after mount
       setTimeout(() => {
@@ -1290,29 +1740,36 @@ export function TerminalPanel({
         } catch (_e) {}
       }, 200);
     },
-    [initializeSessionTerminal, createFreshMiniTerminal, replayHistoryIntoMiniTerm],
+    [initializeSessionTerminal, createFreshMiniTerminal, scheduleMiniTerminalSync],
   );
 
   useEffect(() => {
-    if (!rightPanelVisible) {
-      Object.values(terminalRefs.current).forEach((handle) => {
-        handle.cleanupMiniScroll();
-        try { handle.miniTerm?.dispose(); } catch (_e) {}
-        handle.miniTerm = null;
-      });
-      lastMiniMountNode.current = {};
-      return;
-    }
     const frame = window.requestAnimationFrame(() => {
-      sessions.forEach((session) => ensureMiniTerminal(session, miniContainerRefs.current[session.id]));
+      sessions.forEach((session) => {
+        const node = miniContainerRefs.current[session.id];
+        if (node) ensureMiniTerminal(session, node);
+      });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [rightPanelVisible, sessions, ensureMiniTerminal]);
+  }, [sessions, ensureMiniTerminal]);
+
+  useEffect(() => {
+    if (!rightPanelVisible) return;
+    const timer = setTimeout(() => {
+      sessions.forEach((session) => {
+        if ((session.panel ?? 'right') === 'right') {
+          refreshMiniTerminalFromMain(session.id);
+        }
+      });
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [rightPanelVisible, sessions, refreshMiniTerminalFromMain]);
 
   useEffect(() => {
     sessions.forEach((session) => {
       ensureTerminal(session, containerRefs.current[session.id]);
-      if (rightPanelVisible) ensureMiniTerminal(session, miniContainerRefs.current[session.id]);
+      const miniNode = miniContainerRefs.current[session.id];
+      if (miniNode) ensureMiniTerminal(session, miniNode);
     });
 
     const existingIds = Object.keys(terminalRefs.current);
@@ -1331,9 +1788,14 @@ export function TerminalPanel({
         delete miniContainerRefs.current[sessionId];
         delete inputBuffers.current[sessionId];
         delete pendingTerminalWrites.current[sessionId];
+        if (miniSyncTimers.current[sessionId] !== undefined) {
+          window.clearTimeout(miniSyncTimers.current[sessionId]);
+          delete miniSyncTimers.current[sessionId];
+        }
+        delete miniSyncInFlight.current[sessionId];
+        delete miniSyncDirty.current[sessionId];
+        delete miniSyncGeneration.current[sessionId];
         delete initializedRef.current[sessionId];
-        delete mainOutputHistory.current[sessionId];
-        delete mainOutputHistoryBytes.current[sessionId];
         delete lastMiniMountNode.current[sessionId];
         if (inputTimers.current[sessionId]) {
           window.clearTimeout(inputTimers.current[sessionId]);
@@ -1353,21 +1815,6 @@ export function TerminalPanel({
         const payload = event.payload;
         if (!payload.sessionId) {
           return;
-        }
-        // Accumulate output history for replay after drag
-        if (!mainOutputHistory.current[payload.sessionId]) {
-          mainOutputHistory.current[payload.sessionId] = [];
-          mainOutputHistoryBytes.current[payload.sessionId] = 0;
-        }
-        const replayHistory = mainOutputHistory.current[payload.sessionId];
-        replayHistory.push(payload.chunk);
-        mainOutputHistoryBytes.current[payload.sessionId] += payload.chunk.length * 2;
-        while (
-          replayHistory.length > MAX_REPLAY_HISTORY_CHUNKS
-          || mainOutputHistoryBytes.current[payload.sessionId] > MAX_REPLAY_HISTORY_BYTES
-        ) {
-          const removed = replayHistory.shift();
-          if (removed) mainOutputHistoryBytes.current[payload.sessionId] -= removed.length * 2;
         }
         const handle = terminalRefs.current[payload.sessionId];
         if (!handle) {
@@ -1571,6 +2018,7 @@ export function TerminalPanel({
   useEffect(() => {
     return () => {
       Object.values(inputTimers.current).forEach((timer) => window.clearTimeout(timer));
+      Object.values(miniSyncTimers.current).forEach((timer) => window.clearTimeout(timer));
       Object.values(terminalRefs.current).forEach((item) => {
         item.cleanupScroll();
         item.cleanupMiniScroll();
@@ -1585,8 +2033,10 @@ export function TerminalPanel({
       inputBuffers.current = {};
       inputTimers.current = {};
       pendingTerminalWrites.current = {};
-      mainOutputHistory.current = {};
-      mainOutputHistoryBytes.current = {};
+      miniSyncTimers.current = {};
+      miniSyncInFlight.current = {};
+      miniSyncDirty.current = {};
+      miniSyncGeneration.current = {};
       containerRefs.current = {};
       miniContainerRefs.current = {};
       initializedRef.current = {};
@@ -1629,6 +2079,14 @@ export function TerminalPanel({
   const fileDirty = openedFile !== null && fileContent !== fileOriginalContent;
   const relPath = openedFileRootPath && openedFile ? getRelativePath(openedFile.path, openedFileRootPath) : '';
   const fileHasChanges = gitStatusList.some((g) => g.path === relPath);
+  const canInsertTerminalCommand = (() => {
+    if (!terminalCommandPopup?.suggestion) return false;
+    const handle = terminalRefs.current[terminalCommandPopup.sessionId];
+    return !!handle && isRecognizedEmptyPrompt(
+      handle.term,
+      terminalCommandPopup.suggestion.shellDialect,
+    );
+  })();
 
   return (
     <section className="flex h-full w-full rounded-xl border border-cyber-line bg-cyber-panel/70 overflow-hidden relative">
@@ -1640,7 +2098,7 @@ export function TerminalPanel({
         <div className="flex h-full w-full overflow-hidden select-none">
           {/* Main active terminal center panel */}
           <div 
-            className="flex-1 h-full min-w-0 flex flex-col"
+            className="flex-1 min-h-0 min-w-0 flex flex-col"
           >
             {/* Top: Active terminal canvas viewport */}
             <div 
@@ -1734,6 +2192,52 @@ export function TerminalPanel({
                 </div>
               )}
 
+              {terminalCommandPopup && !openedFile && activeMainView === 'terminal' && (
+                <TerminalCommandPopup
+                  phase={terminalCommandPopup.phase}
+                  position={terminalCommandPopup.position}
+                  environment={terminalCommandPopup.environment}
+                  environmentOverride={terminalCommandPopup.environmentOverride}
+                  requestText={terminalCommandPopup.requestText}
+                  suggestion={terminalCommandPopup.suggestion}
+                  error={terminalCommandPopup.error}
+                  canInsert={canInsertTerminalCommand}
+                  inputRef={terminalCommandInputRef}
+                  onRequestTextChange={(requestText) => {
+                    setTerminalCommandPopup((current) => {
+                      if (!current) return current;
+                      const next = {
+                        ...current,
+                        requestText,
+                        suggestion: null,
+                        error: null,
+                        phase: current.environment?.eligible ? 'input' : current.phase,
+                      } satisfies TerminalCommandPopupState;
+                      terminalCommandPopupRef.current = next;
+                      return next;
+                    });
+                  }}
+                  onEnvironmentOverrideChange={(environmentOverride) => {
+                    setTerminalCommandPopup((current) => {
+                      if (!current) return current;
+                      const next: TerminalCommandPopupState = {
+                        ...current,
+                        environmentOverride,
+                        suggestion: null,
+                        error: null,
+                        phase: 'input',
+                      };
+                      terminalCommandPopupRef.current = next;
+                      return next;
+                    });
+                  }}
+                  onGenerate={generateTerminalCommand}
+                  onCopy={copyTerminalCommand}
+                  onInsert={insertTerminalCommand}
+                  onClose={closeTerminalCommandPopup}
+                />
+              )}
+
               {/* @ Mention Autocomplete Overlay */}
               {mentionActive && (
                 <div 
@@ -1741,7 +2245,7 @@ export function TerminalPanel({
                 >
                   <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/50 bg-[#0d1527]">
                     <span className="text-cyber-neon text-[10px] font-bold tracking-wider">
-                      ⚡ MENTION FILE/FOLDER
+                      ⚡ MENTION FILE/FOLDER <span className="text-[9px] text-cyber-neon/70 font-normal ml-1">(Ctrl+Alt+2)</span>
                     </span>
                     {fileIndexLoading ? (
                       <span className="text-[10px] text-cyber-electric animate-pulse">Indexing...</span>
@@ -1752,7 +2256,7 @@ export function TerminalPanel({
 
                   {/* Filter query display */}
                   <div className="flex items-center gap-1.5 px-3 py-2 border-b border-cyber-line/30 bg-[#080d1a]">
-                    <span className="text-cyber-neon font-bold">@</span>
+                    <span className="text-cyber-neon font-bold text-[10px] px-1 bg-cyber-neon/10 rounded">Ctrl+Alt+2</span>
                     <input
                       ref={mentionInputRef}
                       type="text"
@@ -1769,7 +2273,7 @@ export function TerminalPanel({
                           e.preventDefault();
                           const selected = mentionResults[mentionSelectedIndex];
                           if (selected) {
-                            onSendInput(visibleSessionId!, "\x7f" + selected.name);
+                            onSendInput(visibleSessionId!, selected.name);
                           }
                           closeMention();
                         } else if (e.key === 'Escape') {
@@ -1794,7 +2298,7 @@ export function TerminalPanel({
                           <div
                             key={item.path}
                             onClick={() => {
-                              onSendInput(visibleSessionId!, "\x7f" + item.name);
+                              onSendInput(visibleSessionId!, item.name);
                               closeMention();
                             }}
                             className={`flex items-center gap-2 px-2.5 py-1.5 rounded cursor-pointer transition-colors ${
@@ -1834,7 +2338,7 @@ export function TerminalPanel({
                 >
                   <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/50 bg-[#0c162b]">
                     <span className="text-cyber-electric text-[10px] font-bold tracking-wider">
-                      🔍 RIPGREP SEARCH
+                      🔍 RIPGREP SEARCH <span className="text-[9px] text-cyber-electric/70 font-normal ml-1">(Ctrl+Alt+1)</span>
                     </span>
                     {rgLoading ? (
                       <span className="text-[10px] text-cyber-electric animate-pulse">Searching...</span>
@@ -1845,7 +2349,7 @@ export function TerminalPanel({
 
                   {/* Filter query display */}
                   <div className="flex items-center gap-1.5 px-3 py-2 border-b border-cyber-line/30 bg-[#080d1a]">
-                    <span className="text-cyber-electric font-bold">!</span>
+                    <span className="text-cyber-electric font-bold text-[10px] px-1 bg-cyber-electric/10 rounded">Ctrl+Alt+1</span>
                     <input
                       ref={rgInputRef}
                       type="text"
@@ -1862,7 +2366,7 @@ export function TerminalPanel({
                           e.preventDefault();
                           const selected = rgResults[rgSelectedIndex];
                           if (selected) {
-                            onSendInput(visibleSessionId!, "\x7f" + selected.filePath);
+                            onSendInput(visibleSessionId!, selected.filePath);
                           }
                           closeRg();
                         } else if (e.key === 'Escape') {
@@ -1887,7 +2391,7 @@ export function TerminalPanel({
                           <div
                             key={`${item.filePath}:${item.lineNumber}:${index}`}
                             onClick={() => {
-                              onSendInput(visibleSessionId!, "\x7f" + item.filePath);
+                              onSendInput(visibleSessionId!, item.filePath);
                               closeRg();
                             }}
                             className={`flex flex-col gap-0.5 px-2.5 py-1.5 rounded cursor-pointer transition-colors ${
@@ -1957,11 +2461,6 @@ export function TerminalPanel({
                     <DashboardPanel />
                   </div>
                 )}
-                {uiActive && activeMainView === 'web-ai' && (
-                  <div className="absolute inset-0 z-[5]">
-                    <WebAiPanel visible />
-                  </div>
-                )}
 
                 {/* SSH Drag-drop upload overlay */}
                 {dragOver && (
@@ -2006,11 +2505,24 @@ export function TerminalPanel({
                         >
                           {openedFile.name}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-mono truncate max-w-[250px] ml-1">
+                        <span className="text-[10px] text-slate-500 font-mono truncate max-w-[200px] ml-1">
                           ({openedFile.path})
                         </span>
                         {fileDirty && (
                           <span className="ml-1 h-2 w-2 shrink-0 rounded-full bg-cyber-warn animate-pulse shadow-neon-sm" title="Unsaved changes" />
+                        )}
+
+                        {/* Syntax Validation Status Badge */}
+                        {isConfigFile(openedFile.name) && (
+                          fileValidation.valid ? (
+                            <span className="ml-2 rounded bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/30 font-mono">
+                              ✓ Valid Syntax
+                            </span>
+                          ) : (
+                            <span className="ml-2 rounded bg-rose-500/15 px-2 py-0.5 text-[9px] font-bold text-rose-400 border border-rose-500/40 font-mono truncate max-w-[250px]" title={fileValidation.error}>
+                              ⚠️ {fileValidation.error}
+                            </span>
+                          )
                         )}
 
                         {/* Diff / Edit Mode Toggle */}
@@ -2043,26 +2555,62 @@ export function TerminalPanel({
                       </div>
                       
                       <div className="flex shrink-0 items-center gap-2">
+                        {/* Format / Prettify button */}
+                        {viewMode === 'edit' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const res = formatConfigContent(openedFile.name, fileContent);
+                              if (res.error) {
+                                alert(res.error);
+                              } else if (res.changed) {
+                                setFileContent(res.formatted);
+                              }
+                            }}
+                            title="Format & clean indentation (JSON/YAML/TOML)"
+                            className="rounded border border-cyber-electric/50 px-2 py-1 text-[10px] font-bold uppercase text-cyber-electric transition hover:bg-cyber-electric/10 font-mono"
+                          >
+                            ⚡ Format
+                          </button>
+                        )}
                         {viewMode === 'edit' && fileDirty && (
                           <button
                             type="button"
                             onClick={() => setFileContent(fileOriginalContent)}
                             title="Revert changes"
-                            className="rounded border border-cyber-warn/50 px-2 py-1 text-[10px] font-bold uppercase text-cyber-warn transition hover:bg-cyber-warn/10"
+                            className="rounded border border-cyber-warn/50 px-2 py-1 text-[10px] font-bold uppercase text-cyber-warn transition hover:bg-cyber-warn/10 font-mono"
                           >
                             Revert
                           </button>
                         )}
                         {viewMode === 'edit' && (
-                          <button
-                            type="button"
-                            onClick={onSaveFile}
-                            disabled={!fileDirty || isSavingFile}
-                            title="Save file (Ctrl+S)"
-                            className="rounded border border-cyber-neon/50 px-2.5 py-1 text-[10px] font-bold uppercase text-cyber-neon transition hover:bg-cyber-neon/10 disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            {isSavingFile ? 'Saving…' : 'Save'}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={onSaveFile}
+                              disabled={!fileDirty || isSavingFile}
+                              title="Save file (Ctrl+S)"
+                              className="rounded border border-cyber-neon/50 px-2.5 py-1 text-[10px] font-bold uppercase text-cyber-neon transition hover:bg-cyber-neon/10 disabled:opacity-30 disabled:cursor-not-allowed shadow-neon-sm-faint font-mono"
+                            >
+                              {isSavingFile ? 'Saving…' : 'Save'}
+                            </button>
+
+                            {/* Save & Restart Session button */}
+                            {activeSessionId && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await onSaveFile();
+                                  onSendInput(activeSessionId, '\x03');
+                                }}
+                                disabled={isSavingFile}
+                                title="Save file and send restart signal (Ctrl+C) to active CLI session"
+                                className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[10px] font-bold uppercase text-amber-400 transition hover:bg-amber-500/20 disabled:opacity-30 font-mono"
+                              >
+                                Save & Restart
+                              </button>
+                            )}
+                          </>
                         )}
                         <button
                           type="button"
@@ -2121,36 +2669,57 @@ export function TerminalPanel({
                           </div>
                         )
                       ) : (
-                        <textarea
-                          key={`editor-${openedFile.path}`}
-                          ref={fileEditorRef}
-                          value={fileContent}
-                          onChange={(e) => setFileContent(e.target.value)}
-                          onKeyDown={(e) => {
-                            // Ctrl+S to save
-                            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                              e.preventDefault();
-                              void onSaveFile();
-                            }
-                            // Tab insert
-                            if (e.key === 'Tab') {
-                              e.preventDefault();
-                              const { selectionStart, selectionEnd } = e.currentTarget;
-                              const newVal =
-                                fileContent.substring(0, selectionStart) +
-                                '  ' +
-                                fileContent.substring(selectionEnd);
-                              setFileContent(newVal);
-                              requestAnimationFrame(() => {
-                                e.currentTarget.selectionStart = selectionStart + 2;
-                                e.currentTarget.selectionEnd = selectionStart + 2;
-                              });
-                            }
-                          }}
-                          spellCheck={false}
-                          className="h-full min-h-0 w-full resize-none overflow-auto bg-cyber-base/80 p-4 pb-10 font-mono text-[13px] leading-relaxed text-slate-200 outline-none placeholder-slate-600 scrollbar-thin selection:bg-cyber-neon/30"
-                          style={{ caretColor: 'var(--color-cyber-neon, #39ff14)' }}
-                        />
+                        <div className="flex h-full w-full min-h-0 overflow-hidden bg-cyber-base/80 font-mono text-[13px] leading-relaxed">
+                          {/* Line numbers column */}
+                          <div
+                            ref={lineNumbersRef}
+                            className="shrink-0 select-none overflow-hidden bg-black/40 px-2.5 py-4 text-right text-[11px] font-mono text-slate-600 border-r border-cyber-line/20"
+                            style={{ minWidth: '40px' }}
+                          >
+                            {fileContent.split('\n').map((_, idx) => (
+                              <div key={idx} className="h-[19.5px]">
+                                {idx + 1}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Textarea */}
+                          <textarea
+                            key={`editor-${openedFile.path}`}
+                            ref={fileEditorRef}
+                            value={fileContent}
+                            onChange={(e) => setFileContent(e.target.value)}
+                            onScroll={(e) => {
+                              if (lineNumbersRef.current) {
+                                lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              // Ctrl+S to save
+                              if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                                e.preventDefault();
+                                void onSaveFile();
+                              }
+                              // Tab insert
+                              if (e.key === 'Tab') {
+                                e.preventDefault();
+                                const { selectionStart, selectionEnd } = e.currentTarget;
+                                const newVal =
+                                  fileContent.substring(0, selectionStart) +
+                                  '  ' +
+                                  fileContent.substring(selectionEnd);
+                                setFileContent(newVal);
+                                requestAnimationFrame(() => {
+                                  e.currentTarget.selectionStart = selectionStart + 2;
+                                  e.currentTarget.selectionEnd = selectionStart + 2;
+                                });
+                              }
+                            }}
+                            spellCheck={false}
+                            className="h-full min-h-0 flex-1 resize-none overflow-auto bg-transparent p-4 pb-10 font-mono text-[13px] leading-[19.5px] text-slate-200 outline-none placeholder-slate-600 scrollbar-thin selection:bg-cyber-neon/30"
+                            style={{ caretColor: 'var(--color-cyber-neon, #39ff14)' }}
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -2246,7 +2815,7 @@ export function TerminalPanel({
                           <div className="flex-1 relative min-h-0">
                             {/* Live scaled view */}
                             {(() => {
-                              const mainRows = terminalRefs.current[session.id]?.term?.rows || 24;
+                              const mainRows = termDimensions[session.id]?.rows || terminalRefs.current[session.id]?.term?.rows || 24;
                               const vHeight = Math.max(400, Math.round(mainRows * 17.5));
                               return (
                                 <div 
@@ -2255,14 +2824,14 @@ export function TerminalPanel({
                                     width: '640px', 
                                     height: `${vHeight}px`,
                                   }}
-                                  className="absolute origin-bottom-left bottom-0 left-0 pointer-events-none mini-terminal-viewport"
+                                  className="absolute origin-top-left top-0 left-0 pointer-events-none mini-terminal-viewport"
                                 >
                                   <div
                                     ref={(node) => {
                                       miniContainerRefs.current[session.id] = node;
                                       if (node) {
                                         containerToSessionRef.current.set(node, session.id);
-                                        if (rightPanelVisible) ensureMiniTerminal(session, node);
+                                        ensureMiniTerminal(session, node);
                                       }
                                     }}
                                     className="h-full w-full"
@@ -2419,7 +2988,7 @@ export function TerminalPanel({
                         <div className="flex-1 relative min-h-0">
                           {/* Live scaled view */}
                           {(() => {
-                            const mainRows = terminalRefs.current[session.id]?.term?.rows || 24;
+                            const mainRows = termDimensions[session.id]?.rows || terminalRefs.current[session.id]?.term?.rows || 24;
                             const vHeight = Math.max(400, Math.round(mainRows * 17.5));
                             return (
                               <div 
@@ -2428,14 +2997,14 @@ export function TerminalPanel({
                                   width: '640px', 
                                   height: `${vHeight}px`,
                                 }}
-                                className="absolute origin-bottom-left bottom-0 left-0 pointer-events-none mini-terminal-viewport"
+                                className="absolute origin-top-left top-0 left-0 pointer-events-none mini-terminal-viewport"
                               >
                                 <div
                                   ref={(node) => {
                                     miniContainerRefs.current[session.id] = node;
                                     if (node) {
                                       containerToSessionRef.current.set(node, session.id);
-                                      if (rightPanelVisible) ensureMiniTerminal(session, node);
+                                      ensureMiniTerminal(session, node);
                                     }
                                   }}
                                   className="h-full w-full"

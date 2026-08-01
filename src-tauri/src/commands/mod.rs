@@ -8,4 +8,4 @@ pub mod proxy_commands;
 pub mod quickapps_commands;
 pub mod rtk_commands;
 pub mod system_commands;
-pub mod web_ai_commands;
+

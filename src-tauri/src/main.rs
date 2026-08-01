@@ -15,6 +15,9 @@ use companion::commands::{
     companion_import_legacy, companion_save_config, companion_send,
     companion_set_actions_enabled,
 };
+use companion::terminal_command::{
+    terminal_command_cancel, terminal_command_detect_environment, terminal_command_suggest,
+};
 use commands::{
     api_proxy::{api_proxy_abort, api_proxy_request, api_proxy_stream},
     builtin_llm_commands::{
@@ -53,28 +56,10 @@ use commands::{
     },
     rtk_commands::rtk_get_status,
     system_commands::get_system_logs,
-    web_ai_commands::{
-        web_ai_clear_data, web_ai_close, web_ai_load_profiles, web_ai_reposition,
-        web_ai_save_profiles, web_ai_set_visible, web_ai_spawn_profile,
-    },
 };
 use tauri::{Emitter, Manager};
 
-fn close_web_ai(app: &tauri::AppHandle) {
-    use std::sync::atomic::Ordering;
-    let state = app.state::<AppState>();
-    state.web_ai_generation.fetch_add(1, Ordering::SeqCst);
-    let operation = &state.web_ai_operation;
-    tauri::async_runtime::block_on(async {
-        let _guard = operation.lock().await;
-        if let Some(webview) = app.get_webview("web-ai-viewer") {
-            let _ = webview.close();
-        }
-    });
-}
-
 fn cleanup_for_exit(app: &tauri::AppHandle) {
-    close_web_ai(app);
     let state = app.state::<AppState>();
     let companion = state.companion.clone();
     let monitoring = state.monitoring.clone();
@@ -110,6 +95,9 @@ fn main() {
             companion_clear_history,
             companion_set_actions_enabled,
             companion_import_legacy,
+            terminal_command_detect_environment,
+            terminal_command_suggest,
+            terminal_command_cancel,
             list_clis,
             upsert_cli,
             delete_cli,
@@ -188,13 +176,6 @@ fn main() {
             builtin_llm_generate,
             builtin_llm_get_config,
             builtin_llm_save_config,
-            web_ai_load_profiles,
-            web_ai_save_profiles,
-            web_ai_spawn_profile,
-            web_ai_clear_data,
-            web_ai_reposition,
-            web_ai_set_visible,
-            web_ai_close,
             dashboard_get_resource_usage,
             dashboard_probe_ports,
             dashboard_probe_port,
@@ -266,7 +247,6 @@ fn main() {
                     "hide" => {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.emit("app-window-visibility", false);
-                            close_web_ai(app);
                             let _ = window.hide();
                         }
                     }
@@ -286,7 +266,6 @@ fn main() {
                         if let Some(window) = app.get_webview_window("main") {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.emit("app-window-visibility", false);
-                                close_web_ai(app);
                                 let _ = window.hide();
                             } else {
                                 let _ = window.show();
@@ -317,7 +296,6 @@ fn main() {
                     .show(move |result| {
                         if result {
                             let _ = w.emit("app-window-visibility", false);
-                            close_web_ai(w.app_handle());
                             let _ = w.hide();
                         } else {
                             cleanup_for_exit(w.app_handle());

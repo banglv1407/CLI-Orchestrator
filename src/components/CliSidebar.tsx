@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry } from '../types';
+import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry, SpecialConfigFile } from '../types';
 import { loadApiHistory, clearApiHistory, type ApiHistoryEntry, METHOD_COLORS } from '../lib/api-history';
 import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled } from '../lib/mythical-pets';
 import { getContextMenuPosition } from '../lib/contextMenu';
 import { ProxyPanel } from './ProxyPanel';
 import { AIChatPanel } from './AIChatPanel';
+import { loadSpecialConfigFiles, saveSpecialConfigFile, deleteSpecialConfigFile } from '../lib/configFiles';
+import { SpecialConfigModal } from './SpecialConfigModal';
 
 import { 
   listDirectoryFiles, 
@@ -194,7 +196,7 @@ interface CliSidebarProps {
   onLogsTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'explorer' | 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'operator' | 'remote' | 'apiclient' | 'proxy' | 'logs' | 'dashboard' | 'web-ai';
+type SidebarTab = 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'apiclient' | 'dashboard';
 
 const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['settings']);
 
@@ -357,6 +359,7 @@ export function CliSidebar({
   onLogsTabChange,
 }: CliSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
+  const [cliSubTab, setCliSubTab] = useState<'clis' | 'operator' | 'configs' | 'explorer'>('clis');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('ai-cli-sidebar-collapsed') === 'true';
   });
@@ -366,7 +369,7 @@ export function CliSidebar({
   const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
 
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
-    const tabsWithNoLeftArea = new Set(['quickapps', 'proxy', 'logs', 'remote', 'settings', 'dashboard', 'web-ai']);
+    const tabsWithNoLeftArea = new Set(['quickapps', 'settings', 'dashboard']);
     
     if (tabsWithNoLeftArea.has(tab)) {
       setIsSidebarCollapsed(true);
@@ -374,8 +377,6 @@ export function CliSidebar({
       setActiveTab(tab);
 
       if (tab === 'quickapps' && onQuickAppsTabChange) onQuickAppsTabChange(true);
-      else if (tab === 'proxy' && onProxyTabChange) onProxyTabChange(true);
-      else if (tab === 'logs' && onLogsTabChange) onLogsTabChange(true);
       else if (tab === 'settings') {
         if (onQuickAppsTabChange) onQuickAppsTabChange(false);
         if (onApiClientTabChange) onApiClientTabChange(false);
@@ -383,26 +384,12 @@ export function CliSidebar({
         if (onLogsTabChange) onLogsTabChange(false);
         window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'settings' }));
       }
-      else if (tab === 'remote') {
-        if (onQuickAppsTabChange) onQuickAppsTabChange(false);
-        if (onApiClientTabChange) onApiClientTabChange(false);
-        if (onProxyTabChange) onProxyTabChange(false);
-        if (onLogsTabChange) onLogsTabChange(false);
-        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'remote' }));
-      }
       else if (tab === 'dashboard') {
         if (onQuickAppsTabChange) onQuickAppsTabChange(false);
         if (onApiClientTabChange) onApiClientTabChange(false);
         if (onProxyTabChange) onProxyTabChange(false);
         if (onLogsTabChange) onLogsTabChange(false);
         window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'dashboard' }));
-      }
-      else if (tab === 'web-ai') {
-        if (onQuickAppsTabChange) onQuickAppsTabChange(false);
-        if (onApiClientTabChange) onApiClientTabChange(false);
-        if (onProxyTabChange) onProxyTabChange(false);
-        if (onLogsTabChange) onLogsTabChange(false);
-        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'web-ai' }));
       }
     } else {
       if (activeTab === tab && !isSidebarCollapsed) {
@@ -412,7 +399,7 @@ export function CliSidebar({
         setIsSidebarCollapsed(false);
         localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
         
-        const trackedTabs = new Set(['quickapps', 'apiclient', 'proxy', 'logs']);
+        const trackedTabs = new Set(['quickapps', 'apiclient']);
         const leavingTracked = trackedTabs.has(activeTab) || tabsWithNoLeftArea.has(activeTab);
         const enteringTracked = trackedTabs.has(tab);
 
@@ -427,8 +414,6 @@ export function CliSidebar({
         } else if (enteringTracked) {
           if (tab === 'quickapps' && onQuickAppsTabChange) onQuickAppsTabChange(true);
           else if (tab === 'apiclient' && onApiClientTabChange) onApiClientTabChange(true);
-          else if (tab === 'proxy' && onProxyTabChange) onProxyTabChange(true);
-          else if (tab === 'logs' && onLogsTabChange) onLogsTabChange(true);
         } else {
           // If entering standard tab from standard tab (e.g. explorer -> cli-manager)
           window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'terminal' }));
@@ -444,17 +429,9 @@ export function CliSidebar({
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          let list = [...parsed].filter((t) => t !== 'logs' && t !== 'remote' && t !== 'proxy');
+          let list = [...parsed].filter((t) => t !== 'explorer' && t !== 'operator' && t !== 'web-ai' && t !== 'logs' && t !== 'remote' && t !== 'proxy');
           if (!list.includes('dashboard')) {
             list.unshift('dashboard');
-          }
-          if (!list.includes('web-ai')) {
-            const firstPinnedIndex = list.findIndex((tab) => PINNED_SIDEBAR_TABS.has(tab as SidebarTab));
-            if (firstPinnedIndex !== -1) {
-              list.splice(firstPinnedIndex, 0, 'web-ai');
-            } else {
-              list.push('web-ai');
-            }
           }
           return [
             ...list.filter((t) => !PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
@@ -465,7 +442,7 @@ export function CliSidebar({
         // ignore
       }
     }
-    return ['dashboard', 'cli-manager', 'explorer', 'quickapps', 'operator', 'apiclient', 'web-ai', 'settings'];
+    return ['dashboard', 'cli-manager', 'quickapps', 'apiclient', 'settings'];
   });
 
   const handleTabDragStart = (e: React.DragEvent, tab: SidebarTab) => {
@@ -517,32 +494,6 @@ export function CliSidebar({
             </div>
           </div>
         );
-      case 'explorer':
-        return (
-          <div
-            key="explorer"
-            role="button"
-            tabIndex={0}
-            draggable
-            onDragStart={(e) => handleTabDragStart(e, 'explorer')}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => handleTabDrop(e, 'explorer')}
-            onClick={() => handleSetActiveTab('explorer')}
-            title="File Explorer"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
-              activeTab === 'explorer'
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
-            }`}
-          >
-            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
-              {activeTab === 'explorer' && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-              )}
-              <ExplorerIcon />
-            </div>
-          </div>
-        );
       case 'quickapps':
         return (
           <div
@@ -569,32 +520,6 @@ export function CliSidebar({
             </div>
           </div>
         );
-      case 'operator':
-        return (
-          <div
-            key="operator"
-            role="button"
-            tabIndex={0}
-            draggable
-            onDragStart={(e) => handleTabDragStart(e, 'operator')}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => handleTabDrop(e, 'operator')}
-            onClick={() => handleSetActiveTab('operator')}
-            title="Operator (SSH VM Manager)"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
-              activeTab === 'operator'
-                ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
-            }`}
-          >
-            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
-              {activeTab === 'operator' && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-electric" />
-              )}
-              <CloudIcon />
-            </div>
-          </div>
-        );
       case 'apiclient':
         return (
           <div
@@ -618,88 +543,6 @@ export function CliSidebar({
                 <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
               )}
               <ApiIcon />
-            </div>
-          </div>
-        );
-      case 'logs':
-        return (
-          <div
-            key="logs"
-            role="button"
-            tabIndex={0}
-            draggable
-            onDragStart={(e) => handleTabDragStart(e, 'logs')}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => handleTabDrop(e, 'logs')}
-            onClick={() => handleSetActiveTab('logs')}
-            title="System Logs"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
-              activeTab === 'logs'
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
-            }`}
-          >
-            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
-              {activeTab === 'logs' && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-              )}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
-              </svg>
-            </div>
-          </div>
-        );
-      case 'remote':
-        return (
-          <div
-            key="remote"
-            role="button"
-            tabIndex={0}
-            draggable
-            onDragStart={(e) => handleTabDragStart(e, 'remote')}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => handleTabDrop(e, 'remote')}
-            onClick={() => handleSetActiveTab('remote')}
-            title="Remote SSH Server"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
-              activeTab === 'remote'
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
-            }`}
-          >
-            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
-              {activeTab === 'remote' && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-              )}
-              <RemoteIcon />
-            </div>
-          </div>
-        );
-      case 'proxy':
-        return (
-          <div
-            key="proxy"
-            role="button"
-            tabIndex={0}
-            draggable
-            onDragStart={(e) => handleTabDragStart(e, 'proxy')}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => handleTabDrop(e, 'proxy')}
-            onClick={() => handleSetActiveTab('proxy')}
-            title="CliProxyAI (API Proxy)"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
-              activeTab === 'proxy'
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
-            }`}
-          >
-            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
-              {activeTab === 'proxy' && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-              )}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-              </svg>
             </div>
           </div>
         );
@@ -730,34 +573,6 @@ export function CliSidebar({
                 <rect x="14" y="3" width="7" height="7" rx="1" />
                 <rect x="3" y="14" width="7" height="7" rx="1" />
                 <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-            </div>
-          </div>
-        );
-      case 'web-ai':
-        return (
-          <div
-            key="web-ai"
-            role="button"
-            tabIndex={0}
-            draggable
-            onDragStart={(e) => handleTabDragStart(e, 'web-ai')}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => handleTabDrop(e, 'web-ai')}
-            onClick={() => handleSetActiveTab('web-ai')}
-            title="Web AI Profiles"
-            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
-              activeTab === 'web-ai'
-                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
-                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
-            }`}
-          >
-            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
-              {activeTab === 'web-ai' && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
-              )}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
               </svg>
             </div>
           </div>
@@ -881,15 +696,13 @@ export function CliSidebar({
 
 
 
-  // Auto-switch to Explorer tab when an active session changes and has a workingDir
+  // Auto-switch to Explorer sub-tab in Terminal Orchestrator when an active session changes
   useEffect(() => {
     if (activeSessionId) {
-      const activeSess = sessions.find((s) => s.id === activeSessionId);
-      if (activeSess?.workingDir) {
-        setActiveTab('explorer');
-      }
+      setActiveTab('cli-manager');
+      setCliSubTab('explorer');
     }
-  }, [activeSessionId, sessions]);
+  }, [activeSessionId]);
 
   // --- Local LLM fallback states ---
   const [builtinLlmConfig, setBuiltinLlmConfig] = useState<any>({
@@ -1573,12 +1386,92 @@ export function CliSidebar({
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({});
   const [cachedFiles, setCachedFiles] = useState<Record<string, FileEntry[]>>({});
 
+  // Quick Config Files state
+  const [quickConfigsExpanded, setQuickConfigsExpanded] = useState(true);
+  const [specialConfigs, setSpecialConfigs] = useState<SpecialConfigFile[]>(() => loadSpecialConfigFiles());
+  const [specialModalOpen, setSpecialModalOpen] = useState(false);
+  const [editingSpecialConfig, setEditingSpecialConfig] = useState<SpecialConfigFile | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvt = e as CustomEvent<SpecialConfigFile[]>;
+      setSpecialConfigs(customEvt.detail || loadSpecialConfigFiles());
+    };
+    window.addEventListener('special-configs-changed', handler);
+    return () => window.removeEventListener('special-configs-changed', handler);
+  }, []);
+
+  const quickConfigFiles = useMemo(() => {
+    const list: FileEntry[] = [];
+
+    // Only show user-saved special config files (no auto-discovery)
+    specialConfigs.forEach((sc) => {
+      const fileName = sc.path.split(/[/\\]/).pop() || sc.path;
+      // If path is absolute (Windows or Unix), use it directly; otherwise join with rootPath
+      const isAbsolute = /^([A-Za-z]:[/\\]|\/|\\\\)/.test(sc.path);
+      const fullPath = isAbsolute
+        ? sc.path
+        : rootPath
+          ? joinWorkspacePath(rootPath, sc.path)
+          : sc.path;
+      list.push({
+        name: sc.name || fileName,
+        path: fullPath,
+        isDir: false,
+      });
+    });
+
+    return list;
+  }, [specialConfigs, rootPath]);
+
+  const [configSearchQuery, setConfigSearchQuery] = useState('');
+  const [collapsedConfigGroups, setCollapsedConfigGroups] = useState<Record<string, boolean>>({});
+
+  const groupedConfigs = useMemo(() => {
+    const map: Record<string, { entry: FileEntry; specialMatch?: SpecialConfigFile }[]> = {};
+
+    quickConfigFiles.forEach((entry) => {
+      const specialMatch = specialConfigs.find(
+        (sc) => sc.name === entry.name || sc.path === entry.path || entry.path.endsWith(sc.path)
+      );
+
+      if (configSearchQuery.trim()) {
+        const query = configSearchQuery.toLowerCase();
+        const matchesName = entry.name.toLowerCase().includes(query);
+        const matchesPath = entry.path.toLowerCase().includes(query);
+        const matchesDesc = specialMatch?.description?.toLowerCase().includes(query) ?? false;
+        const matchesGroup = specialMatch?.group?.toLowerCase().includes(query) ?? false;
+        if (!matchesName && !matchesPath && !matchesDesc && !matchesGroup) {
+          return;
+        }
+      }
+
+      const groupName = specialMatch?.group || 'General Configs';
+      if (!map[groupName]) {
+        map[groupName] = [];
+      }
+      map[groupName].push({ entry, specialMatch });
+    });
+
+    return map;
+  }, [quickConfigFiles, specialConfigs, configSearchQuery]);
+
   // Ctrl+P search states
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [allFiles, setAllFiles] = useState<FileEntry[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    const handleOpenQuickConfig = () => {
+      setCliSubTab('configs');
+      handleSetActiveTab('cli-manager');
+      setIsSearchModalOpen(true);
+    };
+    window.addEventListener('open-quick-config-search', handleOpenQuickConfig);
+    return () => window.removeEventListener('open-quick-config-search', handleOpenQuickConfig);
+  }, [handleSetActiveTab]);
 
 
   // Load recursive files when search opens
@@ -1990,6 +1883,32 @@ export function CliSidebar({
     return groups;
   }, [sshConnections, sshSearchQuery]);
 
+  // --- CLI Grouping and Filtering ---
+  const [cliSearchQuery, setCliSearchQuery] = useState('');
+  const [collapsedCliGroups, setCollapsedCliGroups] = useState<Record<string, boolean>>({});
+
+  const groupedClis = useMemo(() => {
+    const query = cliSearchQuery.toLowerCase().trim();
+    const filtered = clis.filter((cli) => {
+      if (!query) return true;
+      return (
+        cli.name.toLowerCase().includes(query) ||
+        cli.command.toLowerCase().includes(query) ||
+        (cli.group || 'Default').toLowerCase().includes(query)
+      );
+    });
+
+    const groups: Record<string, CliDefinition[]> = {};
+    filtered.forEach((cli) => {
+      const g = cli.group || 'Default';
+      if (!groups[g]) {
+        groups[g] = [];
+      }
+      groups[g].push(cli);
+    });
+    return groups;
+  }, [clis, cliSearchQuery]);
+
   return (
     <div
       className="relative flex h-full shrink-0 border-r border-cyber-line bg-cyber-panel/75 backdrop-blur transition-all duration-300 ease-in-out"
@@ -2020,473 +1939,791 @@ export function CliSidebar({
       {!isSidebarCollapsed && (
         <aside className="flex flex-1 flex-col overflow-hidden">
 
-        {/* Active Tab: Explorer */}
-        {activeTab === 'explorer' && (
-          <div className="flex h-full flex-col overflow-hidden">
-            {/* Accordion Panels Container */}
-            <div
-              className="flex flex-col overflow-hidden shrink-0 flex-1 pr-1.5"
-            >
-              {rootPath ? (
-                <div className="flex flex-col h-full overflow-hidden">
-                  {/* Explorer Workspace Info Banner */}
-                  <div className="border-b border-cyber-line/50 bg-cyber-panel/60 p-3 flex flex-col gap-1.5 select-none shrink-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs">{isSshSession ? '🌐' : '🖥️'}</span>
-                        <span className="font-display text-[10px] uppercase font-bold tracking-wider text-cyber-neon truncate">
-                          {isSshSession
-                            ? `SSH: ${sshConnection?.user ? sshConnection.user + '@' : ''}${sshConnection?.host || sshConnectionName || 'Remote'}`
-                            : 'Local Workspace'}
-                        </span>
-                      </div>
-                      {isSshSession && (
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-semibold bg-cyber-electric/15 text-cyber-electric border border-cyber-electric/30">
-                          Port {sshConnection?.port || 22}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between gap-1 text-[10px] font-mono text-slate-400 bg-cyber-base/60 px-2 py-1 rounded border border-cyber-line/30">
-                      <span className="truncate flex-1 text-slate-300" title={rootPath}>
-                        {rootPath}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(rootPath);
-                        }}
-                        className="text-slate-500 hover:text-cyber-electric transition p-0.5"
-                        title="Copy workspace path"
-                      >
-                        📋
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Panel 1: Workspace Files */}
-                  <div className={`flex flex-col overflow-hidden ${workspaceFilesExpanded ? 'flex-1 min-h-[100px]' : 'shrink-0'}`}>
-                    <button
-                      type="button"
-                      onClick={() => setWorkspaceFilesExpanded(!workspaceFilesExpanded)}
-                      className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 hover:bg-cyber-base/70 transition select-none"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FolderArrowIcon isExpanded={workspaceFilesExpanded} />
-                        <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">Workspace Files</span>
-                      </div>
-                      <span className="truncate max-w-[120px] font-mono text-[9px] font-semibold text-cyber-electric/80" title={rootPath}>
-                        {rootPath.split(/[/\\]/).pop() || rootPath}
-                      </span>
-                    </button>
-                    
-                    {workspaceFilesExpanded && (
-                      <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
-                        {(cachedFiles[rootPath] ?? []).map((entry) => renderFileNode(entry, 0))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Panel 2: Git Diff (Changes) */}
-                  <div className={`flex flex-col overflow-hidden border-t border-cyber-line/30 ${gitDiffExpanded ? 'flex-1 min-h-[120px]' : 'shrink-0'}`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextVal = !gitDiffExpanded;
-                        setGitDiffExpanded(nextVal);
-                        if (nextVal && rootPath) {
-                          void refreshGitStatus(rootPath);
-                        }
-                      }}
-                      className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 hover:bg-cyber-base/70 transition select-none"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FolderArrowIcon isExpanded={gitDiffExpanded} />
-                        <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">Git Diff (Changes)</span>
-                      </div>
-                      {gitStatusList.length > 0 && (
-                        <span className="rounded bg-cyber-neon/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-neon border border-cyber-neon/30 font-mono">
-                          {gitStatusList.length}
-                        </span>
-                      )}
-                    </button>
-
-                    {gitDiffExpanded && (
-                      <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
-                        {gitStatusList.length === 0 ? (
-                          <p className="px-4 py-3 text-xs italic text-slate-500 font-mono">No changed files in workspace.</p>
-                        ) : (
-                          <div className="space-y-1">
-                            {(() => {
-                              const staged = gitStatusList.filter(g => g.staged);
-                              const unstaged = gitStatusList.filter(g => !g.staged);
-
-                              const renderItem = (gitItem: typeof gitStatusList[0]) => {
-                                const entry: FileEntry = {
-                                  name: gitItem.path.split('/').pop() || gitItem.path,
-                                  path: joinWorkspacePath(rootPath, gitItem.path),
-                                  isDir: false
-                                };
-                                const isActive = selectedFilePath === entry.path;
-                                let statusBadge = '';
-                                let textClass = 'text-slate-300 hover:text-white';
-                                if (gitItem.status === 'modified') { statusBadge = 'M'; textClass = 'text-amber-300 hover:text-amber-200 hover:bg-amber-400/5'; }
-                                else if (gitItem.status === 'added') { statusBadge = 'A'; textClass = 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-400/5'; }
-                                else if (gitItem.status === 'untracked') { statusBadge = 'U'; textClass = 'text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/5'; }
-                                else if (gitItem.status === 'deleted') { statusBadge = 'D'; textClass = 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 line-through'; }
-
-                                return (
-                                  <button
-                                    key={gitItem.path}
-                                    type="button"
-                                    aria-disabled={gitItem.status === 'deleted'}
-                                    onClick={() => {
-                                      if (gitItem.status !== 'deleted') void onFileClick(entry, rootPath);
-                                    }}
-                                    onContextMenu={(event) => {
-                                      event.preventDefault();
-                                      setFileContextMenu({
-                                        x: event.clientX,
-                                        y: event.clientY,
-                                        target: {
-                                          path: entry.path,
-                                          isDir: false,
-                                          name: entry.name,
-                                          rootPath,
-                                          connection: null,
-                                          canDelete: gitItem.status !== 'deleted',
-                                        },
-                                      });
-                                    }}
-                                    className={`flex w-full items-center justify-between px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 ${
-                                      isActive ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' : `${textClass}`
-                                    }`}>
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="truncate font-semibold text-slate-200">{entry.name}</span>
-                                      <span className="truncate text-[8px] text-slate-500 font-mono mt-0.5" title={gitItem.path}>{gitItem.path}</span>
-                                    </div>
-                                    <span className={`text-[9px] font-bold px-1 py-0.2 rounded border font-mono scale-90 ${
-                                      gitItem.status === 'modified' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
-                                      gitItem.status === 'added' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
-                                      gitItem.status === 'untracked' ? 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20' :
-                                      'text-rose-500 bg-rose-500/10 border-rose-500/20 line-through'
-                                    }`}>{statusBadge}</span>
-                                  </button>
-                                );
-                              };
-
-                              return (
-                                <>
-                                  {staged.length > 0 && (
-                                    <div>
-                                      <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-emerald-400 border-b border-cyber-line/20">Changes to be committed</div>
-                                      {staged.map(renderItem)}
-                                    </div>
-                                  )}
-                                  {unstaged.length > 0 && (
-                                    <div>
-                                      <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-rose-400 border-b border-cyber-line/20">Changes not staged for commit</div>
-                                      {unstaged.map(renderItem)}
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                  <ExplorerIcon />
-                  <p className="mt-4 text-xs font-semibold text-slate-300">No Folder Opened</p>
-                  <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-                    Start an interactive session or select a project directory to explore files.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleSelectFolder}
-                    className="mt-4 rounded border border-cyber-electric bg-cyber-electric/15 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cyber-electric transition hover:bg-cyber-electric/25"
-                  >
-                    Select Folder
-                  </button>
-                </div>
-              )}
-            </div>
-
-
-          </div>
-        )}
-
-        {/* Active Tab: AI Chat */}
-        {activeTab === 'ai-chat' && <AIChatPanel />}
-
-        {/* Active Tab: CLI Manager */}
+        {/* Active Tab: CLI Manager (Terminal Orchestrator - unified hub) */}
         {activeTab === 'cli-manager' && (
           <div className="flex h-full flex-col overflow-hidden">
-            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4 bg-cyber-base/20">
-              <div>
-                <h1 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">Terminal Orchestor</h1>
-                <p className="text-[10px] text-slate-400 mt-0.5">Sessions and Profiles</p>
+            {/* Header & Sub-Navigation Pills */}
+            <div className="flex shrink-0 flex-col border-b border-cyber-line bg-cyber-base/20">
+              <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                <div>
+                  <h1 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">Terminal Orchestor</h1>
+                  <p className="text-[10px] text-slate-400 mt-0.5 font-mono">CLIs, Operator, Configs & Explorer</p>
+                </div>
+              </div>
+
+              {/* Sub-Navigation Pills */}
+              <div className="flex items-center gap-1 px-3 pb-2.5">
+                <button
+                  type="button"
+                  onClick={() => setCliSubTab('clis')}
+                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold transition ${
+                    cliSubTab === 'clis'
+                      ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40 shadow-neon-blue-sm-faint font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+                  }`}
+                >
+                  💻 CLIs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCliSubTab('operator')}
+                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold transition ${
+                    cliSubTab === 'operator'
+                      ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40 shadow-neon-blue-sm-faint font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+                  }`}
+                >
+                  ☁️ VM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCliSubTab('configs')}
+                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold transition ${
+                    cliSubTab === 'configs'
+                      ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40 shadow-neon-blue-sm-faint font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+                  }`}
+                >
+                  ⚡ Configs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCliSubTab('explorer')}
+                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold transition ${
+                    cliSubTab === 'explorer'
+                      ? 'bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/40 shadow-neon-sm-faint font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
+                  }`}
+                >
+                  📁 Explorer
+                </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 space-y-5">
-
-              {/* CLIs SECTION */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setShowCliList((value) => !value)}
-                    className="font-display text-xs uppercase tracking-[0.2em] text-slate-400 hover:text-slate-200"
-                  >
-                    CLIs {showCliList ? '[-]' : '[+]'}
-                  </button>
+            {/* Sub-view 1: CLIs & Sessions */}
+            {cliSubTab === 'clis' && (
+              <div className="flex flex-1 flex-col overflow-hidden">
+                {/* Action bar */}
+                <div className="flex shrink-0 items-center justify-between border-b border-cyber-line/40 px-3 py-2 bg-cyber-base/10">
+                  <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">CLI Connections</span>
                   <button
                     type="button"
                     onClick={onAddCli}
-                    className="rounded border border-cyber-neon/40 px-1.5 py-0.5 text-[10px] font-semibold text-cyber-neon transition hover:border-cyber-neon hover:bg-cyber-neon/10"
+                    className="rounded border border-cyber-neon/40 px-2 py-0.5 text-[10px] font-semibold text-cyber-neon transition hover:border-cyber-neon hover:bg-cyber-neon/10 shadow-neon-sm-faint"
                   >
                     Add CLI
                   </button>
                 </div>
 
-                {showCliList ? (
-                  <div className="space-y-1">
-                    {clis.map((cli) => (
-                      <div
-                        key={cli.name}
-                        className={`rounded border px-1.5 py-1.5 transition ${
-                          activeCli === cli.name
-                            ? 'border-cyber-neon bg-cyber-neon/10 shadow-neon-sm-faint'
-                            : 'border-cyber-line bg-cyber-base/40'
-                        }`}
+                {/* Search Box */}
+                <div className="shrink-0 p-2.5 border-b border-cyber-line/50">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search CLI name, command or group..."
+                      value={cliSearchQuery}
+                      onChange={(e) => setCliSearchQuery(e.target.value)}
+                      className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[11px]"
+                    />
+                    {cliSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setCliSearchQuery('')}
+                        className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white text-xs"
                       >
-                        <div className="flex items-start gap-1.5">
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* CLI Grouped List */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-thin">
+                  {Object.keys(groupedClis).length === 0 ? (
+                    <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8 select-none">
+                      <TerminalIcon />
+                      <p className="mt-4 text-xs font-semibold text-slate-300">No CLIs Found</p>
+                      <p className="mt-1 text-[11px] text-slate-500 leading-normal">
+                        {cliSearchQuery ? 'Try adjusting your search query.' : 'Add your first CLI connection above to start.'}
+                      </p>
+                    </div>
+                  ) : (
+                    (Object.entries(groupedClis) as [string, CliDefinition[]][]).map(([groupName, cliList]) => {
+                      const isCollapsed = !!collapsedCliGroups[groupName];
+                      return (
+                        <div key={groupName} className="space-y-1">
                           <button
                             type="button"
-                            onClick={() => onSelectCli(cli.name)}
-                              onDoubleClick={() => onOpenCliInteraction(cli)}
-                            className="min-w-0 flex-1 text-left leading-tight"
+                            onClick={() => setCollapsedCliGroups((prev) => ({ ...prev, [groupName]: !isCollapsed }))}
+                            className="flex w-full items-center justify-between font-display text-[11px] uppercase tracking-wider text-slate-400 hover:text-slate-200 py-1"
                           >
-                            <span className="block truncate text-[13px] font-semibold text-slate-100">{cli.name}</span>
-                            <span className="block truncate text-[9px] text-slate-400">{cli.command}</span>
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <FolderArrowIcon isExpanded={!isCollapsed} />
+                              <span>{groupName}</span>
+                              <span className="text-[9px] opacity-60 font-semibold lowercase">({cliList.length})</span>
+                            </div>
                           </button>
 
-                          <div className="mt-0.5 flex shrink-0 items-center gap-1">
+                          {!isCollapsed && (
+                            <div className="space-y-1.5 pl-2 border-l border-cyber-line/20 ml-1.5 mt-1">
+                              {cliList.map((cli) => (
+                                <div
+                                  key={cli.name}
+                                  onClick={() => onSelectCli(cli.name)}
+                                  onDoubleClick={() => onOpenCliInteraction(cli)}
+                                  className={`rounded border px-1.5 py-1.5 transition cursor-pointer ${
+                                    activeCli === cli.name
+                                      ? 'border-cyber-neon bg-cyber-neon/10 shadow-neon-sm-faint'
+                                      : 'border-cyber-line bg-cyber-base/40 hover:border-cyber-neon/60 hover:bg-cyber-neon/5'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-1.5">
+                                    <div className="min-w-0 flex-1 text-left">
+                                      <span className="block truncate text-[11px] font-semibold text-slate-200 leading-tight">{cli.name}</span>
+                                      <span className="block truncate text-[9px] text-slate-500 font-mono leading-tight">{cli.command}</span>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onOpenCliInteraction(cli);
+                                        }}
+                                        aria-label={`Start ${cli.name}`}
+                                        title="Start Session"
+                                        className="flex h-5 w-5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
+                                      >
+                                        <PlayIcon />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onEditCli(cli);
+                                        }}
+                                        aria-label={`Edit ${cli.name}`}
+                                        title="Edit CLI"
+                                        className="flex h-5 w-5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
+                                      >
+                                        <EditIcon />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onDeleteCli(cli);
+                                        }}
+                                        aria-label={`Delete ${cli.name}`}
+                                        title="Delete CLI"
+                                        className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
+                                      >
+                                        <TrashIcon />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sub-view 2: VM Operator (SSH connections) */}
+            {cliSubTab === 'operator' && (
+              <div className="flex flex-1 flex-col overflow-hidden">
+                {/* Action bar */}
+                <div className="flex shrink-0 items-center justify-between border-b border-cyber-line/40 px-3 py-2 bg-cyber-base/10">
+                  <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">VM Connections</span>
+                  <button
+                    type="button"
+                    onClick={onAddSsh}
+                    className="rounded border border-cyber-electric/50 px-2 py-0.5 text-[10px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10 shadow-neon-blue-sm-faint"
+                  >
+                    Add VM
+                  </button>
+                </div>
+
+                {/* Search Box */}
+                <div className="shrink-0 p-2.5 border-b border-cyber-line/50">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search VM, host, user or group..."
+                      value={sshSearchQuery}
+                      onChange={(e) => setSshSearchQuery(e.target.value)}
+                      className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
+                    />
+                    {sshSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSshSearchQuery('')}
+                        className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Connection List */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-thin">
+                  {Object.keys(groupedConnections).length === 0 ? (
+                    <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8 select-none">
+                      <CloudIcon />
+                      <p className="mt-4 text-xs font-semibold text-slate-300">No Connections Found</p>
+                      <p className="mt-1 text-[11px] text-slate-500 leading-normal">
+                        {sshSearchQuery ? 'Try adjusting your search query.' : 'Add your first VM connection above to start.'}
+                      </p>
+                    </div>
+                  ) : (
+                    (Object.entries(groupedConnections) as [string, SshConnection[]][]).map(([groupName, conns]) => {
+                      const isCollapsed = !!collapsedGroups[groupName];
+                      return (
+                        <div key={groupName} className="space-y-1">
+                          <button
+                            type="button"
+                            onClick={() => setCollapsedGroups((prev) => ({ ...prev, [groupName]: !isCollapsed }))}
+                            className="flex w-full items-center justify-between font-display text-[11px] uppercase tracking-wider text-slate-400 hover:text-slate-200 py-1"
+                          >
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <FolderArrowIcon isExpanded={!isCollapsed} />
+                              <span>{groupName}</span>
+                              <span className="text-[9px] opacity-60 font-semibold lowercase">({conns.length})</span>
+                            </div>
+                          </button>
+
+                          {!isCollapsed && (
+                            <div className="space-y-1.5 pl-2 border-l border-cyber-line/20 ml-1.5 mt-1">
+                              {conns.map((conn) => (
+                                <div
+                                  key={conn.id}
+                                  onDoubleClick={() => {
+                                    if (conn.protocol === 'rdp') onConnectRdp(conn);
+                                    else onConnectSsh(conn);
+                                    setCliSubTab('explorer');
+                                  }}
+                                  className="rounded border border-cyber-line bg-cyber-base/40 px-1.5 py-1.5 transition hover:border-cyber-electric/60 hover:bg-cyber-electric/5 cursor-pointer"
+                                >
+                                  <div className="flex items-start gap-1.5">
+                                    <div className="min-w-0 flex-1 text-left">
+                                      <span className="block truncate text-[11px] font-semibold text-slate-200 leading-tight">{conn.name}</span>
+                                      <span className="block truncate text-[9px] text-slate-500 font-mono leading-tight">{conn.user}@{conn.host}:{conn.port}</span>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      <span className={`rounded border px-1 py-px text-[7px] font-semibold uppercase tracking-wider ${
+                                        conn.protocol === 'rdp'
+                                          ? 'bg-cyber-electric/10 border-cyber-electric/40 text-cyber-electric'
+                                          : 'bg-cyber-neon/10 border-cyber-neon/40 text-cyber-neon'
+                                      }`}>
+                                        {conn.protocol === 'rdp' ? 'RDP' : conn.authMode === 'key' ? 'KEY' : 'SSH'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (conn.protocol === 'rdp') onConnectRdp(conn);
+                                          else onConnectSsh(conn);
+                                          setCliSubTab('explorer');
+                                        }}
+                                        aria-label={conn.protocol === 'rdp' ? `Remote Desktop to ${conn.name}` : `Connect SSH to ${conn.name}`}
+                                        title={conn.protocol === 'rdp' ? "Launch RDP" : "Connect SSH"}
+                                        className="flex h-5 w-5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
+                                      >
+                                        <PlayIcon />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); onEditSsh(conn); }}
+                                        aria-label={`Edit ${conn.name}`}
+                                        title="Edit"
+                                        className="flex h-5 w-5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
+                                      >
+                                        <EditIcon />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); onDeleteSsh(conn); }}
+                                        aria-label={`Delete ${conn.name}`}
+                                        title="Delete"
+                                        className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
+                                      >
+                                        <TrashIcon />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sub-view 3: Quick Config Files Manager */}
+            {cliSubTab === 'configs' && (
+              <div className="flex flex-1 flex-col overflow-hidden">
+                {/* Action bar */}
+                <div className="flex shrink-0 items-center justify-between border-b border-cyber-line/40 px-3 py-2 bg-cyber-base/10">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">Quick Config Files</span>
+                    {quickConfigFiles.length > 0 && (
+                      <span className="rounded bg-cyber-electric/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-electric border border-cyber-electric/30 font-mono">
+                        {quickConfigFiles.length}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingSpecialConfig(null);
+                      setSpecialModalOpen(true);
+                    }}
+                    className="rounded border border-cyber-electric/50 px-2 py-0.5 text-[10px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10 shadow-neon-blue-sm-faint"
+                  >
+                    + Add Config
+                  </button>
+                </div>
+
+                {/* Search Box */}
+                <div className="shrink-0 p-2.5 border-b border-cyber-line/50">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search config name, path, description or group..."
+                      value={configSearchQuery}
+                      onChange={(e) => setConfigSearchQuery(e.target.value)}
+                      className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
+                    />
+                    {configSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setConfigSearchQuery('')}
+                        className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Grouped Config List */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-thin">
+                  {Object.keys(groupedConfigs).length === 0 ? (
+                    <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8 select-none">
+                      <span className="text-3xl mb-1">⚡</span>
+                      <p className="mt-2 text-xs font-semibold text-slate-300">No Config Files Found</p>
+                      <p className="mt-1 text-[11px] text-slate-500 leading-normal">
+                        {configSearchQuery ? 'Try adjusting your search query.' : 'Add your first config file above to start.'}
+                      </p>
+                    </div>
+                  ) : (
+                    (Object.entries(groupedConfigs) as [string, { entry: FileEntry; specialMatch?: SpecialConfigFile }[]][]).map(([groupName, items]) => {
+                      const isCollapsed = !!collapsedConfigGroups[groupName];
+                      return (
+                        <div key={groupName} className="space-y-1">
+                          <button
+                            type="button"
+                            onClick={() => setCollapsedConfigGroups((prev) => ({ ...prev, [groupName]: !isCollapsed }))}
+                            className="flex w-full items-center justify-between font-display text-[11px] uppercase tracking-wider text-slate-400 hover:text-slate-200 py-1"
+                          >
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <FolderArrowIcon isExpanded={!isCollapsed} />
+                              <span>{groupName}</span>
+                              <span className="text-[9px] opacity-60 font-semibold lowercase">({items.length})</span>
+                            </div>
+                          </button>
+
+                          {!isCollapsed && (
+                            <div className="space-y-2 pl-2 border-l border-cyber-line/20 ml-1.5 mt-1">
+                              {items.map(({ entry, specialMatch }) => {
+                                const ext = entry.name.split('.').pop()?.toUpperCase() || 'CFG';
+                                const isActive = selectedFilePath === entry.path;
+                                return (
+                                  <div
+                                    key={entry.path}
+                                    onDoubleClick={() => void onFileClick(entry, rootPath)}
+                                    className={`rounded border px-2.5 py-2 transition cursor-pointer ${
+                                      isActive
+                                        ? 'border-cyber-electric bg-cyber-electric/15 shadow-neon-blue-sm-faint'
+                                        : 'border-cyber-line bg-cyber-base/40 hover:border-cyber-electric/60 hover:bg-cyber-electric/5'
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <span className="text-sm shrink-0 mt-0.5">{specialMatch ? '⚙️' : '📄'}</span>
+                                      <div className="min-w-0 flex-1 text-left">
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className="truncate text-[11px] font-semibold text-slate-200 leading-tight">
+                                            {specialMatch?.name || entry.name}
+                                          </span>
+                                          <span className="shrink-0 text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-cyber-electric/10 text-cyber-electric border border-cyber-electric/20 font-mono">
+                                            {ext}
+                                          </span>
+                                        </div>
+                                        <span className="block truncate text-[9px] text-slate-400 font-mono leading-tight mt-0.5">
+                                          {specialMatch?.path || entry.path}
+                                        </span>
+                                        {specialMatch?.description && (
+                                          <p className="text-[9px] text-slate-400 leading-tight mt-1 line-clamp-2">
+                                            {specialMatch.description}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-cyber-line/20">
+                                      <span className="text-[8px] text-slate-500 font-mono italic">Double-click or ⚡ to edit content</span>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void onFileClick(entry, rootPath);
+                                          }}
+                                          title="Fast Access: Open file in editor immediately for quick editing"
+                                          className="flex items-center gap-1 rounded border border-cyber-electric/60 px-2 py-0.5 text-[9px] font-semibold text-cyber-electric transition hover:bg-cyber-electric/20"
+                                        >
+                                          ⚡ Open
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingSpecialConfig(
+                                              specialMatch || {
+                                                id: `special-${Date.now()}`,
+                                                name: entry.name,
+                                                path: entry.path,
+                                                description: '',
+                                              }
+                                            );
+                                            setSpecialModalOpen(true);
+                                          }}
+                                          title="Edit Entry Info"
+                                          className="flex h-5 w-5 items-center justify-center rounded border border-slate-600 text-slate-400 transition hover:border-slate-300 hover:text-white"
+                                        >
+                                          <EditIcon />
+                                        </button>
+                                        {specialMatch && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              deleteSpecialConfigFile(specialMatch.id);
+                                            }}
+                                            title="Delete Config Entry"
+                                            className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
+                                          >
+                                            <TrashIcon />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sub-view 4: File Explorer */}
+            {cliSubTab === 'explorer' && (
+              <div className="flex flex-1 flex-col overflow-hidden">
+                <div className="flex flex-col overflow-hidden shrink-0 flex-1 pr-1.5">
+                  {rootPath ? (
+                    <div className="flex flex-col h-full overflow-hidden">
+                      {/* Workspace Info Banner */}
+                      <div className="border-b border-cyber-line/50 bg-cyber-panel/60 p-3 flex flex-col gap-1.5 select-none shrink-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-xs">{isSshSession ? '🌐' : '🖥️'}</span>
+                            <span className="font-display text-[10px] uppercase font-bold tracking-wider text-cyber-neon truncate">
+                              {isSshSession
+                                ? `SSH: ${sshConnection?.user ? sshConnection.user + '@' : ''}${sshConnection?.host || sshConnectionName || 'Remote'}`
+                                : 'Local Workspace'}
+                            </span>
+                          </div>
+                          {isSshSession && (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-semibold bg-cyber-electric/15 text-cyber-electric border border-cyber-electric/30">
+                              Port {sshConnection?.port || 22}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between gap-1 text-[10px] font-mono text-slate-400 bg-cyber-base/60 px-2 py-1 rounded border border-cyber-line/30">
+                          <span className="truncate flex-1 text-slate-300" title={rootPath}>
+                            {rootPath}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(rootPath);
+                            }}
+                            className="text-slate-500 hover:text-cyber-electric transition p-0.5"
+                            title="Copy workspace path"
+                          >
+                            📋
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Panel 0: Quick Config Files */}
+                      <div className={`flex flex-col overflow-hidden border-b border-cyber-line/30 ${quickConfigsExpanded ? 'shrink-0 max-h-[220px]' : 'shrink-0'}`}>
+                        <div className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 select-none">
+                          <button
+                            type="button"
+                            onClick={() => setQuickConfigsExpanded(!quickConfigsExpanded)}
+                            className="flex items-center gap-2 flex-1 text-left"
+                          >
+                            <FolderArrowIcon isExpanded={quickConfigsExpanded} />
+                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-cyber-electric">⚡ Quick Config Files</span>
+                          </button>
+                          <div className="flex items-center gap-1.5">
+                            {quickConfigFiles.length > 0 && (
+                              <span className="rounded bg-cyber-electric/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-electric border border-cyber-electric/30 font-mono">
+                                {quickConfigFiles.length}
+                              </span>
+                            )}
                             <button
                               type="button"
-                              onClick={() => onOpenCliInteraction(cli)}
-                              aria-label={`Start ${cli.name}`}
-                              title="Start Session"
-                              className="flex h-5 w-5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
+                              onClick={() => {
+                                setEditingSpecialConfig(null);
+                                setSpecialModalOpen(true);
+                              }}
+                              className="rounded border border-cyber-neon/40 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyber-neon transition hover:bg-cyber-neon/15"
+                              title="Add custom Special Config File (Name, Path, Description)"
                             >
-                              <PlayIcon />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onEditCli(cli)}
-                              aria-label={`Edit ${cli.name}`}
-                              title="Edit CLI"
-                              className="flex h-5 w-5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
-                            >
-                              <EditIcon />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onDeleteCli(cli)}
-                              aria-label={`Delete ${cli.name}`}
-                              title="Delete CLI"
-                              className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
-                            >
-                              <TrashIcon />
+                              + Add
                             </button>
                           </div>
                         </div>
+
+                        {quickConfigsExpanded && (
+                          <div className="flex-1 overflow-y-auto py-1 scrollbar-thin">
+                            {quickConfigFiles.length === 0 ? (
+                              <p className="px-4 py-2 text-[10px] italic text-slate-500 font-mono">No config files (.yaml, .json, .env, .toml) loaded yet.</p>
+                            ) : (
+                              quickConfigFiles.map((entry) => {
+                                const isActive = selectedFilePath === entry.path;
+                                const specialMatch = specialConfigs.find(sc => sc.name === entry.name || sc.path === entry.path || entry.path.endsWith(sc.path));
+                                return (
+                                  <div
+                                    key={`config-${entry.path}`}
+                                    className={`flex items-center justify-between px-3 py-1.5 transition text-xs font-mono border-b border-cyber-line/10 group ${
+                                      isActive ? 'bg-cyber-electric/15 text-cyber-electric border-l-2 border-cyber-electric pl-3' : 'text-slate-300 hover:text-white hover:bg-cyber-base/40'
+                                    }`}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => void onFileClick(entry, rootPath)}
+                                      className="flex flex-1 items-center gap-2 min-w-0 text-left"
+                                      title={specialMatch ? `${specialMatch.name} (${specialMatch.path}): ${specialMatch.description}` : entry.path}
+                                    >
+                                      <span className="text-[10px] shrink-0">{specialMatch ? '⚙️' : '📄'}</span>
+                                      <div className="flex flex-col min-w-0 flex-1">
+                                        <span className="truncate font-semibold text-[11px] leading-tight">{entry.name}</span>
+                                        {specialMatch?.description && (
+                                          <span className="truncate text-[8px] text-slate-400 mt-0.5">{specialMatch.description}</span>
+                                        )}
+                                      </div>
+                                    </button>
+
+                                    <div className="flex items-center gap-1 shrink-0 ml-1">
+                                      {specialMatch && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteSpecialConfigFile(specialMatch.id);
+                                          }}
+                                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition p-0.5 text-[10px]"
+                                          title="Delete special config entry"
+                                        >
+                                          ✕
+                                        </button>
+                                      )}
+                                      <span className="text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-cyber-electric/10 text-cyber-electric border border-cyber-electric/20 font-mono">
+                                        {entry.name.split('.').pop() || 'CFG'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Active Tab: Quick Apps — content renders in main area */}
-        {activeTab === 'quickapps' && (
-          <div className="flex flex-col items-center justify-center h-full gap-4 text-cyber-muted p-6">
-            <div className="w-14 h-14 rounded-2xl bg-cyber-accent/10 border border-cyber-accent/30 flex items-center justify-center text-2xl">
-              🚀
-            </div>
-            <div className="text-center">
-              <p className="text-[13px] font-semibold text-cyber-text">Quick Apps</p>
-              <p className="text-[11px] text-cyber-muted mt-1 leading-relaxed">
-                Displayed in the main area →
-              </p>
-            </div>
-          </div>
-        )}
+                      {/* Panel 1: Workspace Files */}
+                      <div className={`flex flex-col overflow-hidden ${workspaceFilesExpanded ? 'flex-1 min-h-[100px]' : 'shrink-0'}`}>
+                        <button
+                          type="button"
+                          onClick={() => setWorkspaceFilesExpanded(!workspaceFilesExpanded)}
+                          className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 hover:bg-cyber-base/70 transition select-none"
+                        >
+                          <div className="flex items-center gap-2">
+                            <FolderArrowIcon isExpanded={workspaceFilesExpanded} />
+                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">Workspace Files</span>
+                          </div>
+                          <span className="truncate max-w-[120px] font-mono text-[9px] font-semibold text-cyber-electric/80" title={rootPath}>
+                            {rootPath.split(/[/\\]/).pop() || rootPath}
+                          </span>
+                        </button>
+                        
+                        {workspaceFilesExpanded && (
+                          <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
+                            {(cachedFiles[rootPath] ?? []).map((entry) => renderFileNode(entry, 0))}
+                          </div>
+                        )}
+                      </div>
 
+                      {/* Panel 2: Git Diff (Changes) */}
+                      <div className={`flex flex-col overflow-hidden border-t border-cyber-line/30 ${gitDiffExpanded ? 'flex-1 min-h-[120px]' : 'shrink-0'}`}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextVal = !gitDiffExpanded;
+                            setGitDiffExpanded(nextVal);
+                            if (nextVal && rootPath) {
+                              void refreshGitStatus(rootPath);
+                            }
+                          }}
+                          className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 hover:bg-cyber-base/70 transition select-none"
+                        >
+                          <div className="flex items-center gap-2">
+                            <FolderArrowIcon isExpanded={gitDiffExpanded} />
+                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">Git Diff (Changes)</span>
+                          </div>
+                          {gitStatusList.length > 0 && (
+                            <span className="rounded bg-cyber-neon/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-neon border border-cyber-neon/30 font-mono">
+                              {gitStatusList.length}
+                            </span>
+                          )}
+                        </button>
 
-        {/* Active Tab: API Client History */}
-        {activeTab === 'apiclient' && (
-          <ApiHistoryList />
-        )}
+                        {gitDiffExpanded && (
+                          <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
+                            {gitStatusList.length === 0 ? (
+                              <p className="px-4 py-3 text-xs italic text-slate-500 font-mono">No changed files in workspace.</p>
+                            ) : (
+                              <div className="space-y-1">
+                                {(() => {
+                                  const staged = gitStatusList.filter(g => g.staged);
+                                  const unstaged = gitStatusList.filter(g => !g.staged);
 
-        {/* Active Tab: CliProxyAI — render ProxyPanel in sidebar */}
-        {activeTab === 'proxy' && (
-          <div className="h-full overflow-hidden">
-            <ProxyPanel isInSidebar={true} />
-          </div>
-        )}
+                                  const renderItem = (gitItem: typeof gitStatusList[0]) => {
+                                    const entry: FileEntry = {
+                                      name: gitItem.path.split('/').pop() || gitItem.path,
+                                      path: joinWorkspacePath(rootPath, gitItem.path),
+                                      isDir: false
+                                    };
+                                    const isActive = selectedFilePath === entry.path;
+                                    let statusBadge = '';
+                                    let textClass = 'text-slate-300 hover:text-white';
+                                    if (gitItem.status === 'modified') { statusBadge = 'M'; textClass = 'text-amber-300 hover:text-amber-200 hover:bg-amber-400/5'; }
+                                    else if (gitItem.status === 'added') { statusBadge = 'A'; textClass = 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-400/5'; }
+                                    else if (gitItem.status === 'untracked') { statusBadge = 'U'; textClass = 'text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/5'; }
+                                    else if (gitItem.status === 'deleted') { statusBadge = 'D'; textClass = 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 line-through'; }
 
-        {/* Active Tab: System Logs */}
-        {activeTab === 'logs' && (
-          <div className="flex flex-col items-center justify-center h-full gap-4 text-cyber-muted p-6">
-            <div className="w-14 h-14 rounded-2xl bg-cyber-accent/10 border border-cyber-accent/30 flex items-center justify-center text-2xl">
-              📋
-            </div>
-            <div className="text-center">
-              <p className="text-[13px] font-semibold text-cyber-text">System Logs</p>
-              <p className="text-[11px] text-cyber-muted mt-1 leading-relaxed">
-                View in the main panel →
-              </p>
-            </div>
-          </div>
-        )}
+                                    return (
+                                      <button
+                                        key={gitItem.path}
+                                        type="button"
+                                        aria-disabled={gitItem.status === 'deleted'}
+                                        onClick={() => {
+                                          if (gitItem.status !== 'deleted') void onFileClick(entry, rootPath);
+                                        }}
+                                        onContextMenu={(event) => {
+                                          event.preventDefault();
+                                          setFileContextMenu({
+                                            x: event.clientX,
+                                            y: event.clientY,
+                                            target: {
+                                              path: entry.path,
+                                              isDir: false,
+                                              name: entry.name,
+                                              rootPath,
+                                              connection: null,
+                                              canDelete: gitItem.status !== 'deleted',
+                                            },
+                                          });
+                                        }}
+                                        className={`flex w-full items-center justify-between px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 ${
+                                          isActive ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' : `${textClass}`
+                                        }`}>
+                                        <div className="flex flex-col min-w-0">
+                                          <span className="truncate font-semibold text-slate-200">{entry.name}</span>
+                                          <span className="truncate text-[8px] text-slate-500 font-mono mt-0.5" title={gitItem.path}>{gitItem.path}</span>
+                                        </div>
+                                        <span className={`text-[9px] font-bold px-1 py-0.2 rounded border font-mono scale-90 ${
+                                          gitItem.status === 'modified' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
+                                          gitItem.status === 'added' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
+                                          gitItem.status === 'untracked' ? 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20' :
+                                          'text-rose-500 bg-rose-500/10 border-rose-500/20 line-through'
+                                        }`}>{statusBadge}</span>
+                                      </button>
+                                    );
+                                  };
 
-        {/* Active Tab: Operator (SSH VM Manager) */}
-        {activeTab === 'operator' && (
-          <div className="flex h-full flex-col overflow-hidden">
-            {/* Header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4 bg-cyber-base/20">
-              <div>
-                <h1 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">VM Operator</h1>
-                <p className="text-[10px] text-slate-400 mt-0.5">SSH connections to your VMs</p>
-              </div>
-              <button
-                type="button"
-                onClick={onAddSsh}
-                className="rounded border border-cyber-electric/50 px-2 py-1 text-[10px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10 shadow-neon-blue-sm-faint"
-              >
-                Add VM
-              </button>
-            </div>
-
-            {/* Search Box */}
-            <div className="shrink-0 p-3 border-b border-cyber-line/50">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search VM, host, user or group..."
-                  value={sshSearchQuery}
-                  onChange={(e) => setSshSearchQuery(e.target.value)}
-                  className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
-                />
-                {sshSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSshSearchQuery('')}
-                    className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white text-xs"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* VM Connection List grouped by Group */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-thin">
-              {Object.keys(groupedConnections).length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8 select-none">
-                  <CloudIcon />
-                  <p className="mt-4 text-xs font-semibold text-slate-300">No Connections Found</p>
-                  <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-                    {sshSearchQuery ? 'Try adjusting your search query.' : 'Add your first VM connection above to start.'}
-                  </p>
-                </div>
-              ) : (
-                (Object.entries(groupedConnections) as [string, SshConnection[]][]).map(([groupName, conns]) => {
-                  const isCollapsed = !!collapsedGroups[groupName];
-                  return (
-                    <div key={groupName} className="space-y-1">
-                      {/* Group Header */}
+                                  return (
+                                    <>
+                                      {staged.length > 0 && (
+                                        <div>
+                                          <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-emerald-400 border-b border-cyber-line/20">Changes to be committed</div>
+                                          {staged.map(renderItem)}
+                                        </div>
+                                      )}
+                                      {unstaged.length > 0 && (
+                                        <div>
+                                          <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-rose-400 border-b border-cyber-line/20">Changes not staged for commit</div>
+                                          {unstaged.map(renderItem)}
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+                      <ExplorerIcon />
+                      <p className="mt-4 text-xs font-semibold text-slate-300">No Folder Opened</p>
+                      <p className="mt-1 text-[11px] text-slate-500 leading-normal">
+                        Start an interactive session or select a project directory to explore files.
+                      </p>
                       <button
                         type="button"
-                        onClick={() => setCollapsedGroups((prev) => ({ ...prev, [groupName]: !isCollapsed }))}
-                        className="flex w-full items-center justify-between font-display text-[11px] uppercase tracking-wider text-slate-400 hover:text-slate-200 py-1"
+                        onClick={handleSelectFolder}
+                        className="mt-4 rounded border border-cyber-electric bg-cyber-electric/15 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cyber-electric transition hover:bg-cyber-electric/25"
                       >
-                        <div className="flex items-center gap-1.5 font-bold">
-                          <FolderArrowIcon isExpanded={!isCollapsed} />
-                          <span>{groupName}</span>
-                          <span className="text-[9px] opacity-60 font-semibold lowercase">({conns.length})</span>
-                        </div>
+                        Select Folder
                       </button>
-
-                      {/* Group Connection cards */}
-                      {!isCollapsed && (
-                        <div className="space-y-1.5 pl-2 border-l border-cyber-line/20 ml-1.5 mt-1">
-                          {conns.map((conn) => (
-                            <div
-                              key={conn.id}
-                              onDoubleClick={() => conn.protocol === 'rdp' ? onConnectRdp(conn) : onConnectSsh(conn)}
-                              className="rounded border border-cyber-line bg-cyber-base/40 px-1.5 py-1.5 transition hover:border-cyber-electric/60 hover:bg-cyber-electric/5 cursor-pointer"
-                            >
-                              <div className="flex items-start gap-1.5">
-                                <div className="min-w-0 flex-1 text-left">
-                                  <span className="block truncate text-[11px] font-semibold text-slate-200 leading-tight">{conn.name}</span>
-                                  <span className="block truncate text-[9px] text-slate-500 font-mono leading-tight">{conn.user}@{conn.host}:{conn.port}</span>
-                                </div>
-                                <div className="flex shrink-0 items-center gap-1">
-                                  <span className={`rounded border px-1 py-px text-[7px] font-semibold uppercase tracking-wider ${
-                                    conn.protocol === 'rdp'
-                                      ? 'bg-cyber-electric/10 border-cyber-electric/40 text-cyber-electric'
-                                      : 'bg-cyber-neon/10 border-cyber-neon/40 text-cyber-neon'
-                                  }`}>
-                                    {conn.protocol === 'rdp' ? 'RDP' : conn.authMode === 'key' ? 'KEY' : 'SSH'}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); conn.protocol === 'rdp' ? onConnectRdp(conn) : onConnectSsh(conn); }}
-                                    aria-label={conn.protocol === 'rdp' ? `Remote Desktop to ${conn.name}` : `Connect SSH to ${conn.name}`}
-                                    title={conn.protocol === 'rdp' ? "Launch RDP" : "Connect SSH"}
-                                    className="flex h-5 w-5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
-                                  >
-                                    <PlayIcon />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); onEditSsh(conn); }}
-                                    aria-label={`Edit ${conn.name}`}
-                                    title="Edit"
-                                    className="flex h-5 w-5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
-                                  >
-                                    <EditIcon />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); onDeleteSsh(conn); }}
-                                    aria-label={`Delete ${conn.name}`}
-                                    title="Delete"
-                                    className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
-                                  >
-                                    <TrashIcon />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
+
+        {/* Active Tab: API Client (History & saved queries) */}
+        {activeTab === 'apiclient' && <ApiHistoryList />}
       </aside>
       )}
 
@@ -2771,6 +3008,16 @@ export function CliSidebar({
           </div>
         </div>
       )}
+
+      {/* Special Config File Modal */}
+      <SpecialConfigModal
+        isOpen={specialModalOpen}
+        initialConfig={editingSpecialConfig}
+        onClose={() => setSpecialModalOpen(false)}
+        onSave={(entry) => {
+          saveSpecialConfigFile(entry);
+        }}
+      />
     </div>
   );
 }

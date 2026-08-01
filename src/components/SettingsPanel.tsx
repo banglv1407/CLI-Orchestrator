@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { AppTheme, BuiltinLlmConfig, BuiltinLlmStatus, LlmConfig, WebAiProfile, WebAiConfig } from '../types';
-import { petInstallPack, pickFolder, webAiLoadProfiles, webAiSaveProfiles, webAiClearData } from '../lib/tauri';
+import type { AppTheme, BuiltinLlmConfig, BuiltinLlmStatus, LlmConfig } from '../types';
+import { petInstallPack, pickFolder } from '../lib/tauri';
 import {
   getActivePetId,
   setActivePetId,
@@ -88,7 +88,6 @@ type SettingsSection =
   | 'mythical-pet'
   | 'ai-companion'
   | 'local-llm'
-  | 'web-ai'
   | 'navigation'
   | 'proxy'
   | 'remote'
@@ -236,11 +235,6 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
   const [companionStatusMsg, setCompanionStatusMsg] = useState<string | null>(null);
   const [companionErrorMsg, setCompanionErrorMsg] = useState<string | null>(null);
 
-  // Web AI Profiles state
-  const [webAiProfiles, setWebAiProfiles] = useState<WebAiProfile[]>([]);
-  const [newProfileName, setNewProfileName] = useState('');
-  const [newProfileUrl, setNewProfileUrl] = useState('');
-  const [defaultProfileId, setDefaultProfileId] = useState<string>('');
 
   // Local LLM states
   const [builtinLlmConfig, setBuiltinLlmConfig] = useState<BuiltinLlmConfig>({
@@ -289,15 +283,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
       }
     }
 
-    // Load Web AI Profiles
-    webAiLoadProfiles()
-      .then((cfg) => {
-        setWebAiProfiles(cfg.profiles);
-        if (cfg.preferredProfileId) {
-          setDefaultProfileId(cfg.preferredProfileId);
-        }
-      })
-      .catch((err) => console.error('Failed to load Web AI profiles:', err));
+
   }, []);
 
   const handleLoadBuiltinLlm = async () => {
@@ -409,71 +395,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
     setTimeout(() => setCompanionStatusMsg(null), 3000);
   };
 
-  // Web AI handlers
-  const saveWebAiConfig = async (profiles: WebAiProfile[], preferredId?: string) => {
-    try {
-      await webAiSaveProfiles({
-        profiles,
-        preferredProfileId: preferredId || defaultProfileId || undefined,
-      });
-    } catch (e) {
-      console.error('Failed to save Web AI config:', e);
-    }
-  };
 
-  const handleAddWebAiProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProfileName.trim() || !newProfileUrl.trim()) return;
-
-    const id = newProfileName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-');
-    let hostname = '';
-    try {
-      hostname = new URL(newProfileUrl.trim()).hostname;
-    } catch {
-      hostname = newProfileUrl.trim();
-    }
-
-    const newProfile: WebAiProfile = {
-      id,
-      name: newProfileName.trim(),
-      defaultUrl: newProfileUrl.trim(),
-      partition: id,
-      allowNavigationRules: [hostname],
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    };
-
-    const next = [...webAiProfiles, newProfile];
-    setWebAiProfiles(next);
-    saveWebAiConfig(next);
-
-    setNewProfileName('');
-    setNewProfileUrl('');
-  };
-
-  const handleDeleteWebAiProfile = (id: string) => {
-    const next = webAiProfiles.filter((p) => p.id !== id);
-    setWebAiProfiles(next);
-    let nextDefault = defaultProfileId;
-    if (defaultProfileId === id && next.length > 0) {
-      nextDefault = next[0].id;
-      setDefaultProfileId(nextDefault);
-    }
-    saveWebAiConfig(next, nextDefault);
-  };
-
-  const handleSetDefaultWebAiProfile = (id: string) => {
-    setDefaultProfileId(id);
-    saveWebAiConfig(webAiProfiles, id);
-  };
-
-  const handleClearWebAiData = async () => {
-    try {
-      await webAiClearData();
-      alert('Secure Web AI caches, cookies, and local database sessions have been cleared successfully.');
-    } catch (e: any) {
-      alert('Failed to clear Web AI data: ' + String(e));
-    }
-  };
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-cyber-panel/40 p-4 md:p-6 select-none">
@@ -1035,190 +957,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
             </div>
           )}
 
-          {/* Web AI Profiles Section */}
-          {activeSection === 'web-ai' && (
-            <div className="space-y-4">
-              <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">Web AI Sandboxed Profiles</h3>
-              <div className="space-y-4 text-xs">
-                {/* Profiles List */}
-                <div className="space-y-2">
-                  <span className="block font-semibold uppercase tracking-wider text-slate-300 font-mono text-[10px]">Configured Profiles</span>
-                  {webAiProfiles.length === 0 ? (
-                    <div className="p-4 border border-dashed border-cyber-line text-slate-500 text-center font-mono rounded">
-                      No profiles configured. Add one below.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {webAiProfiles.map((p) => (
-                        <div
-                          key={p.id}
-                          className="rounded-lg border border-cyber-line/55 bg-cyber-base/30 transition hover:border-cyber-neon/40 p-3 space-y-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="min-w-0 flex-1">
-                              <span className="font-bold text-slate-200">{p.name}</span>
-                              <span className="text-[10px] text-slate-500 block truncate">{p.defaultUrl}</span>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {defaultProfileId === p.id ? (
-                                <span className="rounded bg-cyber-neon/15 border border-cyber-neon/40 text-cyber-neon font-bold text-[9px] px-2 py-0.5 uppercase">
-                                  Default
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetDefaultWebAiProfile(p.id)}
-                                  className="rounded border border-slate-600 hover:border-cyber-neon/40 px-2 py-0.5 text-[9px] text-slate-400 hover:text-cyber-neon transition uppercase"
-                                >
-                                  Set Default
-                                </button>
-                              )}
-                              <button
-                                  type="button"
-                                  onClick={() => handleDeleteWebAiProfile(p.id)}
-                                  className="rounded border border-red-500/40 hover:bg-red-950/20 px-2 py-0.5 text-[9px] text-red-400 hover:text-red-300 transition uppercase"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                          
-                          <details className="text-[10px] text-slate-400 space-y-2">
-                            <summary className="cursor-pointer text-[9px] uppercase tracking-wider text-slate-500 hover:text-slate-300 select-none">
-                              Edit Advanced Settings
-                            </summary>
-                            <div className="pt-2 space-y-2.5 border-t border-cyber-line/20">
-                              <div className="grid grid-cols-2 gap-2">
-                                <label className="block space-y-0.5">
-                                  <span className="text-[8px] uppercase tracking-wider text-slate-500">Partition</span>
-                                  <input
-                                    type="text"
-                                    value={p.partition}
-                                    onChange={(e) => {
-                                      const next = [...webAiProfiles];
-                                      const idx = next.findIndex((x) => x.id === p.id);
-                                      next[idx] = { ...p, partition: e.target.value };
-                                      setWebAiProfiles(next);
-                                      saveWebAiConfig(next);
-                                    }}
-                                    className="w-full bg-cyber-base border border-cyber-line rounded px-2 py-1 text-[10px] text-slate-200 focus:border-cyber-neon outline-none"
-                                  />
-                                </label>
-                                <label className="block space-y-0.5">
-                                  <span className="text-[8px] uppercase tracking-wider text-slate-500">Default URL</span>
-                                  <input
-                                    type="text"
-                                    value={p.defaultUrl}
-                                    onChange={(e) => {
-                                      const next = [...webAiProfiles];
-                                      const idx = next.findIndex((x) => x.id === p.id);
-                                      next[idx] = { ...p, defaultUrl: e.target.value };
-                                      setWebAiProfiles(next);
-                                      saveWebAiConfig(next);
-                                    }}
-                                    className="w-full bg-cyber-base border border-cyber-line rounded px-2 py-1 text-[10px] text-slate-200 focus:border-cyber-neon outline-none"
-                                  />
-                                </label>
-                              </div>
-                              <label className="block space-y-0.5">
-                                <span className="text-[8px] uppercase tracking-wider text-slate-500">User Agent</span>
-                                <input
-                                  type="text"
-                                  value={p.userAgent || ''}
-                                  placeholder="Standard Browser UserAgent"
-                                  onChange={(e) => {
-                                    const next = [...webAiProfiles];
-                                    const idx = next.findIndex((x) => x.id === p.id);
-                                    next[idx] = { ...p, userAgent: e.target.value || undefined };
-                                    setWebAiProfiles(next);
-                                    saveWebAiConfig(next);
-                                  }}
-                                  className="w-full bg-cyber-base border border-cyber-line rounded px-2 py-1 text-[10px] text-slate-200 focus:border-cyber-neon outline-none"
-                                />
-                              </label>
-                              <label className="block space-y-0.5">
-                                <span className="text-[8px] uppercase tracking-wider text-slate-500">Allowed Domains / Navigation Rules (comma separated)</span>
-                                <input
-                                  type="text"
-                                  value={p.allowNavigationRules.join(', ')}
-                                  onChange={(e) => {
-                                    const next = [...webAiProfiles];
-                                    const idx = next.findIndex((x) => x.id === p.id);
-                                    next[idx] = {
-                                      ...p,
-                                      allowNavigationRules: e.target.value
-                                        .split(',')
-                                        .map((s) => s.trim())
-                                        .filter(Boolean),
-                                    };
-                                    setWebAiProfiles(next);
-                                    saveWebAiConfig(next);
-                                  }}
-                                  className="w-full bg-cyber-base border border-cyber-line rounded px-2 py-1 text-[10px] text-slate-200 focus:border-cyber-neon outline-none"
-                                />
-                              </label>
-                            </div>
-                          </details>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
-                {/* Add Profile Form */}
-                <form onSubmit={handleAddWebAiProfile} className="space-y-3 p-4 rounded-lg border border-cyber-line/40 bg-cyber-base/20">
-                  <span className="block font-bold uppercase text-[10px] text-slate-300 font-mono border-b border-cyber-line/20 pb-1">
-                    Add Web AI Profile
-                  </span>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[9px] uppercase text-slate-500 mb-0.5">Profile Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Claude AI"
-                        value={newProfileName}
-                        onChange={(e) => setNewProfileName(e.target.value)}
-                        className="w-full rounded border border-cyber-line bg-cyber-base px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyber-neon"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] uppercase text-slate-500 mb-0.5">Start URL</label>
-                      <input
-                        type="url"
-                        required
-                        placeholder="https://..."
-                        value={newProfileUrl}
-                        onChange={(e) => setNewProfileUrl(e.target.value)}
-                        className="w-full rounded border border-cyber-line bg-cyber-base px-2.5 py-1.5 text-slate-200 outline-none focus:border-cyber-neon"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="submit"
-                    className="rounded border border-cyber-neon/50 bg-cyber-neon/10 hover:bg-cyber-neon/20 px-4 py-1.5 font-bold uppercase tracking-wider text-cyber-neon transition"
-                  >
-                    Add Profile
-                  </button>
-                </form>
-
-                {/* Clear Site Data */}
-                <div className="p-4 rounded-lg border border-red-500/25 bg-red-950/5 flex justify-between items-center">
-                  <div>
-                    <span className="font-semibold text-slate-300">Clear Site Data</span>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Removes cache, cookies, and local site databases for Web AI sessions</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleClearWebAiData}
-                    className="rounded border border-red-500/40 hover:bg-red-500/25 px-4 py-2 font-bold text-red-400 hover:text-red-300 transition uppercase"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Navigation Section */}
           {activeSection === 'navigation' && (
@@ -1256,19 +995,23 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
 }
 
 const TAB_LABELS: Record<string, { label: string; icon: string }> = {
-  'cli-manager': { label: 'CLI Orchestrator', icon: '💻' },
-  'explorer': { label: 'File Explorer', icon: '📁' },
+  'cli-manager': { label: 'Terminal Orchestor', icon: '💻' },
   'quickapps': { label: 'Quick Apps', icon: '⚡' },
-  'operator': { label: 'VM Operator', icon: '☁️' },
   'apiclient': { label: 'API Client', icon: '🔗' },
+  'dashboard': { label: 'Dashboard', icon: '📊' },
   'settings': { label: 'Settings', icon: '⚙️' },
 };
 
-const DEFAULT_ORDER = ['cli-manager', 'explorer', 'quickapps', 'operator', 'apiclient', 'settings'];
+const DEFAULT_ORDER = ['dashboard', 'cli-manager', 'quickapps', 'apiclient', 'settings'];
 const PINNED_TABS = new Set(['settings']);
 
 function normalizeSidebarOrder(order: string[]): string[] {
-  let list = [...order];
+  let list = order.filter((tab) => Boolean(TAB_LABELS[tab]));
+  for (const def of DEFAULT_ORDER) {
+    if (!list.includes(def)) {
+      list.push(def);
+    }
+  }
   return [
     ...list.filter((tab) => !PINNED_TABS.has(tab)),
     ...list.filter((tab) => PINNED_TABS.has(tab)),

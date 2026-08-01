@@ -447,6 +447,23 @@ pub fn chat_completions_url(base_url: &str) -> String {
 }
 
 const MAX_STREAM_LOG_BYTES: usize = 256 * 1024;
+const INTERNAL_PROXY_SOURCE_HEADER: &str = "x-clx-internal-source";
+const PRIVATE_PROXY_LOG_PLACEHOLDER: &str = "[redacted: inline terminal command assistant]";
+
+fn proxy_log_value(private_request: bool, value: String) -> String {
+    if private_request {
+        PRIVATE_PROXY_LOG_PLACEHOLDER.to_string()
+    } else {
+        value
+    }
+}
+
+fn is_private_proxy_request(headers: &HeaderMap) -> bool {
+    headers
+        .get(INTERNAL_PROXY_SOURCE_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value == "terminal-command")
+}
 
 fn append_stream_log_preview(preview: &mut Vec<u8>, chunk: &[u8]) {
     let remaining = MAX_STREAM_LOG_BYTES.saturating_sub(preview.len());
@@ -460,6 +477,7 @@ fn streaming_response(
     request_json: String,
     log_id: u64,
     started_at: std::time::Instant,
+    private_request: bool,
 ) -> Response {
     let status = upstream.status();
     let status_code = status.as_u16();
@@ -497,11 +515,18 @@ fn streaming_response(
             }
         }
 
-        let response_json = String::from_utf8_lossy(&preview).into_owned();
+        let response_json = proxy_log_value(
+            private_request,
+            String::from_utf8_lossy(&preview).into_owned(),
+        );
         let usage_string = String::from_utf8_lossy(&usage_buffer).into_owned();
         let (prompt_tokens, completion_tokens, total_tokens) =
             extract_stream_token_usage(&usage_string);
-        let normalized_response_json = compute_normalized_for_off(&response_json);
+        let normalized_response_json = if private_request {
+            PRIVATE_PROXY_LOG_PLACEHOLDER.to_string()
+        } else {
+            compute_normalized_for_off(&response_json)
+        };
 
         // Record in SQLite DB
         if let Some(ref bid) = backend.id {
@@ -590,9 +615,11 @@ async fn handle_models_list(State(state): State<Arc<ProxyState>>) -> Response {
 
 async fn handle_chat_completion(
     State(state): State<Arc<ProxyState>>,
+    headers: HeaderMap,
     Json(request): Json<ChatCompletionRequest>,
 ) -> Response {
     let log_id = state.counter.fetch_add(1, Ordering::Relaxed) + 1;
+    let private_request = is_private_proxy_request(&headers);
 
     let targeted_backend_id = if request.model.starts_with("clx:") {
         Some(request.model[4..].to_string())
@@ -720,7 +747,10 @@ async fn handle_chat_completion(
                 Ok(resp) => {
                     let status_code = resp.status().as_u16();
                     if (200..300).contains(&status_code) && request.stream {
-                        let request_json = serde_json::to_string(&body).unwrap_or_default();
+                        let request_json = proxy_log_value(
+                            private_request,
+                            serde_json::to_string(&body).unwrap_or_default(),
+                        );
                         return streaming_response(
                             resp,
                             state.clone(),
@@ -728,10 +758,14 @@ async fn handle_chat_completion(
                             request_json,
                             log_id,
                             start,
+                            private_request,
                         );
                     }
                     let body_text = resp.text().await.unwrap_or_default();
-                    let request_json = serde_json::to_string(&body).unwrap_or_default();
+                    let request_json = proxy_log_value(
+                        private_request,
+                        serde_json::to_string(&body).unwrap_or_default(),
+                    );
                     let duration_ms = start.elapsed().as_millis() as u64;
 
                     // Success
@@ -767,7 +801,10 @@ async fn handle_chat_completion(
                                 backend: backend.name.clone(),
                                 model: backend.model.clone(),
                                 request_json,
-                                response_json: response_json.clone(),
+                                response_json: proxy_log_value(
+                                    private_request,
+                                    response_json.clone(),
+                                ),
                                 status: status_code,
                                 duration_ms,
                                 success: true,
@@ -775,7 +812,10 @@ async fn handle_chat_completion(
                                 prompt_tokens: pt,
                                 completion_tokens: ct,
                                 total_tokens: tt,
-                                normalized_response_json: response_json,
+                                normalized_response_json: proxy_log_value(
+                                    private_request,
+                                    response_json,
+                                ),
                                 response_truncated: false,
                             })
                             .await;
@@ -826,7 +866,7 @@ async fn handle_chat_completion(
                             backend: backend.name.clone(),
                             model: backend.model.clone(),
                             request_json,
-                            response_json: body_text.clone(),
+                            response_json: proxy_log_value(private_request, body_text.clone()),
                             status: status_code,
                             duration_ms,
                             success: false,
@@ -859,7 +899,10 @@ async fn handle_chat_completion(
                 Err(e) => {
                     let duration_ms = start.elapsed().as_millis() as u64;
                     let err_msg = format!("{}", e);
-                    let request_json = serde_json::to_string(&body).unwrap_or_default();
+                    let request_json = proxy_log_value(
+                        private_request,
+                        serde_json::to_string(&body).unwrap_or_default(),
+                    );
                     state
                         .add_log(ProxyLogEntry {
                             id: log_id,
@@ -969,6 +1012,21 @@ mod tests {
             chat_completions_url("https://example.test/v1/chat/completions"),
             "https://example.test/v1/chat/completions"
         );
+    }
+
+    #[test]
+    fn terminal_command_proxy_requests_are_marked_private_for_logs() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static(INTERNAL_PROXY_SOURCE_HEADER),
+            HeaderValue::from_static("terminal-command"),
+        );
+        assert!(is_private_proxy_request(&headers));
+        assert_eq!(
+            proxy_log_value(true, "secret prompt and command".to_string()),
+            PRIVATE_PROXY_LOG_PLACEHOLDER
+        );
+        assert!(!proxy_log_value(false, "ordinary".to_string()).contains("redacted"));
     }
 
     async fn mock_streaming_upstream(

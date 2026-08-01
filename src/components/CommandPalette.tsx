@@ -142,6 +142,14 @@ export function CommandPalette({
       action: onAddCli,
     });
     items.push({
+      id: 'action-quick-config', type: 'action' as const,
+      label: '⚡ Search & Edit Config Files',
+      description: 'Quickly open YAML, JSON, TOML, ENV configs',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('open-quick-config-search'));
+      },
+    });
+    items.push({
       id: 'action-new-ssh', type: 'action' as const,
       label: 'New SSH Connection...',
       description: 'Add a remote server',
@@ -197,30 +205,12 @@ export function CommandPalette({
         action: () => onSwitchView('remote'),
       });
     }
-    if (activeMainView !== 'web-ai') {
-      items.push({
-        id: 'action-view-web-ai', type: 'action' as const,
-        label: 'Launch Web AI',
-        description: 'Launch Web AI sandboxed profiles browser',
-        action: () => onSwitchView('web-ai'),
-      });
-    }
-    items.push({
-      id: 'action-view-ai-companion', type: 'action' as const,
-      label: 'Launch AI Companion',
-      description: 'Open the custom AI Companion sidebar panel',
-      action: () => {
-        window.dispatchEvent(new CustomEvent('open-sidebar-tab', { detail: 'ai-chat' }));
-      },
-    });
-
     // Settings sections deep links
     const settingsSections: { id: string; label: string; desc: string }[] = [
       { id: 'appearance', label: 'Settings: Appearance', desc: 'Configure application theme and styling' },
       { id: 'mythical-pet', label: 'Settings: Mythical Pet', desc: 'Enable/disable and select mythical pets' },
       { id: 'ai-companion', label: 'Settings: AI Companion', desc: 'Configure OpenAI-compatible endpoint settings' },
       { id: 'local-llm', label: 'Settings: Local LLM', desc: 'Manage offline GGUF inference fallbacks' },
-      { id: 'web-ai', label: 'Settings: Web AI', desc: 'Manage secure in-app Web AI profile configurations' },
       { id: 'navigation', label: 'Settings: Sidebar Navigation', desc: 'Reorder sidebar activity icons' },
     ];
 

@@ -32,6 +32,8 @@ const SHATTER_KINDS = new Set<PetMoveDefinition['kind']>([
   'beam',
   'orb-lunge',
   'web-shot',
+  'big-kamehameha',
+  'web-screen-split',
 ]);
 const ACTOR_CANVAS = 192;
 const EFFECT_MAX = 320;
@@ -329,10 +331,34 @@ function chooseMove(pet: MythicalPet, previous: string) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+const CLONE_20_GRID = [
+  { rx: 0.08, ry: 0.14, facing: 1 as const },
+  { rx: 0.26, ry: 0.12, facing: -1 as const },
+  { rx: 0.44, ry: 0.18, facing: 1 as const },
+  { rx: 0.64, ry: 0.14, facing: -1 as const },
+  { rx: 0.84, ry: 0.16, facing: 1 as const },
+  { rx: 0.14, ry: 0.38, facing: -1 as const },
+  { rx: 0.32, ry: 0.35, facing: 1 as const },
+  { rx: 0.50, ry: 0.42, facing: -1 as const },
+  { rx: 0.68, ry: 0.36, facing: 1 as const },
+  { rx: 0.86, ry: 0.40, facing: -1 as const },
+  { rx: 0.08, ry: 0.62, facing: 1 as const },
+  { rx: 0.25, ry: 0.66, facing: -1 as const },
+  { rx: 0.44, ry: 0.60, facing: 1 as const },
+  { rx: 0.62, ry: 0.65, facing: -1 as const },
+  { rx: 0.82, ry: 0.62, facing: 1 as const },
+  { rx: 0.18, ry: 0.85, facing: -1 as const },
+  { rx: 0.36, ry: 0.88, facing: 1 as const },
+  { rx: 0.55, ry: 0.82, facing: -1 as const },
+  { rx: 0.74, ry: 0.86, facing: 1 as const },
+  { rx: 0.92, ry: 0.84, facing: -1 as const },
+];
+
 export function MythicalPet() {
   const actorRef = useRef<HTMLCanvasElement>(null);
   const cloneLeftRef = useRef<HTMLCanvasElement>(null);
   const cloneRightRef = useRef<HTMLCanvasElement>(null);
+  const screenClonesCanvasRef = useRef<HTMLCanvasElement>(null);
   const effectCoreRef = useRef<SVGPathElement>(null);
   const effectGlowRef = useRef<SVGPathElement>(null);
   const orbRef = useRef<SVGCircleElement>(null);
@@ -354,6 +380,10 @@ export function MythicalPet() {
     if (orbRef.current) orbRef.current.style.visibility = 'hidden';
     for (const clone of [cloneLeftRef.current, cloneRightRef.current]) {
       if (clone) clone.style.visibility = 'hidden';
+    }
+    if (screenClonesCanvasRef.current) {
+      const ctx = screenClonesCanvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, screenClonesCanvasRef.current.width, screenClonesCanvasRef.current.height);
     }
   }, []);
 
@@ -734,6 +764,117 @@ export function MythicalPet() {
           );
           break;
         }
+        case 'big-kamehameha': {
+          if (progress <= 0.38) {
+            const orb = orbRef.current;
+            const orbX = runtime.x + runtime.facing * 38;
+            if (orb) {
+              orb.setAttribute('cx', String(orbX));
+              orb.setAttribute('cy', String(runtime.y));
+              orb.setAttribute('r', String(16 + Math.sin(progress * 30) * 14));
+              orb.setAttribute('stroke', primary);
+              orb.style.visibility = 'visible';
+            }
+          }
+          if (progress > 0.22 && progress < 0.94) {
+            const startX = runtime.x + runtime.facing * 36;
+            const endX = runtime.facing === 1 ? window.innerWidth : 0;
+            const width = 28 + Math.sin(progress * Math.PI) * 55;
+            drawEffectPath(
+              `M ${startX} ${runtime.y} L ${endX} ${runtime.y}`,
+              secondary,
+              primary,
+              width,
+            );
+          }
+          break;
+        }
+        case 'screen-clones': {
+          const clonesCanvas = screenClonesCanvasRef.current;
+          if (clonesCanvas) {
+            if (clonesCanvas.width !== window.innerWidth || clonesCanvas.height !== window.innerHeight) {
+              clonesCanvas.width = window.innerWidth;
+              clonesCanvas.height = window.innerHeight;
+            }
+            const ctx = clonesCanvas.getContext('2d');
+            if (ctx) {
+              ctx.clearRect(0, 0, clonesCanvas.width, clonesCanvas.height);
+              const loaded = clipCacheRef.current.get(
+                `${pet.id}:${pet.animations[runtime.clipId]?.sheet}`,
+              );
+              if (loaded?.image && !loaded.failed) {
+                const clip = pet.animations[runtime.clipId] ?? pet.animations.idle;
+                const drawSize = frameDrawSize(pet, clip.frameWidth);
+                const sourceFrame = runtime.frameIndex % clip.frameCount;
+                const cloneAlpha = Math.sin(progress * Math.PI) * 0.9;
+
+                CLONE_20_GRID.forEach((pos) => {
+                  const cx = pos.rx * window.innerWidth;
+                  const cy = pos.ry * window.innerHeight;
+
+                  ctx.save();
+                  ctx.globalAlpha = cloneAlpha;
+                  ctx.imageSmoothingEnabled = false;
+                  ctx.shadowColor = primary;
+                  ctx.shadowBlur = 14;
+
+                  ctx.translate(cx, cy);
+                  if (pos.facing === -1) {
+                    ctx.scale(-1, 1);
+                  }
+                  ctx.drawImage(
+                    loaded.image!,
+                    sourceFrame * clip.frameWidth,
+                    0,
+                    clip.frameWidth,
+                    clip.frameHeight,
+                    -drawSize / 2,
+                    -drawSize / 2,
+                    drawSize,
+                    drawSize,
+                  );
+                  ctx.restore();
+                });
+              }
+            }
+          }
+
+          if (progress > 0.08 && progress < 0.92) {
+            let smokePaths = '';
+            CLONE_20_GRID.forEach((pos, idx) => {
+              const cx = pos.rx * window.innerWidth;
+              const cy = pos.ry * window.innerHeight;
+              const r = 22 + Math.sin(progress * Math.PI * 3 + idx) * 8;
+              smokePaths += `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} `;
+            });
+            drawEffectPath(smokePaths.trim(), secondary, primary, 3);
+          }
+          break;
+        }
+        case 'web-screen-split': {
+          if (progress > 0.12 && progress < 0.92) {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const cx = runtime.x;
+            const cy = runtime.y;
+            const webPath = `
+              M ${cx} ${cy} L 0 0
+              M ${cx} ${cy} L ${w} 0
+              M ${cx} ${cy} L 0 ${h}
+              M ${cx} ${cy} L ${w} ${h}
+              M ${cx} ${cy} L ${cx} 0
+              M ${cx} ${cy} L ${cx} ${h}
+              M ${cx} ${cy} L 0 ${cy}
+              M ${cx} ${cy} L ${w} ${cy}
+              M ${w * 0.15} 0 Q ${cx} ${h * 0.15} ${w * 0.85} 0
+              M ${w * 0.15} ${h} Q ${cx} ${h * 0.85} ${w * 0.85} ${h}
+              M 0 ${h * 0.15} Q ${w * 0.15} ${cy} 0 ${h * 0.85}
+              M ${w} ${h * 0.15} Q ${w * 0.85} ${cy} ${w} ${h * 0.85}
+            `.replace(/\s+/g, ' ').trim();
+            drawEffectPath(webPath, '#ffffff', primary, 2.5 + Math.sin(progress * Math.PI) * 2);
+          }
+          break;
+        }
         case 'blink':
           if (progress >= 0.48 && !special.relocated) {
             runtime.x = special.targetX;
@@ -1013,6 +1154,13 @@ export function MythicalPet() {
           </g>
         )}
       </svg>
+      <canvas
+        ref={screenClonesCanvasRef}
+        width={typeof window !== 'undefined' ? window.innerWidth : 1920}
+        height={typeof window !== 'undefined' ? window.innerHeight : 1080}
+        className="fixed inset-0 pointer-events-none z-[38]"
+        style={{ imageRendering: 'pixelated' }}
+      />
       {[cloneLeftRef, cloneRightRef, actorRef].map((ref, index) => (
         <canvas
           key={index}
@@ -1118,6 +1266,20 @@ export function PetPreviewStage({
         context.lineTo(canvas.width - 12, centerY);
         context.stroke();
         context.restore();
+      } else if (move?.kind === 'big-kamehameha' && progress > 0.2) {
+        const gradient = context.createLinearGradient(centerX + 20, 0, canvas.width, 0);
+        gradient.addColorStop(0, move.secondaryColor ?? '#ffffff');
+        gradient.addColorStop(1, move.primaryColor ?? '#00d2ff');
+        context.save();
+        context.strokeStyle = gradient;
+        context.lineWidth = 32;
+        context.shadowColor = move.primaryColor ?? '#00d2ff';
+        context.shadowBlur = 24;
+        context.beginPath();
+        context.moveTo(centerX + 18, centerY);
+        context.lineTo(canvas.width, centerY);
+        context.stroke();
+        context.restore();
       } else if (
         (move?.kind === 'web-shot' || move?.kind === 'web-zip')
         && progress > 0.12
@@ -1130,6 +1292,19 @@ export function PetPreviewStage({
         context.beginPath();
         context.moveTo(centerX + 28, centerY - 8);
         context.quadraticCurveTo(centerX + 76, centerY - 94, canvas.width - 18, 24);
+        context.stroke();
+        context.restore();
+      } else if (move?.kind === 'web-screen-split' && progress > 0.1) {
+        context.save();
+        context.strokeStyle = '#ffffff';
+        context.lineWidth = 2;
+        context.shadowColor = move.primaryColor ?? '#cbd5e1';
+        context.shadowBlur = 10;
+        context.beginPath();
+        context.moveTo(0, 0); context.lineTo(canvas.width, canvas.height);
+        context.moveTo(canvas.width, 0); context.lineTo(0, canvas.height);
+        context.moveTo(centerX, 0); context.lineTo(centerX, canvas.height);
+        context.moveTo(0, centerY); context.lineTo(canvas.width, centerY);
         context.stroke();
         context.restore();
       } else if (move?.kind === 'orb-lunge' && progress > 0.18) {
@@ -1148,8 +1323,8 @@ export function PetPreviewStage({
 
       actor2d.clearRect(0, 0, ACTOR_CANVAS, ACTOR_CANVAS);
       drawFrame(actor2d, pet, clipId, loaded, frame, 1);
-      if (move?.kind === 'clone') {
-        context.globalAlpha = Math.sin(progress * Math.PI) * 0.65;
+      if (move?.kind === 'clone' || move?.kind === 'screen-clones') {
+        context.globalAlpha = Math.sin(progress * Math.PI) * 0.75;
         context.drawImage(actorBuffer, centerX - 150, centerY - 96, ACTOR_CANVAS, ACTOR_CANVAS);
         context.drawImage(actorBuffer, centerX - 42, centerY - 96, ACTOR_CANVAS, ACTOR_CANVAS);
         context.globalAlpha = 1;

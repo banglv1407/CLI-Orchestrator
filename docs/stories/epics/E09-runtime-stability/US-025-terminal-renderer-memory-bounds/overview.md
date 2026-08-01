@@ -6,7 +6,8 @@ The first US-024 30-minute runtime soak failed with UI-owned working-set growth 
 
 ## Changes
 
-- Bound replay history to 1 MiB and 1,000 chunks per session.
+- Remove the raw replay-history copy; mini terminals mirror a throttled snapshot
+  of the parsed main xterm buffer.
 - Bound pending/write queues to 2 MiB per session.
 - Reduce main xterm scrollback from 5,000 to 2,000 lines.
 - Reduce mini xterm scrollback from 2,000 to 500 lines.
@@ -15,8 +16,8 @@ The first US-024 30-minute runtime soak failed with UI-owned working-set growth 
 
 ## Acceptance
 
-- Large output cannot make replay or pending queues grow without a byte bound.
+- Large output cannot create an additional replay-history copy, and pending
+  queues remain byte-bounded.
 - Closing the thumbnail panel releases all mini xterm instances.
 - Terminal output and nested-TUI behavior remain functional.
 - A post-fix US-024 soak passes the UI-owned RAM delta and slope gates.
-

@@ -673,6 +673,7 @@ impl CompanionManager {
                     env: std::collections::HashMap::new(),
                     default_working_dir, saved_directories: Vec::new(),
                     enable_rtk: false,
+                    group: parsed["group"].as_str().map(String::from),
                 }, None).map_err(|e| e.to_string())?;
                 Ok(format!("CLI profile '{}' saved", name))
             }

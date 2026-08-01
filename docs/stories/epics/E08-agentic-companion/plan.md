@@ -162,6 +162,12 @@ knowledge-only, read-tool, action-tool, or unavailable.
 For an out-of-scope action, Companion explains the feature and may navigate to
 the correct UI, but must say that it cannot perform the action itself.
 
+US-032 is a deliberately narrower exception to the PTY-input non-goal. Its
+terminal-owned popup may insert one syntax-verified command as unexecuted text
+after an explicit click. It is not a Companion tool, never sends Enter, cannot
+run arbitrary model actions, and does not broaden the E08 sidebar's tool
+permissions.
+
 ## Architecture
 
 ### 1. Shared capability catalog

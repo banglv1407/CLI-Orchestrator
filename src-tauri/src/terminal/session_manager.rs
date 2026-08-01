@@ -29,11 +29,22 @@ pub struct SessionInfo {
     pub project_tag: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SessionRuntimeInfo {
+    pub id: String,
+    pub cli_name: String,
+    pub working_dir: Option<String>,
+    pub launch_command: String,
+    pub launch_args: Vec<String>,
+}
+
 struct Session {
     id: String,
     cli_name: String,
     working_dir: Option<String>,
     project_tag: Option<String>,
+    launch_command: String,
+    launch_args: Vec<String>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Arc<Mutex<Box<dyn portable_pty::Child + Send>>>,
     status: Arc<Mutex<String>>,
@@ -92,6 +103,11 @@ impl SessionManager {
         command: ResolvedCommand,
     ) -> Result<SessionInfo, SessionError> {
         let session_id = format!("{}-{}", cli_name, Uuid::new_v4().as_simple());
+        // Preserve the requested executable for feature-level environment
+        // detection. Windows may wrap it in cmd.exe solely to keep interactive
+        // CLI processes attached; that wrapper is not the user's actual shell.
+        let launch_command = command.command.clone();
+        let launch_args = command.args.clone();
         let (spawn_command, startup_input) = prepare_interactive_spawn_command(&cli_name, command);
 
         let log_cwd = spawn_command.cwd.clone();
@@ -129,6 +145,8 @@ impl SessionManager {
             cli_name: cli_name.clone(),
             working_dir: working_dir.clone(),
             project_tag: project_tag.clone(),
+            launch_command,
+            launch_args,
             writer: handle.writer,
             child: handle.child,
             status: handle.status,
@@ -306,6 +324,22 @@ impl SessionManager {
                 }
             })
             .collect()
+    }
+
+    pub async fn runtime_info(&self, session_id: &str) -> Result<SessionRuntimeInfo, SessionError> {
+        let session = {
+            let guard = self.sessions.read().await;
+            guard.get(session_id).cloned()
+        }
+        .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
+
+        Ok(SessionRuntimeInfo {
+            id: session.id.clone(),
+            cli_name: session.cli_name.clone(),
+            working_dir: session.working_dir.clone(),
+            launch_command: session.launch_command.clone(),
+            launch_args: session.launch_args.clone(),
+        })
     }
 }
 

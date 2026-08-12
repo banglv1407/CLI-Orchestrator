@@ -16,8 +16,11 @@ without leaving the terminal.
    manager; uncertain probes require an OS/shell choice and default to local
    Windows Bash.
 4. Only the request, environment, and last 20 visible redacted lines are sent.
-5. AI Companion is tried first. CliProxyAI is tried only when already running
-   with an active backend; neither the proxy nor built-in LLM is auto-started.
+5. Saved LLM Proxy backends are called directly in their configured UI order,
+   including each backend's actual model/request options and retry count. The
+   next backend is the fallback. Routing works while the Proxy service is
+   stopped; it is not auto-started, and neither AI Companion nor the built-in
+   LLM is used.
 6. The result is one physical-line command that passes the target syntax
    validator. One repair attempt per provider is allowed.
 7. Copy is always available. Insert is enabled only at a recognized empty

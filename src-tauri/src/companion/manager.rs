@@ -1,10 +1,10 @@
+use futures_util::StreamExt;
 /// Companion model runtime — manages chat requests, streaming, tool loops, and approvals.
 use std::sync::Arc;
 use std::time::Duration;
-use futures_util::StreamExt;
+use tauri::Emitter;
 use tokio::sync::{Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
-use tauri::Emitter;
 
 use crate::companion::catalog::Catalog;
 use crate::companion::config::CompanionConfig;
@@ -124,7 +124,10 @@ impl ToolRisk {
 
     #[allow(dead_code)]
     pub fn requires_approval(&self) -> bool {
-        matches!(self, ToolRisk::ConfigWrite | ToolRisk::Delete | ToolRisk::Stop)
+        matches!(
+            self,
+            ToolRisk::ConfigWrite | ToolRisk::Delete | ToolRisk::Stop
+        )
     }
 }
 
@@ -286,7 +289,9 @@ impl CompanionManager {
 
             let request = self
                 .http_client
-                .post(&crate::core::proxy_server::chat_completions_url(&config.base_url))
+                .post(&crate::core::proxy_server::chat_completions_url(
+                    &config.base_url,
+                ))
                 .header("Authorization", format!("Bearer {}", config.api_key))
                 .header("Content-Type", "application/json")
                 .json(&request_body);
@@ -310,9 +315,19 @@ impl CompanionManager {
                             Ok(body) => body,
                             Err(error) => {
                                 if cancel.is_cancelled() {
-                                    self.emit(CompanionEvent::Warning { run_id: run_id.to_string(), seq, message: "Run cancelled by user".to_string() }).await;
+                                    self.emit(CompanionEvent::Warning {
+                                        run_id: run_id.to_string(),
+                                        seq,
+                                        message: "Run cancelled by user".to_string(),
+                                    })
+                                    .await;
                                 } else {
-                                    self.emit(CompanionEvent::Error { run_id: run_id.to_string(), seq, message: error }).await;
+                                    self.emit(CompanionEvent::Error {
+                                        run_id: run_id.to_string(),
+                                        seq,
+                                        message: error,
+                                    })
+                                    .await;
                                 }
                                 break;
                             }
@@ -340,17 +355,28 @@ impl CompanionManager {
                         break;
                     }
 
-                    let body_text = match read_response_body_bounded(resp, 2 * 1024 * 1024, cancel).await {
-                        Ok(body) => body,
-                        Err(error) => {
-                            if cancel.is_cancelled() {
-                                self.emit(CompanionEvent::Warning { run_id: run_id.to_string(), seq, message: "Run cancelled by user".to_string() }).await;
-                            } else {
-                                self.emit(CompanionEvent::Error { run_id: run_id.to_string(), seq, message: error }).await;
+                    let body_text =
+                        match read_response_body_bounded(resp, 2 * 1024 * 1024, cancel).await {
+                            Ok(body) => body,
+                            Err(error) => {
+                                if cancel.is_cancelled() {
+                                    self.emit(CompanionEvent::Warning {
+                                        run_id: run_id.to_string(),
+                                        seq,
+                                        message: "Run cancelled by user".to_string(),
+                                    })
+                                    .await;
+                                } else {
+                                    self.emit(CompanionEvent::Error {
+                                        run_id: run_id.to_string(),
+                                        seq,
+                                        message: error,
+                                    })
+                                    .await;
+                                }
+                                break;
                             }
-                            break;
-                        }
-                    };
+                        };
                     let parsed: serde_json::Value =
                         serde_json::from_str(&body_text).unwrap_or(serde_json::Value::Null);
 
@@ -463,9 +489,7 @@ impl CompanionManager {
                                 }
 
                                 tool_call_count += 1;
-                                if cancel.is_cancelled()
-                                    || tool_call_count >= MAX_TOOL_CALLS
-                                {
+                                if cancel.is_cancelled() || tool_call_count >= MAX_TOOL_CALLS {
                                     break;
                                 }
                             }
@@ -833,7 +857,10 @@ impl CompanionManager {
         if let Some(handle) = self.app_handle.read().await.as_ref() {
             let _ = handle.emit("companion-run-event", &event);
         } else {
-            eprintln!("[companion] emit dropped (no app_handle): {:?}", std::mem::discriminant(&event));
+            eprintln!(
+                "[companion] emit dropped (no app_handle): {:?}",
+                std::mem::discriminant(&event)
+            );
         }
     }
 }
@@ -863,7 +890,10 @@ async fn read_response_body_bounded(
 
 fn append_response_chunk(body: &mut Vec<u8>, chunk: &[u8], max_bytes: usize) -> Result<(), String> {
     if body.len().saturating_add(chunk.len()) > max_bytes {
-        return Err(format!("Model response exceeded the {} KiB limit", max_bytes / 1024));
+        return Err(format!(
+            "Model response exceeded the {} KiB limit",
+            max_bytes / 1024
+        ));
     }
     body.extend_from_slice(chunk);
     Ok(())

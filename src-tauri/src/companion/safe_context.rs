@@ -105,10 +105,7 @@ impl SafeAppContext {
             ));
         }
         if !self.quick_apps.is_empty() {
-            ctx.push_str(&format!(
-                "- Quick Apps: {}\n",
-                self.quick_apps.join(", ")
-            ));
+            ctx.push_str(&format!("- Quick Apps: {}\n", self.quick_apps.join(", ")));
         }
         ctx.push_str(&format!(
             "- Built-in LLM loaded: {}\n",

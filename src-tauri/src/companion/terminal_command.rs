@@ -2,7 +2,6 @@ use std::{collections::HashMap, process::Stdio, sync::LazyLock, time::Duration};
 
 use futures_util::StreamExt;
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use tokio::{io::AsyncWriteExt, process::Command, sync::Mutex};
@@ -11,7 +10,10 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     app_state::AppState,
     commands::cli_commands::{run_ssh_command, SshConnection},
-    core::proxy_server::chat_completions_url,
+    core::proxy_server::{
+        build_upstream_body, build_upstream_headers, chat_completions_url, ChatCompletionRequest,
+        ChatMessage, ProxyBackend, ProxyConfig, ProxyLogEntry,
+    },
     terminal::session_manager::SessionRuntimeInfo,
 };
 
@@ -19,11 +21,10 @@ const MAX_VISIBLE_LINES: usize = 20;
 const MAX_CONTEXT_BYTES: usize = 8 * 1024;
 const MAX_COMMAND_BYTES: usize = 4 * 1024;
 const MAX_PROVIDER_BODY_BYTES: usize = 512 * 1024;
-const TOTAL_REQUEST_TIMEOUT: Duration = Duration::from_secs(45);
+const TOTAL_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(12);
 const VALIDATION_TIMEOUT: Duration = Duration::from_secs(12);
-const INTERNAL_PROXY_HEADER: &str = "x-clx-internal-source";
-const INTERNAL_PROXY_SOURCE: &str = "terminal-command";
+const PRIVATE_LOG_PLACEHOLDER: &str = "[redacted: inline terminal command assistant]";
 
 static ACTIVE_REQUESTS: LazyLock<Mutex<HashMap<String, CancellationToken>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -132,17 +133,15 @@ struct ModelCommand {
     shell: String,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum ProviderSource {
-    Companion,
-    Proxy,
+    Backend(String),
 }
 
 impl ProviderSource {
-    fn label(self) -> &'static str {
+    fn label(&self) -> &str {
         match self {
-            Self::Companion => "companion",
-            Self::Proxy => "proxy",
+            Self::Backend(name) => name.as_str(),
         }
     }
 }
@@ -233,33 +232,16 @@ async fn generate_suggestion(
     }
     let messages = build_messages(&sanitized_request, &environment, &context);
 
-    let proxy_status = state.proxy_server.status().await;
-    let companion_config = state.companion.config.read().await.clone();
-    let companion_is_proxy = proxy_status.running
-        && companion_targets_proxy(&companion_config.base_url, proxy_status.port);
-
-    let mut sources = Vec::new();
-    if companion_is_proxy {
-        sources.push(ProviderSource::Proxy);
-    } else {
-        sources.push(ProviderSource::Companion);
-        if proxy_status.running && proxy_status.active_backends > 0 {
-            sources.push(ProviderSource::Proxy);
-        }
-    }
+    let proxy_config = state.proxy_server.state.config.read().await.clone();
+    // The saved Proxy backend list is the routing contract. Calling backends
+    // directly keeps Command Assistant available while the HTTP proxy is stopped.
+    let sources = configured_backend_sources(proxy_config);
 
     let mut failures = Vec::new();
-    for source in sources {
+    for (source, backend) in &sources {
         let mut attempt_messages = messages.clone();
         for attempt in 0..2 {
-            let response = match source {
-                ProviderSource::Companion => {
-                    call_companion(state, &companion_config, &attempt_messages, cancel).await
-                }
-                ProviderSource::Proxy => {
-                    call_proxy(state, proxy_status.port, &attempt_messages, cancel).await
-                }
-            };
+            let response = call_backend_direct(state, backend, &attempt_messages, cancel).await;
 
             let raw = match response {
                 Ok(raw) => raw,
@@ -313,16 +295,22 @@ async fn generate_suggestion(
         }
     }
 
-    if proxy_status.running && proxy_status.active_backends == 0 {
-        failures.push("proxy: no configured backends".to_string());
-    } else if !proxy_status.running && !companion_is_proxy {
-        failures.push("proxy: not running (it was not started automatically)".to_string());
+    if sources.is_empty() {
+        failures.push("no LLM Proxy backends are configured".to_string());
     }
 
     Err(format!(
         "No provider returned a syntax-verified command. {}",
         failures.join("; ")
     ))
+}
+
+fn configured_backend_sources(proxy_config: ProxyConfig) -> Vec<(ProviderSource, ProxyBackend)> {
+    proxy_config
+        .backends
+        .into_iter()
+        .map(|backend| (ProviderSource::Backend(backend.name.clone()), backend))
+        .collect()
 }
 
 async fn detect_environment(
@@ -666,109 +654,147 @@ fn build_messages(
     ]
 }
 
-async fn call_companion(
+async fn call_backend_direct(
     state: &AppState,
-    config: &crate::companion::config::CompanionConfig,
+    backend: &ProxyBackend,
     messages: &[serde_json::Value],
     cancel: &CancellationToken,
 ) -> Result<String, String> {
-    if config.base_url.trim().is_empty() || config.model.trim().is_empty() {
-        return Err("AI Companion endpoint or model is not configured".to_string());
-    }
+    let target_url = chat_completions_url(&backend.url);
 
-    let mut headers = HeaderMap::new();
-    let mut has_user_agent = false;
-    for (name, value) in &config.custom_headers {
-        let header_name = HeaderName::from_bytes(name.as_bytes())
-            .map_err(|_| format!("Invalid AI Companion header name: {name}"))?;
-        let header_value = HeaderValue::from_str(value)
-            .map_err(|_| format!("Invalid AI Companion header value for {name}"))?;
-        if name.eq_ignore_ascii_case("user-agent") {
-            has_user_agent = true;
+    let headers = build_upstream_headers(backend);
+    let messages = messages
+        .iter()
+        .cloned()
+        .map(serde_json::from_value::<ChatMessage>)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to build Proxy request: {error}"))?;
+    let body = build_upstream_body(
+        &ChatCompletionRequest {
+            model: "clx-terminal-command-assistant".to_string(),
+            messages,
+            stream: false,
+            temperature: None,
+            max_tokens: None,
+            extra: serde_json::Map::new(),
+        },
+        backend,
+    );
+
+    let mut failures = Vec::new();
+    for _ in 0..backend.max_retries.max(1) {
+        let start = std::time::Instant::now();
+        let response = match tokio::select! {
+            _ = cancel.cancelled() => return Err("cancelled".to_string()),
+            result = state
+                .companion
+                .http_client
+                .post(&target_url)
+                .headers(headers.clone())
+                .json(&body)
+                .send() => result,
+        } {
+            Ok(response) => response,
+            Err(error) => {
+                let message = format!("backend request failed: {error}");
+                log_terminal_command_call(
+                    state,
+                    &backend.name,
+                    &backend.model,
+                    0,
+                    start.elapsed().as_millis() as u64,
+                    false,
+                    Some(&message),
+                )
+                .await;
+                failures.push(message);
+                continue;
+            }
+        };
+
+        let status_code = response.status().as_u16();
+        let body_text = match read_bounded_body(response, cancel).await {
+            Ok(text) => text,
+            Err(error) => {
+                log_terminal_command_call(
+                    state,
+                    &backend.name,
+                    &backend.model,
+                    status_code,
+                    start.elapsed().as_millis() as u64,
+                    false,
+                    Some(&error),
+                )
+                .await;
+                failures.push(error);
+                continue;
+            }
+        };
+        let success = (200..300).contains(&status_code);
+        log_terminal_command_call(
+            state,
+            &backend.name,
+            &backend.model,
+            status_code,
+            start.elapsed().as_millis() as u64,
+            success,
+            (!success).then_some("upstream returned a non-success status"),
+        )
+        .await;
+        if !success {
+            failures.push(format!("HTTP {status_code}"));
+            continue;
         }
-        headers.insert(header_name, header_value);
-    }
-    if !has_user_agent {
-        headers.insert(
-            reqwest::header::USER_AGENT,
-            HeaderValue::from_static("CLX-Terminal-Command-Assistant"),
-        );
-    }
-    if !config.api_key.is_empty() {
-        headers.insert(
-            reqwest::header::AUTHORIZATION,
-            HeaderValue::from_str(&format!("Bearer {}", config.api_key))
-                .map_err(|_| "Invalid AI Companion API key".to_string())?,
-        );
+
+        let parsed: serde_json::Value = serde_json::from_str(body_text.trim())
+            .map_err(|_| "provider returned invalid JSON".to_string())?;
+        return extract_provider_content(&parsed)
+            .ok_or_else(|| "provider response contained no command content".to_string());
     }
 
-    let mut body = serde_json::json!({
-        "model": config.model,
-        "messages": messages,
-        "stream": false,
-    });
-    if let Some(effort) = config
-        .reasoning_effort
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-    {
-        body["reasoning_effort"] = serde_json::json!(effort);
-    }
-
-    let response = tokio::select! {
-        _ = cancel.cancelled() => return Err("cancelled".to_string()),
-        response = state
-            .companion
-            .http_client
-            .post(chat_completions_url(&config.base_url))
-            .headers(headers)
-            .json(&body)
-            .send() => response.map_err(|error| format!("request failed: {error}"))?,
-    };
-    parse_provider_response(response, cancel).await
+    Err(failures
+        .last()
+        .cloned()
+        .unwrap_or_else(|| "backend request failed".to_string()))
 }
 
-async fn call_proxy(
+async fn log_terminal_command_call(
     state: &AppState,
-    port: u16,
-    messages: &[serde_json::Value],
-    cancel: &CancellationToken,
-) -> Result<String, String> {
-    let status = state.proxy_server.status().await;
-    if !status.running || status.active_backends == 0 {
-        return Err("proxy is not running with an active backend".to_string());
-    }
-    let body = serde_json::json!({
-        "model": "clx-terminal-command-assistant",
-        "messages": messages,
-        "stream": false,
-    });
-    let response = tokio::select! {
-        _ = cancel.cancelled() => return Err("cancelled".to_string()),
-        response = state
-            .companion
-            .http_client
-            .post(format!("http://127.0.0.1:{port}/v1/chat/completions"))
-            .header(INTERNAL_PROXY_HEADER, INTERNAL_PROXY_SOURCE)
-            .json(&body)
-            .send() => response.map_err(|error| format!("proxy request failed: {error}"))?,
-    };
-    parse_provider_response(response, cancel).await
-}
-
-async fn parse_provider_response(
-    response: reqwest::Response,
-    cancel: &CancellationToken,
-) -> Result<String, String> {
-    let status = response.status();
-    let body = read_bounded_body(response, cancel).await?;
-    if !status.is_success() {
-        return Err(format!("HTTP {}", status.as_u16()));
-    }
-    let parsed: serde_json::Value = serde_json::from_str(body.trim())
-        .map_err(|_| "provider returned invalid JSON".to_string())?;
-    extract_provider_content(&parsed)
-        .ok_or_else(|| "provider response contained no command content".to_string())
+    backend_label: &str,
+    model: &str,
+    status: u16,
+    duration_ms: u64,
+    success: bool,
+    error: Option<&str>,
+) {
+    use std::sync::atomic::Ordering;
+    let log_id = state
+        .proxy_server
+        .state
+        .counter
+        .fetch_add(1, Ordering::Relaxed)
+        + 1;
+    state
+        .proxy_server
+        .state
+        .add_log(ProxyLogEntry {
+            id: log_id,
+            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+            backend: format!("terminal-cmd:{}", backend_label),
+            model: model.to_string(),
+            request_json: PRIVATE_LOG_PLACEHOLDER.to_string(),
+            response_json: PRIVATE_LOG_PLACEHOLDER.to_string(),
+            status,
+            duration_ms,
+            success,
+            error_msg: error.map(compact_error),
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+            normalized_response_json: String::new(),
+            response_truncated: false,
+        })
+        .await;
 }
 
 fn extract_provider_content(parsed: &serde_json::Value) -> Option<String> {
@@ -1316,12 +1342,6 @@ fn find_ssh_connection(state: &AppState, cli_name: &str) -> Result<SshConnection
         .ok_or_else(|| format!("SSH profile '{name}' was not found"))
 }
 
-fn companion_targets_proxy(base_url: &str, port: u16) -> bool {
-    let lower = base_url.trim().trim_end_matches('/').to_ascii_lowercase();
-    lower.starts_with(&format!("http://127.0.0.1:{port}"))
-        || lower.starts_with(&format!("http://localhost:{port}"))
-}
-
 fn executable_name(value: &str) -> String {
     value
         .rsplit(['/', '\\'])
@@ -1396,10 +1416,11 @@ fn classify_command_risk(command: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_environment_override, classify_command_risk, distro_family, extract_provider_content,
-        is_bash_executable, is_nested_tui_cli_name, parse_probe, sanitize_visible_lines,
-        validate_cmd_strict, validate_powershell, TerminalCommandEnvironment,
-        TerminalEnvironmentOverride, MAX_CONTEXT_BYTES, MAX_VISIBLE_LINES,
+        apply_environment_override, classify_command_risk, configured_backend_sources,
+        distro_family, extract_provider_content, is_bash_executable, is_nested_tui_cli_name,
+        parse_probe, sanitize_visible_lines, validate_cmd_strict, validate_powershell,
+        ProxyBackend, ProxyConfig, TerminalCommandEnvironment, TerminalEnvironmentOverride,
+        MAX_CONTEXT_BYTES, MAX_VISIBLE_LINES,
     };
     use tokio_util::sync::CancellationToken;
 
@@ -1522,6 +1543,41 @@ mod tests {
             assert!(is_bash_executable(executable), "{executable}");
         }
         assert!(!is_bash_executable("notbash.exe"));
+    }
+
+    #[test]
+    fn proxy_backend_routing_preserves_saved_order_even_when_proxy_is_stopped() {
+        let backend = |name: &str| ProxyBackend {
+            id: Some(format!("{name}-id")),
+            name: name.to_string(),
+            url: format!("https://{name}.example.test/v1"),
+            api_key: format!("{name}-key"),
+            model: format!("{name}-model"),
+            weight: 1,
+            max_retries: 2,
+            headers: std::collections::HashMap::new(),
+            custom_user_agent: None,
+            enable_rtk: false,
+            enable_ponytail: false,
+            reasoning_effort: None,
+        };
+        let sources = configured_backend_sources(ProxyConfig {
+            port: 9876,
+            backends: vec![backend("first"), backend("second"), backend("third")],
+            enabled: false,
+        });
+
+        assert_eq!(
+            sources
+                .iter()
+                .map(|(source, backend)| (source.label(), backend.model.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("first", "first-model"),
+                ("second", "second-model"),
+                ("third", "third-model"),
+            ]
+        );
     }
 
     #[test]

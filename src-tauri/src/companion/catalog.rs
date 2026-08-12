@@ -66,7 +66,9 @@ impl Catalog {
         for f in &self.features {
             idx.push_str(&format!(
                 "- {}: {} ({})\n",
-                f.feature_id, f.title, f.tool_exposure_label()
+                f.feature_id,
+                f.title,
+                f.tool_exposure_label()
             ));
         }
         idx

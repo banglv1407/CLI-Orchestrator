@@ -144,8 +144,11 @@ Example configuration:
 
 3. **Build for Production**:
    ```bash
-   npm run tauri build
+   npm run build:production
    ```
+
+   The production build appends the local build date in `MMDD` format to both
+   the window title and executable name, for example `CLX (0808).exe`.
 
 ## 📂 Project Structure
 

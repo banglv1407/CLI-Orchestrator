@@ -47,7 +47,9 @@ impl RtkSanitizer {
                 in_passing_test_block = true;
                 continue;
             } else if in_passing_test_block {
-                result.push(format!("[RTK: {passed_test_count} passing tests collapsed]"));
+                result.push(format!(
+                    "[RTK: {passed_test_count} passing tests collapsed]"
+                ));
                 passed_test_count = 0;
                 in_passing_test_block = false;
             }
@@ -67,7 +69,11 @@ impl RtkSanitizer {
 
             // 3. Truncate excessively long lines (e.g., >400 chars)
             if line.len() > 400 {
-                let trunc = format!("{}... [RTK: truncated {} chars]", &line[..350], line.len() - 350);
+                let trunc = format!(
+                    "{}... [RTK: truncated {} chars]",
+                    &line[..350],
+                    line.len() - 350
+                );
                 result.push(trunc);
             } else {
                 result.push(line.to_string());
@@ -75,7 +81,9 @@ impl RtkSanitizer {
         }
 
         if in_passing_test_block && passed_test_count > 0 {
-            result.push(format!("[RTK: {passed_test_count} passing tests collapsed]"));
+            result.push(format!(
+                "[RTK: {passed_test_count} passing tests collapsed]"
+            ));
         }
         if repeat_count > 1 {
             result.push(format!("[RTK: repeated x{repeat_count}]"));

@@ -14,8 +14,11 @@ Rust owns the trust boundary:
 3. Apply only a supported typed environment override.
 4. Redact known Companion, Proxy, and SSH secrets plus common credential/token
    patterns.
-5. Call the Companion endpoint with the fixed command policy.
-6. If that fails, call an already-running Proxy with at least one backend.
+5. Snapshot the saved LLM Proxy config and call its backends directly in array
+   order, independent of the Proxy service lifecycle.
+6. Reuse Proxy request construction for model, authentication/custom headers,
+   user agent, RTK/Ponytail transforms, reasoning effort, and `maxRetries`;
+   exhaust one backend before falling back to the next.
 7. Parse strict JSON, normalize to one line, validate syntax, and repair once
    per provider when needed.
 8. Return command, source, validator, environment, and locally classified risk.
@@ -43,6 +46,7 @@ override cannot turn a known CLI/TUI session into a shell.
 - User request: 4 KiB maximum and redacted by the same rules.
 - Provider response: 512 KiB maximum.
 - Command: 4 KiB maximum, no CR/LF, NUL, or escape characters.
-- End-to-end request timeout: 45 seconds.
+- End-to-end request timeout: 300 seconds.
 - Environment probe and validator timeout: 12 seconds each.
-- Proxy logs use a fixed placeholder for marked internal requests.
+- Direct backend-attempt logs use the same fixed request/response placeholder;
+  terminal context and generated commands are never retained.

@@ -462,6 +462,7 @@ export function TerminalPanel({
   const inputBuffers = useRef<Record<string, string>>({});
   const inputTimers = useRef<Record<string, number>>({});
   const pendingTerminalWrites = useRef<Record<string, string[]>>({});
+  const pendingTerminalWritesBytes = useRef<Record<string, number>>({});
   const miniSyncTimers = useRef<Record<string, number>>({});
   const miniSyncInFlight = useRef<Record<string, boolean>>({});
   const miniSyncDirty = useRef<Record<string, boolean>>({});
@@ -1163,7 +1164,8 @@ export function TerminalPanel({
   const syncMiniTerminalFromMain = useCallback((sessionId: string): void => {
     const handle = terminalRefs.current[sessionId];
     const miniTerm = handle?.miniTerm;
-    if (!handle || !miniTerm || !miniTerm.element) return;
+    const mountNode = miniContainerRefs.current[sessionId];
+    if (!handle || !miniTerm || !miniTerm.element || !mountNode || !mountNode.isConnected) return;
     if (miniSyncInFlight.current[sessionId]) {
       miniSyncDirty.current[sessionId] = true;
       return;
@@ -1202,6 +1204,8 @@ export function TerminalPanel({
 
   const scheduleMiniTerminalSync = useCallback(
     (sessionId: string, delay = MINI_TERMINAL_SYNC_MS) => {
+      const mountNode = miniContainerRefs.current[sessionId];
+      if (!mountNode || !mountNode.isConnected) return;
       if (miniSyncTimers.current[sessionId] !== undefined) return;
       miniSyncTimers.current[sessionId] = window.setTimeout(() => {
         delete miniSyncTimers.current[sessionId];
@@ -1615,6 +1619,7 @@ export function TerminalPanel({
         const pendingChunks = pendingTerminalWrites.current[session.id];
         term.write(pendingChunks.join(''), () => scheduleMiniTerminalSync(session.id, 0));
         delete pendingTerminalWrites.current[session.id];
+        delete pendingTerminalWritesBytes.current[session.id];
       }
 
       return handle;
@@ -1788,6 +1793,7 @@ export function TerminalPanel({
         delete miniContainerRefs.current[sessionId];
         delete inputBuffers.current[sessionId];
         delete pendingTerminalWrites.current[sessionId];
+        delete pendingTerminalWritesBytes.current[sessionId];
         if (miniSyncTimers.current[sessionId] !== undefined) {
           window.clearTimeout(miniSyncTimers.current[sessionId]);
           delete miniSyncTimers.current[sessionId];
@@ -1820,14 +1826,15 @@ export function TerminalPanel({
         if (!handle) {
           if (!pendingTerminalWrites.current[payload.sessionId]) {
             pendingTerminalWrites.current[payload.sessionId] = [];
+            pendingTerminalWritesBytes.current[payload.sessionId] = 0;
           }
           pendingTerminalWrites.current[payload.sessionId].push(payload.chunk);
-          let pendingBytes = pendingTerminalWrites.current[payload.sessionId]
-            .reduce((total, chunk) => total + chunk.length * 2, 0);
-          while (pendingBytes > MAX_TERMINAL_WRITE_QUEUE_BYTES) {
+          pendingTerminalWritesBytes.current[payload.sessionId] =
+            (pendingTerminalWritesBytes.current[payload.sessionId] || 0) + payload.chunk.length * 2;
+          while (pendingTerminalWritesBytes.current[payload.sessionId] > MAX_TERMINAL_WRITE_QUEUE_BYTES) {
             const removed = pendingTerminalWrites.current[payload.sessionId].shift();
             if (!removed) break;
-            pendingBytes -= removed.length * 2;
+            pendingTerminalWritesBytes.current[payload.sessionId] -= removed.length * 2;
           }
           return;
         }
@@ -2033,6 +2040,7 @@ export function TerminalPanel({
       inputBuffers.current = {};
       inputTimers.current = {};
       pendingTerminalWrites.current = {};
+      pendingTerminalWritesBytes.current = {};
       miniSyncTimers.current = {};
       miniSyncInFlight.current = {};
       miniSyncDirty.current = {};

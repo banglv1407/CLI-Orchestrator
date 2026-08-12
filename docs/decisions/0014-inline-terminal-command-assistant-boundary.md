@@ -29,10 +29,12 @@ environment, and at most 20 visible terminal lines. Known credentials and
 token-shaped values are redacted before provider access. No Companion history,
 custom prompt, tools, or app-action consent is inherited.
 
-Provider order is the AI Companion endpoint followed by CliProxyAI only when
-the proxy is already running with an active backend. The built-in local LLM is
-excluded. Internal proxy requests carry a marker that replaces request and
-response bodies in proxy logs with a fixed redaction placeholder.
+Provider order is exactly the saved LLM Proxy backend array. Command Assistant
+calls each upstream directly using the Proxy backend's model, headers,
+transforms, reasoning setting, and retry count, then falls back to the next
+backend. Routing is independent of the Proxy service lifecycle and never
+starts it. AI Companion and the built-in local LLM are excluded. Attempt logs
+replace request and response bodies with a fixed redaction placeholder.
 
 The model must return one JSON object containing one physical-line command and
 the shell dialect. CLX retries one repair per provider and accepts output only

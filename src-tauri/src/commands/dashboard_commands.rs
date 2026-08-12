@@ -224,13 +224,8 @@ fn get_process_tree_stats(root_pid: u32) -> (u64, u64, u64, u64, u32, u32) {
         if name.eq_ignore_ascii_case("msedgewebview2.exe") {
             webview_count += 1;
         }
-        let handle = unsafe {
-            OpenProcess(
-                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ,
-                0,
-                pid,
-            )
-        };
+        let handle =
+            unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, 0, pid) };
         if handle != 0 {
             let mut counters: PROCESS_MEMORY_COUNTERS_EX = unsafe { mem::zeroed() };
             counters.cb = mem::size_of::<PROCESS_MEMORY_COUNTERS_EX>() as u32;
@@ -247,7 +242,8 @@ fn get_process_tree_stats(root_pid: u32) -> (u64, u64, u64, u64, u32, u32) {
                 private_bytes = private_bytes.saturating_add(counters.PrivateUsage as u64);
                 if pid == root_pid || webview_owned {
                     ui_working_set = ui_working_set.saturating_add(counters.WorkingSetSize as u64);
-                    ui_private_bytes = ui_private_bytes.saturating_add(counters.PrivateUsage as u64);
+                    ui_private_bytes =
+                        ui_private_bytes.saturating_add(counters.PrivateUsage as u64);
                 }
             }
             unsafe { windows_sys::Win32::Foundation::CloseHandle(handle) };
@@ -1045,11 +1041,13 @@ pub async fn dashboard_probe_monitors(
     } else {
         probe_local_windows_monitors(local_windows).await
     };
-    snapshots.extend(stream::iter(remaining)
-        .map(|monitor| probe_monitor(manager.clone(), monitor))
-        .buffer_unordered(4)
-        .collect::<Vec<_>>()
-        .await);
+    snapshots.extend(
+        stream::iter(remaining)
+            .map(|monitor| probe_monitor(manager.clone(), monitor))
+            .buffer_unordered(4)
+            .collect::<Vec<_>>()
+            .await,
+    );
     Ok(snapshots)
 }
 
@@ -1067,22 +1065,18 @@ async fn probe_local_windows_monitors(monitors: Vec<MonitorConfig>) -> Vec<Monit
         .iter()
         .map(|monitor| monitor.service_port)
         .collect::<Vec<_>>();
-    let result = run_local_capture(
-        "windows",
-        &windows_probe_batch_script(&ports),
-        None,
-    )
-    .await
-    .and_then(|output| {
-        if output.exit_status != Some(0) {
-            return Err(format!(
-                "Windows port batch probe failed: {}",
-                output.stderr.trim()
-            ));
-        }
-        serde_json::from_str::<Vec<WindowsBatchProbe>>(output.stdout.trim())
-            .map_err(|error| format!("Failed to parse Windows port batch probe: {error}"))
-    });
+    let result = run_local_capture("windows", &windows_probe_batch_script(&ports), None)
+        .await
+        .and_then(|output| {
+            if output.exit_status != Some(0) {
+                return Err(format!(
+                    "Windows port batch probe failed: {}",
+                    output.stderr.trim()
+                ));
+            }
+            serde_json::from_str::<Vec<WindowsBatchProbe>>(output.stdout.trim())
+                .map_err(|error| format!("Failed to parse Windows port batch probe: {error}"))
+        });
     let checked_at = chrono::Utc::now().to_rfc3339();
     match result {
         Ok(probes) => {
@@ -1101,7 +1095,12 @@ async fn probe_local_windows_monitors(monitors: Vec<MonitorConfig>) -> Vec<Monit
                     MonitorSnapshot {
                         monitor_id: monitor.id,
                         service_port: monitor.service_port,
-                        status: if listening { "listening" } else { "notListening" }.to_string(),
+                        status: if listening {
+                            "listening"
+                        } else {
+                            "notListening"
+                        }
+                        .to_string(),
                         target_os: "windows".to_string(),
                         unverified_ssh: false,
                         listeners,
@@ -2256,9 +2255,9 @@ fn queue_log_line(
     text: String,
 ) {
     let _ = sender.send(LogLineEvent {
-            sequence,
-            stream: stream.to_string(),
-            text,
+        sequence,
+        stream: stream.to_string(),
+        text,
     });
 }
 
@@ -2548,10 +2547,7 @@ fn parse_socket_addr(addr: &str) -> (&str, u16) {
         if let Some(bracket_end) = addr.find(']') {
             let ip = &addr[1..bracket_end];
             let port_str = &addr[bracket_end + 1..]; // includes the colon
-            let port = port_str
-                .trim_start_matches(':')
-                .parse::<u16>()
-                .unwrap_or(0);
+            let port = port_str.trim_start_matches(':').parse::<u16>().unwrap_or(0);
             return (ip, port);
         }
     }
@@ -2567,11 +2563,7 @@ fn parse_socket_addr(addr: &str) -> (&str, u16) {
 /// Resolve a domain to IP addresses using `nslookup` (Windows) or `getent`/`host` (*nix).
 fn resolve_domain_to_ips(target: &str) -> Vec<String> {
     // If it's already an IP, return it directly
-    if target
-        .chars()
-        .all(|c| c.is_ascii_digit() || c == '.')
-        && target.split('.').count() == 4
-    {
+    if target.chars().all(|c| c.is_ascii_digit() || c == '.') && target.split('.').count() == 4 {
         return vec![target.to_string()];
     }
 
@@ -2596,10 +2588,7 @@ fn resolve_domain_to_ips(target: &str) -> Vec<String> {
             for part in &parts[1..] {
                 let addr = part.trim_end_matches(',');
                 // Skip localhost-like addresses from nslookup header
-                if addr
-                    .chars()
-                    .all(|c| c.is_ascii_digit() || c == '.')
-                    && !addr.starts_with("127.")
+                if addr.chars().all(|c| c.is_ascii_digit() || c == '.') && !addr.starts_with("127.")
                 {
                     ips.push(addr.to_string());
                 }
@@ -2616,7 +2605,9 @@ fn resolve_domain_to_ips(target: &str) -> Vec<String> {
 }
 
 #[tauri::command]
-pub async fn dashboard_get_target_connections(target: String) -> Result<Vec<TcpConnection>, String> {
+pub async fn dashboard_get_target_connections(
+    target: String,
+) -> Result<Vec<TcpConnection>, String> {
     tokio::task::spawn_blocking(move || {
         let ips = resolve_domain_to_ips(&target);
         let all = parse_all_tcp_connections();
@@ -2654,13 +2645,9 @@ mod target_monitoring_tests {
     #[cfg(target_os = "windows")]
     #[tokio::test]
     async fn windows_batch_probe_returns_one_result_per_port() {
-        let output = run_local_capture(
-            "windows",
-            &windows_probe_batch_script(&[9, 10]),
-            None,
-        )
-        .await
-        .unwrap();
+        let output = run_local_capture("windows", &windows_probe_batch_script(&[9, 10]), None)
+            .await
+            .unwrap();
         assert_eq!(output.exit_status, Some(0), "{}", output.stderr);
         let parsed: serde_json::Value = serde_json::from_str(output.stdout.trim()).unwrap();
         let results = parsed.as_array().expect("batch probe must return an array");

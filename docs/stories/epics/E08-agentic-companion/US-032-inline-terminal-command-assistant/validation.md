@@ -6,21 +6,20 @@
 - `cargo check --manifest-path src-tauri/Cargo.toml --no-default-features`:
   passed.
 - `cargo test --manifest-path src-tauri/Cargo.toml --no-default-features
-  terminal_command`: passed 10 focused tests.
+  terminal_command`: passed 14 focused tests.
 - `cargo test --manifest-path src-tauri/Cargo.toml --no-default-features`:
-  passed 74 tests; 1 saved-live-provider test remained intentionally ignored.
-- `git diff --check`: passed.
+  passed 83 tests; 1 saved-live-provider test remained intentionally ignored.
+- Scoped `git diff --check` for US-032-owned files: passed.
 
 Automated Rust coverage includes Ubuntu/RHEL-family mapping, context bounds and
 redaction, cmd acceptance/rejection, PowerShell AST acceptance/rejection,
-Windows Bash fallback mapping, local risk classification, and Proxy privacy
-marker behavior.
+Windows Bash fallback mapping, local risk classification, saved Proxy backend
+order while `enabled=false`, and Proxy privacy placeholder behavior.
 
 `npm.cmd run validate:quick` was attempted as required by the Harness workflow,
 but this checkout has no `validate:quick` package script. Repository-wide
-`cargo fmt --check` also reports pre-existing formatting drift across unrelated
-dirty files; feature-owned new Rust files were formatted directly without
-rewriting the user's existing worktree changes.
+`cargo fmt --check` was not used as proof because the checkout contains
+unrelated dirty Rust files; the scoped diff check above is the formatting gate.
 
 ## Manual desktop matrix
 
@@ -36,8 +35,9 @@ rewriting the user's existing worktree changes.
 - [ ] Non-empty or unrecognized prompt: Copy remains available; Insert is
       disabled and click-time guard does not send input.
 - [ ] Close/session/view switch during generation: no late result is rendered.
-- [ ] Proxy fallback: proxy is not started automatically and marked log bodies
-      contain only the redaction placeholder.
+- [ ] Proxy routing: with the service stopped, backend 1 is called directly;
+      after its configured retries fail, backend 2 succeeds; the service stays
+      stopped and attempt log bodies contain only the redaction placeholder.
 
 Real SSH/WSL fixture coverage remains a release gate; automated compilation
 does not substitute for those checks.

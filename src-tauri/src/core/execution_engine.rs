@@ -45,13 +45,14 @@ impl ExecutionEngine {
             args.push(prompt_value.to_string());
         }
 
-        let (base_command, args) = if cli.enable_rtk && crate::core::rtk_sanitizer::RtkSanitizer::is_rtk_installed() {
-            let mut rtk_args = vec![base_command];
-            rtk_args.extend(args);
-            ("rtk".to_string(), rtk_args)
-        } else {
-            (base_command, args)
-        };
+        let (base_command, args) =
+            if cli.enable_rtk && crate::core::rtk_sanitizer::RtkSanitizer::is_rtk_installed() {
+                let mut rtk_args = vec![base_command];
+                rtk_args.extend(args);
+                ("rtk".to_string(), rtk_args)
+            } else {
+                (base_command, args)
+            };
 
         let (command, args) = platform_prepare_command(cli.mode.clone(), base_command, args);
 

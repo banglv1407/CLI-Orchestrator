@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-
 use crate::{
     commands::api_proxy::{ApiProxyState, SharedApiProxyState},
     companion::manager::CompanionManager,

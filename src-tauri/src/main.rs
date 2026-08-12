@@ -9,15 +9,6 @@ mod runners;
 mod terminal;
 
 use app_state::AppState;
-use companion::commands::{
-    companion_cancel, companion_clear_history, companion_get_catalog, companion_get_config,
-    companion_get_help, companion_get_history, companion_get_safe_context, companion_help_search,
-    companion_import_legacy, companion_save_config, companion_send,
-    companion_set_actions_enabled,
-};
-use companion::terminal_command::{
-    terminal_command_cancel, terminal_command_detect_environment, terminal_command_suggest,
-};
 use commands::{
     api_proxy::{api_proxy_abort, api_proxy_request, api_proxy_stream},
     builtin_llm_commands::{
@@ -30,12 +21,12 @@ use commands::{
         delete_ssh_file_or_dir, detect_installed_clis, download_ssh_file, get_git_diff,
         get_git_status, get_remote_system_stats, get_ssh_server_config, get_ssh_server_status,
         list_all_files_recursive, list_clis, list_directory_files, list_project_tags,
-        list_sessions, list_ssh_directory_files, list_ssh_files_recursive,
-        load_ssh_connections, open_backend_logs_folder, open_workspace_folder, pick_file,
-        pick_folder, read_file_content, read_ssh_file_content, resize_cli, reveal_in_file_manager,
-        ripgrep_search, save_cli_tag, save_project_tag, save_ssh_connections,
-        save_ssh_server_config, send_cli_input, send_llm_chat, start_ssh_server, stop_cli,
-        stop_ssh_server, upload_ssh_file, upsert_cli, write_file_content, write_ssh_file_content,
+        list_sessions, list_ssh_directory_files, list_ssh_files_recursive, load_ssh_connections,
+        open_backend_logs_folder, open_workspace_folder, pick_file, pick_folder, read_file_content,
+        read_ssh_file_content, resize_cli, reveal_in_file_manager, ripgrep_search, save_cli_tag,
+        save_project_tag, save_ssh_connections, save_ssh_server_config, send_cli_input,
+        send_llm_chat, start_ssh_server, stop_cli, stop_ssh_server, upload_ssh_file, upsert_cli,
+        write_file_content, write_ssh_file_content,
     },
     dashboard_commands::{
         dashboard_delete_monitor, dashboard_discover_log_sources, dashboard_get_all_connections,
@@ -48,14 +39,24 @@ use commands::{
     notepad_commands::{get_notepad, save_notepad},
     pet_commands::{pet_install_pack, pet_list_packs, pet_load_asset},
     proxy_commands::{
-        proxy_add_backend, proxy_get_config, proxy_get_logs, proxy_get_recent_logs, proxy_get_usage, proxy_remove_backend,
-        proxy_reset_usage, proxy_save_config, proxy_start, proxy_status, proxy_stop,
+        proxy_add_backend, proxy_get_config, proxy_get_logs, proxy_get_recent_logs,
+        proxy_get_usage, proxy_remove_backend, proxy_reset_usage, proxy_save_config, proxy_start,
+        proxy_status, proxy_stop,
     },
     quickapps_commands::{
         delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
     },
     rtk_commands::rtk_get_status,
     system_commands::get_system_logs,
+};
+use companion::commands::{
+    companion_cancel, companion_clear_history, companion_get_catalog, companion_get_config,
+    companion_get_help, companion_get_history, companion_get_safe_context, companion_help_search,
+    companion_import_legacy, companion_save_config, companion_send, companion_set_actions_enabled,
+    send_companion_chat,
+};
+use companion::terminal_command::{
+    terminal_command_cancel, terminal_command_detect_environment, terminal_command_suggest,
 };
 use tauri::{Emitter, Manager};
 
@@ -95,6 +96,7 @@ fn main() {
             companion_clear_history,
             companion_set_actions_enabled,
             companion_import_legacy,
+            send_companion_chat,
             terminal_command_detect_environment,
             terminal_command_suggest,
             terminal_command_cancel,

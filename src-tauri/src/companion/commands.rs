@@ -83,7 +83,11 @@ pub async fn companion_get_safe_context(
         config.backends.iter().map(|b| b.name.clone()).collect()
     };
     let ssh_profiles: Vec<String> = {
-        let file_path = state.registry.data_dirs().root_dir.join("ssh_connections.json");
+        let file_path = state
+            .registry
+            .data_dirs()
+            .root_dir
+            .join("ssh_connections.json");
         if let Ok(content) = std::fs::read_to_string(&file_path) {
             #[derive(serde::Deserialize)]
             struct SshConn {
@@ -202,10 +206,7 @@ pub async fn companion_send(
 }
 
 #[tauri::command]
-pub async fn companion_cancel(
-    run_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn companion_cancel(run_id: String, state: State<'_, AppState>) -> Result<(), String> {
     state.companion.cancel(&run_id).await
 }
 
@@ -348,9 +349,7 @@ pub async fn companion_import_legacy(
 
     // Import history — redact known secrets
     let config = state.companion.config.read().await;
-    let redaction_values: Vec<&str> = vec![
-        config.api_key.as_str(),
-    ];
+    let redaction_values: Vec<&str> = vec![config.api_key.as_str()];
 
     for msg in &legacy.history {
         let mut content = msg.content.clone();
@@ -378,4 +377,109 @@ pub async fn companion_import_legacy(
     }
 
     Ok(result)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompanionChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompanionChatRequest {
+    pub system_prompt: String,
+    pub messages: Vec<CompanionChatMessage>,
+}
+
+#[tauri::command]
+pub async fn send_companion_chat(
+    request: CompanionChatRequest,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+
+    let config = state.companion.config.read().await.clone();
+
+    if config.api_key.is_empty() && config.base_url == "https://api.openai.com/v1" {
+        return Err("AI Companion is not configured".to_string());
+    }
+    if config.model.trim().is_empty() {
+        return Err("AI Companion model is not set".to_string());
+    }
+
+    let url = crate::core::proxy_server::chat_completions_url(&config.base_url);
+
+    let mut headers = HeaderMap::new();
+    let mut has_user_agent = false;
+    for (name, value) in &config.custom_headers {
+        let header_name = HeaderName::from_bytes(name.as_bytes())
+            .map_err(|e| format!("Invalid header name '{}': {}", name, e))?;
+        let header_value = HeaderValue::from_str(value)
+            .map_err(|e| format!("Invalid header value for '{}': {}", name, e))?;
+        if name.eq_ignore_ascii_case("user-agent") {
+            has_user_agent = true;
+        }
+        headers.insert(header_name, header_value);
+    }
+    if !has_user_agent {
+        headers.insert(
+            reqwest::header::USER_AGENT,
+            HeaderValue::from_static("CLX-Companion-Chat"),
+        );
+    }
+    if !config.api_key.is_empty() {
+        headers.insert(
+            reqwest::header::AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", config.api_key))
+                .map_err(|_| "Invalid API key".to_string())?,
+        );
+    }
+
+    let mut chat_messages: Vec<serde_json::Value> = Vec::new();
+    if !request.system_prompt.is_empty() {
+        chat_messages.push(serde_json::json!({
+            "role": "system",
+            "content": request.system_prompt,
+        }));
+    }
+    for msg in &request.messages {
+        chat_messages.push(serde_json::json!({
+            "role": msg.role,
+            "content": msg.content,
+        }));
+    }
+
+    let body = serde_json::json!({
+        "model": config.model,
+        "messages": chat_messages,
+        "stream": false,
+    });
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .headers(headers)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let status = response.status();
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read body: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("Companion LLM error {}: {}", status, text));
+    }
+
+    let json_resp: serde_json::Value =
+        serde_json::from_str(text.trim()).map_err(|e| format!("Invalid JSON response: {}", e))?;
+
+    json_resp["choices"][0]["message"]["content"]
+        .as_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Response contained no content".to_string())
 }

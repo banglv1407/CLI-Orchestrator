@@ -1,5 +1,5 @@
-use serde::Serialize;
 use crate::core::rtk_sanitizer::RtkSanitizer;
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

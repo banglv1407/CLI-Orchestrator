@@ -1331,12 +1331,26 @@ export function PetPreviewStage({
       }
       context.drawImage(actorBuffer, centerX - 96, centerY - 96, ACTOR_CANVAS, ACTOR_CANVAS);
 
-      if (clip.looped || progress < 1) {
+      if ((clip.looped || progress < 1) && !document.hidden) {
         animationRef.current = requestAnimationFrame(loop);
       }
     };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animationRef.current);
+      } else if (clip.looped) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
     animationRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animationRef.current);
+    return () => {
+      cancelAnimationFrame(animationRef.current);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [clip, clipId, loaded, move, pet, replayToken]);
 
   return (

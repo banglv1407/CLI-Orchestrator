@@ -478,7 +478,7 @@ export interface TerminalEnvironmentOverride {
 export interface TerminalCommandSuggestion {
   command: string;
   shellDialect: Exclude<TerminalShellDialect, 'unknown'>;
-  source: 'companion' | 'proxy';
+  source: string;
   risk: 'normal' | 'elevated' | 'destructive';
   validation: {
     status: 'verified';

@@ -31,10 +31,12 @@ The assistant:
   is inconclusive, the user chooses the OS/shell target; local Windows Bash is
   selected by default.
 - Sends the user's request plus at most 20 visible, filtered terminal lines to
-  the independently configured AI Companion endpoint.
-- Falls back to CliProxyAI only when that proxy is already running with an
-  active backend. It never starts the proxy and never uses the built-in local
-  LLM for command generation.
+  the LLM Proxy backends in their saved UI order.
+- Calls those configured upstreams directly, using each backend's model,
+  headers, transforms, reasoning setting, and retry count before falling back
+  to the next backend. This works while the Proxy service is stopped and does
+  not start it. AI Companion and the built-in local LLM are not used for
+  command generation.
 - Accepts only one-line structured output that passes the matching syntax
   validator: strict cmd grammar, PowerShell AST parsing, or `bash -n` in the
   target WSL/SSH environment.

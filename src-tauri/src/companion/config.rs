@@ -24,7 +24,8 @@ pub struct CompanionConfig {
 fn default_system_prompt() -> String {
     "You are a helpful AI companion for CLX, a desktop CLI orchestrator. \
      Answer questions about the app's features and help the user navigate. \
-     Be concise and practical.".to_string()
+     Be concise and practical."
+        .to_string()
 }
 
 impl Default for CompanionConfig {

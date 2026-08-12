@@ -651,6 +651,8 @@ export function CliSidebar({
   });
 
   const isResizingRef = useRef(false);
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -661,9 +663,9 @@ export function CliSidebar({
         return;
       }
       const newWidth = Math.max(220, Math.min(e.clientX, 800));
+      sidebarWidthRef.current = newWidth;
       setSidebarWidth(newWidth);
       setIsSidebarCollapsed(false);
-      localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
     };
 
     const handleMouseUp = () => {
@@ -671,7 +673,8 @@ export function CliSidebar({
         isResizingRef.current = false;
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-        localStorage.setItem('ai-cli-sidebar-width', String(sidebarWidth));
+        localStorage.setItem('ai-cli-sidebar-width', String(sidebarWidthRef.current));
+        localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
       }
     };
 
@@ -681,7 +684,7 @@ export function CliSidebar({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [sidebarWidth]);
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1107,42 +1110,55 @@ export function CliSidebar({
     }
 
     try {
-      // Try Cloud/Configured LLM first
-      const reply = await invoke<string>('send_llm_chat', {
+      // 1. Try AI Companion endpoint first (uses companion.json config from backend)
+      const reply = await invoke<string>('send_companion_chat', {
         request: {
-          baseUrl: llmConfig.baseUrl,
-          model: llmConfig.model,
-          apiKey: llmConfig.apiKey,
-          headers: llmConfig.headers,
           systemPrompt: systemPrompt,
           messages: [{ role: 'user', content: text.trim() }],
-          stream: false,
         },
       });
       setRewriteModal(prev => prev ? { ...prev, resultText: reply.trim(), loading: false } : null);
-    } catch (cloudErr) {
-      console.warn('Cloud LLM failed, falling back to local LLM:', cloudErr);
-      
-      // Local LLM Fallback
+    } catch (companionErr) {
+      console.warn('Companion LLM failed, falling back to configured LLM:', companionErr);
+
       try {
-        const status = await invoke<any>('builtin_llm_status');
-        if (!status.loaded) {
-          await invoke('builtin_llm_load');
-          const stat = await invoke<any>('builtin_llm_status');
-          setBuiltinLlmStatus(stat);
-        }
-        const reply = await invoke<string>('builtin_llm_generate', {
-          prompt: text.trim(),
-          task: type,
+        // 2. Fallback to localStorage llm config (send_llm_chat)
+        const reply = await invoke<string>('send_llm_chat', {
+          request: {
+            baseUrl: llmConfig.baseUrl,
+            model: llmConfig.model,
+            apiKey: llmConfig.apiKey,
+            headers: llmConfig.headers,
+            systemPrompt: systemPrompt,
+            messages: [{ role: 'user', content: text.trim() }],
+            stream: false,
+          },
         });
-        setRewriteModal(prev => prev ? { ...prev, resultText: `[Local Fallback] ${reply.trim()}`, loading: false } : null);
-      } catch (localErr: any) {
-        console.error('Both Cloud LLM and Local LLM fallback failed:', localErr);
-        setRewriteModal(prev => prev ? { 
-          ...prev, 
-          error: `Cloud LLM Error: ${String(cloudErr)}\nLocal LLM Fallback Error: ${String(localErr)}`, 
-          loading: false 
-        } : null);
+        setRewriteModal(prev => prev ? { ...prev, resultText: reply.trim(), loading: false } : null);
+      } catch (cloudErr) {
+        console.warn('Configured LLM failed, falling back to local LLM:', cloudErr);
+      
+        // 3. Local LLM Fallback
+        try {
+          const status = await invoke<any>('builtin_llm_status');
+          if (!status.loaded) {
+            await invoke('builtin_llm_load');
+            const stat = await invoke<any>('builtin_llm_status');
+            setBuiltinLlmStatus(stat);
+          }
+          const reply = await invoke<string>('builtin_llm_generate', {
+            prompt: text.trim(),
+            task: type,
+          });
+          setRewriteModal(prev => prev ? { ...prev, resultText: `[Local Fallback] ${reply.trim()}`, loading: false } : null);
+        } catch (localErr: any) {
+          console.error('All LLM providers failed:', localErr);
+          setRewriteModal(prev => prev ? { 
+            ...prev, 
+            error: `Companion Error: ${String(companionErr)}\nCloud LLM Error: ${String(cloudErr)}\nLocal LLM Fallback Error: ${String(localErr)}`, 
+            loading: false 
+          } : null);
+        }
       }
     }
   };

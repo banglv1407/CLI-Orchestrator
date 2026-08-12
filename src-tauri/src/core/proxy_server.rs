@@ -372,7 +372,37 @@ fn compute_normalized_for_off(raw: &str) -> String {
 
 // ── SSE helpers ────────────────────────────────────────────────
 
-fn build_upstream_body(
+pub(crate) fn build_upstream_headers(backend: &ProxyBackend) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        HeaderName::from_static("authorization"),
+        format!("Bearer {}", backend.api_key)
+            .parse()
+            .unwrap_or_else(|_| HeaderValue::from_static("")),
+    );
+    headers.insert(
+        HeaderName::from_static("content-type"),
+        "application/json"
+            .parse()
+            .unwrap_or_else(|_| HeaderValue::from_static("application/json")),
+    );
+    for (name, value) in &backend.headers {
+        if let (Ok(name), Ok(value)) = (HeaderName::from_bytes(name.as_bytes()), value.parse()) {
+            headers.insert(name, value);
+        }
+    }
+    if let Some(user_agent) = &backend.custom_user_agent {
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            user_agent
+                .parse()
+                .unwrap_or_else(|_| HeaderValue::from_static("CliProxyAI/1.0")),
+        );
+    }
+    headers
+}
+
+pub(crate) fn build_upstream_body(
     request: &ChatCompletionRequest,
     backend: &ProxyBackend,
 ) -> serde_json::Value {
@@ -664,31 +694,7 @@ async fn handle_chat_completion(
         for retry in 0..max_retries {
             let target_url = chat_completions_url(&backend.url);
 
-            let mut headers = HeaderMap::new();
-            headers.insert(
-                HeaderName::from_static("authorization"),
-                format!("Bearer {}", backend.api_key)
-                    .parse()
-                    .unwrap_or_else(|_| HeaderValue::from_static("")),
-            );
-            headers.insert(
-                HeaderName::from_static("content-type"),
-                "application/json"
-                    .parse()
-                    .unwrap_or_else(|_| HeaderValue::from_static("application/json")),
-            );
-            for (k, v) in &backend.headers {
-                if let (Ok(name), Ok(value)) = (HeaderName::from_bytes(k.as_bytes()), v.parse()) {
-                    headers.insert(name, value);
-                }
-            }
-            if let Some(ua) = &backend.custom_user_agent {
-                headers.insert(
-                    HeaderName::from_static("user-agent"),
-                    ua.parse()
-                        .unwrap_or_else(|_| HeaderValue::from_static("CliProxyAI/1.0")),
-                );
-            }
+            let headers = build_upstream_headers(&backend);
 
             let mut body = build_upstream_body(&request, &backend);
 

@@ -155,42 +155,54 @@ export function Dashboard() {
     } else if (type === 'title') {
       systemPrompt = 'Generate a very short, concise title (max 5 words) for the following text. Do not put quotes around the title. Output ONLY the title itself.';
     }
-
     try {
-      // Try Cloud/Configured LLM first
-      const reply = await invoke<string>('send_llm_chat', {
+      // 1. Try AI Companion endpoint first (uses companion.json config from backend)
+      const reply = await invoke<string>('send_companion_chat', {
         request: {
-          baseUrl: llmConfig.baseUrl,
-          model: llmConfig.model,
-          apiKey: llmConfig.apiKey,
-          headers: llmConfig.headers,
           systemPrompt: systemPrompt,
           messages: [{ role: 'user', content: text }],
-          stream: false,
         },
       });
       setRewriteModal(prev => prev ? { ...prev, resultText: reply.trim(), loading: false } : null);
-    } catch (cloudErr) {
-      console.warn('Cloud LLM failed, falling back to local LLM:', cloudErr);
-      
-      // Local LLM Fallback
+    } catch (companionErr) {
+      console.warn('Companion LLM failed, falling back to configured LLM:', companionErr);
+
       try {
-        const status = await invoke<any>('builtin_llm_status');
-        if (!status.loaded) {
-          await invoke('builtin_llm_load');
-        }
-        const reply = await invoke<string>('builtin_llm_generate', {
-          prompt: text,
-          task: type,
+        // 2. Fallback to localStorage llm config (send_llm_chat)
+        const reply = await invoke<string>('send_llm_chat', {
+          request: {
+            baseUrl: llmConfig.baseUrl,
+            model: llmConfig.model,
+            apiKey: llmConfig.apiKey,
+            headers: llmConfig.headers,
+            systemPrompt: systemPrompt,
+            messages: [{ role: 'user', content: text }],
+            stream: false,
+          },
         });
-        setRewriteModal(prev => prev ? { ...prev, resultText: `[Local Fallback] ${reply.trim()}`, loading: false } : null);
-      } catch (localErr: any) {
-        console.error('Both Cloud LLM and Local LLM fallback failed:', localErr);
-        setRewriteModal(prev => prev ? { 
-          ...prev, 
-          error: `Cloud LLM Error: ${String(cloudErr)}\nLocal LLM Fallback Error: ${String(localErr)}`, 
-          loading: false 
-        } : null);
+        setRewriteModal(prev => prev ? { ...prev, resultText: reply.trim(), loading: false } : null);
+      } catch (cloudErr) {
+        console.warn('Configured LLM failed, falling back to local LLM:', cloudErr);
+      
+        // 3. Local LLM Fallback
+        try {
+          const status = await invoke<any>('builtin_llm_status');
+          if (!status.loaded) {
+            await invoke('builtin_llm_load');
+          }
+          const reply = await invoke<string>('builtin_llm_generate', {
+            prompt: text,
+            task: type,
+          });
+          setRewriteModal(prev => prev ? { ...prev, resultText: `[Local Fallback] ${reply.trim()}`, loading: false } : null);
+        } catch (localErr: any) {
+          console.error('All LLM providers failed:', localErr);
+          setRewriteModal(prev => prev ? { 
+            ...prev, 
+            error: `Companion Error: ${String(companionErr)}\nCloud LLM Error: ${String(cloudErr)}\nLocal LLM Fallback Error: ${String(localErr)}`, 
+            loading: false 
+          } : null);
+        }
       }
     }
   };

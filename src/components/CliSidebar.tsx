@@ -94,6 +94,17 @@ function QuickAppsIcon() {
   );
 }
 
+function BuzzIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+      <circle cx="6" cy="6" r="2.25" />
+      <circle cx="18" cy="6" r="2.25" />
+      <circle cx="12" cy="18" r="2.25" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7.5 10.5 16.5M16 7.5 13.5 16.5M6.75 8h10.5" />
+    </svg>
+  );
+}
+
 
 function FolderArrowIcon({ isExpanded }: { isExpanded: boolean }) {
   return (
@@ -196,7 +207,7 @@ interface CliSidebarProps {
   onLogsTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'cli-manager' | 'quickapps' | 'settings' | 'ai-chat' | 'apiclient' | 'dashboard';
+type SidebarTab = 'cli-manager' | 'quickapps' | 'buzz' | 'settings' | 'ai-chat' | 'apiclient' | 'dashboard';
 
 const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['settings']);
 
@@ -369,7 +380,7 @@ export function CliSidebar({
   const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
 
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
-    const tabsWithNoLeftArea = new Set(['quickapps', 'settings', 'dashboard']);
+    const tabsWithNoLeftArea = new Set(['quickapps', 'buzz', 'settings', 'dashboard']);
     
     if (tabsWithNoLeftArea.has(tab)) {
       setIsSidebarCollapsed(true);
@@ -377,6 +388,9 @@ export function CliSidebar({
       setActiveTab(tab);
 
       if (tab === 'quickapps' && onQuickAppsTabChange) onQuickAppsTabChange(true);
+      else if (tab === 'buzz') {
+        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'buzz' }));
+      }
       else if (tab === 'settings') {
         if (onQuickAppsTabChange) onQuickAppsTabChange(false);
         if (onApiClientTabChange) onApiClientTabChange(false);
@@ -433,6 +447,10 @@ export function CliSidebar({
           if (!list.includes('dashboard')) {
             list.unshift('dashboard');
           }
+          if (!list.includes('buzz')) {
+            const quickIdx = list.indexOf('quickapps');
+            list.splice(quickIdx >= 0 ? quickIdx + 1 : list.length, 0, 'buzz');
+          }
           return [
             ...list.filter((t) => !PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
             ...list.filter((t) => PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
@@ -442,7 +460,7 @@ export function CliSidebar({
         // ignore
       }
     }
-    return ['dashboard', 'cli-manager', 'quickapps', 'apiclient', 'settings'];
+    return ['dashboard', 'cli-manager', 'quickapps', 'buzz', 'apiclient', 'settings'];
   });
 
   const handleTabDragStart = (e: React.DragEvent, tab: SidebarTab) => {
@@ -492,6 +510,27 @@ export function CliSidebar({
               )}
               <TerminalIcon />
             </div>
+          </div>
+        );
+      case 'buzz':
+        return (
+          <div
+            key="buzz"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'buzz')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'buzz')}
+            onClick={() => handleSetActiveTab('buzz')}
+            className={`group relative flex h-10 w-10 items-center justify-center rounded-xl text-xs font-semibold cursor-pointer transition-all duration-200 ${
+              activeTab === 'buzz'
+                ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25 ring-1 ring-amber-400/30'
+                : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
+            }`}
+            title="Buzz Workspace"
+          >
+            <BuzzIcon />
           </div>
         );
       case 'quickapps':

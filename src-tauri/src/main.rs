@@ -11,6 +11,7 @@ mod terminal;
 use app_state::AppState;
 use commands::{
     api_proxy::{api_proxy_abort, api_proxy_request, api_proxy_stream},
+    buzz_commands::*,
     builtin_llm_commands::{
         builtin_llm_generate, builtin_llm_get_config, builtin_llm_load, builtin_llm_save_config,
         builtin_llm_status, builtin_llm_unload,
@@ -84,6 +85,21 @@ fn main() {
         .manage(state.api_proxy.clone())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
+            buzz_get_config,
+            buzz_set_config,
+            buzz_list_channels,
+            buzz_get_messages,
+            buzz_get_thread,
+            buzz_send_message,
+            buzz_list_members,
+            buzz_resolve_users,
+            buzz_open_dm,
+            buzz_list_agents,
+            buzz_add_agent,
+            buzz_has_identity,
+            buzz_generate_identity,
+            buzz_import_identity,
+            buzz_clear_identity,
             companion_get_catalog,
             companion_help_search,
             companion_get_help,

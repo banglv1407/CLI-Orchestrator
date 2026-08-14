@@ -1,4 +1,5 @@
 pub mod api_proxy;
+pub mod buzz_commands;
 pub mod builtin_llm_commands;
 pub mod cli_commands;
 pub mod dashboard_commands;

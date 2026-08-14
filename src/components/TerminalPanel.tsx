@@ -30,6 +30,7 @@ import { RemoteMonitorWidget } from './RemoteMonitorWidget';
 import { SshFileTransferDialog } from './SshFileTransferDialog';
 import { save } from '@tauri-apps/plugin-dialog';
 import { QuickAppsPanel } from './QuickAppsPanel';
+import { BuzzWorkspacePanel } from './BuzzWorkspacePanel';
 import { ApiClientPanel } from './ApiClientPanel';
 import { ProxyPanel } from './ProxyPanel';
 import { SystemLogPanel } from './SystemLogPanel';
@@ -2461,6 +2462,7 @@ export function TerminalPanel({
                 ))}
                 {/* Sub-view overlays */}
                 {activeMainView === 'quickapps' && <QuickAppsPanel />}
+                {activeMainView === 'buzz' && <BuzzWorkspacePanel />}
                 {activeMainView === 'apiclient' && <ApiClientPanel />}
                 {activeMainView === 'settings' && <SettingsPanel theme={theme!} setTheme={setTheme!} />}
                 {/* Heavy UI surfaces own work only while selected and visible. */}

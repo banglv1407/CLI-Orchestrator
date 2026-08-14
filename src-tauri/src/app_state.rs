@@ -26,6 +26,7 @@ pub struct AppState {
     pub ssh_server_manager: Arc<std::sync::Mutex<crate::core::ssh_server::SshServerManager>>,
     pub builtin_llm: Arc<tokio::sync::Mutex<crate::builtin_llm::engine::BuiltinLlmEngine>>,
     pub companion: Arc<CompanionManager>,
+    pub buzz: Arc<crate::core::buzz_manager::BuzzManager>,
 }
 
 impl AppState {
@@ -64,6 +65,7 @@ impl AppState {
 
         let companion_db_path = registry.data_dirs().root_dir.join("companion.db");
         let companion = Arc::new(CompanionManager::new(&companion_db_path)?);
+        let buzz = Arc::new(crate::core::buzz_manager::BuzzManager::new());
 
         Ok(Self {
             registry: registry.clone(),
@@ -79,6 +81,7 @@ impl AppState {
             )),
             builtin_llm,
             companion,
+            buzz,
         })
     }
 }

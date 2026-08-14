@@ -1,3 +1,6 @@
+pub mod buzz_types;
+pub mod buzz_identity;
+pub mod buzz_manager;
 pub mod cli_registry;
 pub mod events;
 pub mod execution_engine;

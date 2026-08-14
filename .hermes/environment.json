@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "recipe": {
+    "name": "Vite",
+    "kind": "vite",
+    "bootstrap": [
+      "bun install"
+    ],
+    "build": [
+      "bun run build"
+    ],
+    "test": [],
+    "start": "bun run dev",
+    "port": 1407,
+    "readinessPath": "/",
+    "evidence": [
+      "Detected package.json",
+      "Package manager: bun",
+      "Scripts: dev, build, build:production, preview, tauri"
+    ]
+  },
+  "updatedAt": "2026-08-14T12:11:19.216839+00:00"
+}

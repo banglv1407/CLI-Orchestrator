@@ -1,0 +1,11 @@
+**
+!crates/
+!crates/nes-protocol/
+!crates/nes-protocol/Cargo.toml
+!crates/nes-protocol/src/
+!crates/nes-protocol/src/**
+!crates/nes-session/
+!crates/nes-session/Cargo.toml
+!crates/nes-session/Cargo.lock
+!crates/nes-session/src/
+!crates/nes-session/src/**

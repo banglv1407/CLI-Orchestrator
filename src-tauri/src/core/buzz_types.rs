@@ -60,6 +60,13 @@ pub struct BuzzDmResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuzzDmConversation {
+    pub dm_id: String,
+    pub participants: Vec<String>,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuzzAgentConfig {
     pub agent_id: String,
     pub name: String,

@@ -1,9 +1,10 @@
-use std::sync::Mutex;
 use crate::core::buzz_identity;
+use crate::core::buzz_live::BuzzLiveClient;
 use crate::core::buzz_types::{
-    BuzzAgentConfig, BuzzChannel, BuzzDmResult, BuzzMember, BuzzMessage, BuzzRelayConfig,
-    BuzzUserProfile,
+    BuzzAgentConfig, BuzzChannel, BuzzDmConversation, BuzzDmResult, BuzzMember, BuzzMessage,
+    BuzzRelayConfig, BuzzUserProfile,
 };
+use std::sync::Mutex;
 
 /// Windows CREATE_NO_WINDOW — spawn buzz.exe without popping a console window.
 #[cfg(target_os = "windows")]
@@ -12,6 +13,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 pub struct BuzzManager {
     config: Mutex<BuzzRelayConfig>,
     agents: Mutex<Vec<BuzzAgentConfig>>,
+    live: BuzzLiveClient,
 }
 
 impl BuzzManager {
@@ -19,7 +21,12 @@ impl BuzzManager {
         Self {
             config: Mutex::new(BuzzRelayConfig::default()),
             agents: Mutex::new(Vec::new()),
+            live: BuzzLiveClient::new(),
         }
+    }
+
+    pub fn live(&self) -> &BuzzLiveClient {
+        &self.live
     }
 
     pub fn get_config(&self) -> BuzzRelayConfig {
@@ -73,7 +80,10 @@ impl BuzzManager {
         }
     }
 
-    pub async fn fetch_channels(&self, relay_url: Option<String>) -> Result<Vec<BuzzChannel>, String> {
+    pub async fn fetch_channels(
+        &self,
+        relay_url: Option<String>,
+    ) -> Result<Vec<BuzzChannel>, String> {
         let target_url = relay_url.unwrap_or_else(|| self.get_config().relay_url);
         let stdout = self
             .run_buzz::<Vec<BuzzChannel>>(&target_url, &["channels", "list"])
@@ -82,13 +92,24 @@ impl BuzzManager {
             .map_err(|e| format!("JSON parse error: {}", e))
     }
 
-    pub async fn fetch_messages(&self, channel_id: &str, limit: usize) -> Result<Vec<BuzzMessage>, String> {
+    pub async fn fetch_messages(
+        &self,
+        channel_id: &str,
+        limit: usize,
+    ) -> Result<Vec<BuzzMessage>, String> {
         let target_url = self.get_config().relay_url;
         let limit_str = limit.to_string();
         let stdout = self
             .run_buzz::<Vec<BuzzMessage>>(
                 &target_url,
-                &["messages", "get", "--channel", channel_id, "--limit", &limit_str],
+                &[
+                    "messages",
+                    "get",
+                    "--channel",
+                    channel_id,
+                    "--limit",
+                    &limit_str,
+                ],
             )
             .await?;
         serde_json::from_slice::<Vec<BuzzMessage>>(&stdout)
@@ -155,7 +176,9 @@ impl BuzzManager {
         }
 
         let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        let stdout = self.run_buzz::<serde_json::Value>(&target_url, &args_ref).await?;
+        let stdout = self
+            .run_buzz::<serde_json::Value>(&target_url, &args_ref)
+            .await?;
         let res: serde_json::Value = serde_json::from_slice(&stdout).unwrap_or_default();
         Ok(res["event_id"].as_str().unwrap_or("").to_string())
     }
@@ -171,8 +194,8 @@ impl BuzzManager {
             .await?;
 
         // The raw shape from `channels members` is [{pubkey, role}].
-        let raw: Vec<serde_json::Value> = serde_json::from_slice(&stdout)
-            .map_err(|e| format!("JSON parse error: {}", e))?;
+        let raw: Vec<serde_json::Value> =
+            serde_json::from_slice(&stdout).map_err(|e| format!("JSON parse error: {}", e))?;
         let mut members: Vec<BuzzMember> = raw
             .iter()
             .map(|m| BuzzMember {
@@ -188,10 +211,7 @@ impl BuzzManager {
         if let Ok(profiles) = self.resolve_users(&pubkeys).await {
             for member in members.iter_mut() {
                 if let Some(p) = profiles.iter().find(|p| p.pubkey == member.pubkey) {
-                    member.display_name = p
-                        .display_name
-                        .clone()
-                        .or_else(|| p.name.clone());
+                    member.display_name = p.display_name.clone().or_else(|| p.name.clone());
                     member.picture = p.picture.clone();
                 }
             }
@@ -211,7 +231,9 @@ impl BuzzManager {
             }
         }
         let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        let stdout = self.run_buzz::<Vec<BuzzUserProfile>>(&target_url, &args_ref).await?;
+        let stdout = self
+            .run_buzz::<Vec<BuzzUserProfile>>(&target_url, &args_ref)
+            .await?;
         serde_json::from_slice::<Vec<BuzzUserProfile>>(&stdout)
             .map_err(|e| format!("JSON parse error: {}", e))
     }
@@ -227,13 +249,101 @@ impl BuzzManager {
             }
         }
         let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        let stdout = self.run_buzz::<serde_json::Value>(&target_url, &args_ref).await?;
+        let stdout = self
+            .run_buzz::<serde_json::Value>(&target_url, &args_ref)
+            .await?;
         let value: serde_json::Value = serde_json::from_slice(&stdout).unwrap_or_default();
         Ok(BuzzDmResult {
             dm_id: value["dm_id"].as_str().unwrap_or("").to_string(),
             accepted: value["accepted"].as_bool().unwrap_or(false),
             event_id: value["event_id"].as_str().map(|s| s.to_string()),
         })
+    }
+
+    /// List direct-message conversations for the current identity.
+    /// Each conversation carries its `dm_id` and participant pubkeys; the
+    /// frontend resolves participant display names/avatars via `resolve_users`.
+    pub async fn fetch_dms(&self) -> Result<Vec<BuzzDmConversation>, String> {
+        let target_url = self.get_config().relay_url;
+        let stdout = self
+            .run_buzz::<Vec<BuzzDmConversation>>(&target_url, &["dms", "list"])
+            .await?;
+        // The CLI emits `created_at` as an unsigned Unix timestamp; deserialize
+        // through Value to tolerate the u64→i64 shape difference.
+        let raw: Vec<serde_json::Value> =
+            serde_json::from_slice(&stdout).map_err(|e| format!("JSON parse error: {e}"))?;
+        Ok(raw
+            .iter()
+            .map(|v| BuzzDmConversation {
+                dm_id: v["dm_id"].as_str().unwrap_or("").to_string(),
+                participants: v["participants"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                created_at: v["created_at"].as_i64().unwrap_or(0),
+            })
+            .collect())
+    }
+
+    /// Set the current identity's display profile (`buzz users set-profile`).
+    pub async fn set_profile(
+        &self,
+        name: &str,
+        about: Option<&str>,
+        avatar: Option<&str>,
+    ) -> Result<(), String> {
+        let target_url = self.get_config().relay_url;
+        let mut args: Vec<String> = vec![
+            "users".into(),
+            "set-profile".into(),
+            "--name".into(),
+            name.into(),
+        ];
+        if let Some(a) = about {
+            if !a.is_empty() {
+                args.push("--about".into());
+                args.push(a.into());
+            }
+        }
+        if let Some(av) = avatar {
+            if !av.is_empty() {
+                args.push("--avatar".into());
+                args.push(av.into());
+            }
+        }
+        let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        self.run_buzz::<serde_json::Value>(&target_url, &args_ref)
+            .await?;
+        Ok(())
+    }
+
+    /// Fetch the current identity's own profile (`buzz users get` with no args).
+    /// Returns None when no profile has been set yet.
+    pub async fn get_my_profile(&self) -> Result<Option<BuzzUserProfile>, String> {
+        let target_url = self.get_config().relay_url;
+        let stdout = self
+            .run_buzz::<serde_json::Value>(&target_url, &["users", "get"])
+            .await?;
+        let value: serde_json::Value =
+            serde_json::from_slice(&stdout).unwrap_or(serde_json::Value::Null);
+        if let Some(arr) = value.as_array() {
+            if let Some(first) = arr.first() {
+                return serde_json::from_value::<BuzzUserProfile>(first.clone())
+                    .map(Some)
+                    .map_err(|e| format!("JSON parse error: {e}"));
+            }
+            return Ok(None);
+        }
+        if value.is_object() {
+            return serde_json::from_value::<BuzzUserProfile>(value)
+                .map(Some)
+                .map_err(|e| format!("JSON parse error: {e}"));
+        }
+        Ok(None)
     }
 
     pub fn list_agents(&self) -> Vec<BuzzAgentConfig> {

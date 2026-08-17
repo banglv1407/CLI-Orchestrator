@@ -1,12 +1,12 @@
-use tauri::State;
 use crate::{
     app_state::AppState,
     core::buzz_identity,
     core::buzz_types::{
-        BuzzAgentConfig, BuzzChannel, BuzzDmResult, BuzzMember, BuzzMessage, BuzzRelayConfig,
-        BuzzUserProfile,
+        BuzzAgentConfig, BuzzChannel, BuzzDmConversation, BuzzDmResult, BuzzMember, BuzzMessage,
+        BuzzRelayConfig, BuzzUserProfile,
     },
 };
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub fn buzz_get_config(state: State<'_, AppState>) -> Result<BuzzRelayConfig, String> {
@@ -33,7 +33,10 @@ pub async fn buzz_get_messages(
     limit: Option<usize>,
     state: State<'_, AppState>,
 ) -> Result<Vec<BuzzMessage>, String> {
-    state.buzz.fetch_messages(&channel_id, limit.unwrap_or(20)).await
+    state
+        .buzz
+        .fetch_messages(&channel_id, limit.unwrap_or(20))
+        .await
 }
 
 #[tauri::command]
@@ -94,15 +97,17 @@ pub async fn buzz_open_dm(
 }
 
 #[tauri::command]
+pub async fn buzz_list_dms(state: State<'_, AppState>) -> Result<Vec<BuzzDmConversation>, String> {
+    state.buzz.fetch_dms().await
+}
+
+#[tauri::command]
 pub fn buzz_list_agents(state: State<'_, AppState>) -> Result<Vec<BuzzAgentConfig>, String> {
     Ok(state.buzz.list_agents())
 }
 
 #[tauri::command]
-pub fn buzz_add_agent(
-    agent: BuzzAgentConfig,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub fn buzz_add_agent(agent: BuzzAgentConfig, state: State<'_, AppState>) -> Result<(), String> {
     state.buzz.add_agent(agent);
     Ok(())
 }
@@ -110,6 +115,13 @@ pub fn buzz_add_agent(
 #[tauri::command]
 pub fn buzz_has_identity(state: State<'_, AppState>) -> Result<bool, String> {
     Ok(state.buzz.identity_key().is_some())
+}
+
+/// Derive the Nostr public key for the Buzz identity (shared vault with NES).
+/// Never returns the private key.
+#[tauri::command]
+pub fn buzz_get_pubkey() -> Result<String, String> {
+    crate::core::nes_identity::derive_pubkey()
 }
 
 #[tauri::command]
@@ -126,9 +138,7 @@ pub fn buzz_generate_identity(state: State<'_, AppState>) -> Result<String, Stri
 }
 
 #[tauri::command]
-pub fn buzz_import_identity(
-    key: String,
-) -> Result<(), String> {
+pub fn buzz_import_identity(key: String) -> Result<(), String> {
     let trimmed = key.trim();
     if trimmed.len() != 64 || !trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err("Invalid private key: expected 64 hex characters".to_string());
@@ -139,4 +149,51 @@ pub fn buzz_import_identity(
 #[tauri::command]
 pub fn buzz_clear_identity() -> Result<(), String> {
     buzz_identity::vault_delete()
+}
+
+#[tauri::command]
+pub async fn buzz_set_profile(
+    name: String,
+    about: Option<String>,
+    avatar: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .buzz
+        .set_profile(&name, about.as_deref(), avatar.as_deref())
+        .await
+}
+
+#[tauri::command]
+pub async fn buzz_get_my_profile(
+    state: State<'_, AppState>,
+) -> Result<Option<BuzzUserProfile>, String> {
+    state.buzz.get_my_profile().await
+}
+
+#[tauri::command]
+pub async fn buzz_subscribe_live(
+    channel_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let relay = state.buzz.get_config().relay_url;
+    state.buzz.live().subscribe(app, relay, Some(channel_id));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn buzz_unsubscribe_live(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state.buzz.live().subscribe(app, String::new(), None);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn buzz_live_status(
+    state: State<'_, AppState>,
+) -> Result<Option<(String, String)>, String> {
+    Ok(state.buzz.live().current().await)
 }

@@ -19,6 +19,7 @@ import {
 import { ProxyPanel } from './ProxyPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
 import { SystemLogPanel } from './SystemLogPanel';
+import { BuzzNesSettings } from './BuzzNesSettings';
 import { PetPreviewStage } from './MythicalPet';
 
 function PetPickerThumbnail({ pet }: { pet: MythicalPet }) {
@@ -88,6 +89,7 @@ type SettingsSection =
   | 'mythical-pet'
   | 'ai-companion'
   | 'local-llm'
+  | 'buzz-nes'
   | 'navigation'
   | 'proxy'
   | 'remote'
@@ -98,6 +100,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: string; desc: string
   { id: 'mythical-pet', label: 'Mythical Pet', icon: '🐉', desc: 'Interact with your desktop companions' },
   { id: 'ai-companion', label: 'AI Companion', icon: '🤖', desc: 'Configure cloud LLM endpoints and settings' },
   { id: 'local-llm', label: 'Local LLM', icon: '🧠', desc: 'Manage offline inference fallbacks' },
+  { id: 'buzz-nes', label: 'Buzz & NES', icon: '🐝', desc: 'Buzz relay/identity and NES session service' },
   { id: 'proxy', label: 'CliProxyAI', icon: '🔀', desc: 'Durable API proxy usage and endpoints' },
   { id: 'remote', label: 'SSH Connections', icon: '🖥️', desc: 'Manage remote terminal connections' },
   { id: 'logs', label: 'System Logs', icon: '📋', desc: 'View orchestration command and server logs' },
@@ -967,6 +970,9 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
               <SidebarOrderEditor />
             </div>
           )}
+
+          {/* Buzz & NES Section */}
+          {activeSection === 'buzz-nes' && <BuzzNesSettings />}
 
           {/* CliProxyAI Section */}
           {activeSection === 'proxy' && (

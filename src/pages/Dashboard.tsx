@@ -70,7 +70,7 @@ export function Dashboard() {
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
-  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'buzz' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote' | 'dashboard'>('terminal');
+  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'buzz' | 'game' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote' | 'dashboard'>('terminal');
   const [showNotepad, setShowNotepad] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 

@@ -10,7 +10,7 @@ tauri-build = { version = "2.0", features = [] }
 
 [dependencies]
 tauri = { version = "2.0", features = ["tray-icon", "unstable"] }
-tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "process", "io-util", "sync"] }
+tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "process", "io-util", "sync", "time"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
@@ -31,6 +31,7 @@ bytes = "1.10"
 base64 = "0.22"
 tokio-util = { version = "0.7", features = ["rt"] }
 zeroize = "1.8"
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 reqwest = { version = "0.12", features = ["json", "blocking", "stream"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 ico = "0.3"
@@ -43,6 +44,10 @@ regex = "1.12"
 axum = { version = "0.8", features = ["json"] }
 tower-http = { version = "0.6", features = ["cors"] }
 tower = { version = "0.5", features = ["util"] }
+
+# NES multiplayer shared wire contracts (D:\CLI-Ochestor\crates\nes-protocol)
+nes-protocol = { path = "../crates/nes-protocol" }
+k256 = { version = "0.13", features = ["schnorr"] }
 
 # Built-in LLM dependencies (optional)
 candle-core = { version = "0.8.2", optional = true }

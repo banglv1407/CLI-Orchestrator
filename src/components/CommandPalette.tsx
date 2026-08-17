@@ -181,6 +181,14 @@ export function CommandPalette({
         action: () => onSwitchView('apiclient'),
       });
     }
+    if (activeMainView !== 'game') {
+      items.push({
+        id: 'action-view-game', type: 'action' as const,
+        label: 'View: NES Multiplayer',
+        description: 'Switch to NES multiplayer workspace',
+        action: () => onSwitchView('game'),
+      });
+    }
     if (activeMainView !== 'proxy') {
       items.push({
         id: 'action-view-proxy', type: 'action' as const,

@@ -4,11 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --configLoader native",
+    "postinstall": "node scripts/patch-jsnes-ppu.mjs",
+    "predev": "node scripts/patch-jsnes-ppu.mjs",
+    "dev": "vite --force --configLoader native",
+    "prebuild": "node scripts/patch-jsnes-ppu.mjs",
     "build": "tsc && vite build",
     "build:production": "node scripts/build-production.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:nes-patch": "node --test scripts/patch-jsnes-ppu.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.0",
@@ -16,6 +20,7 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
     "@xterm/xterm": "^6.0.0",
+    "jsnes": "2.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

@@ -1,11 +1,16 @@
-pub mod buzz_types;
 pub mod buzz_identity;
+pub mod buzz_live;
 pub mod buzz_manager;
+pub mod buzz_types;
 pub mod cli_registry;
 pub mod events;
 pub mod execution_engine;
 pub mod icon_extractor;
 pub mod monitoring;
+pub mod nes_client;
+pub mod nes_identity;
+pub mod nes_rom;
+pub mod nes_types;
 pub mod project_store;
 pub mod proxy_server;
 pub mod proxy_usage_db;

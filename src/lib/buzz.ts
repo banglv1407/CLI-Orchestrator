@@ -43,6 +43,12 @@ export interface BuzzDmResult {
   event_id?: string;
 }
 
+export interface BuzzDmConversation {
+  dm_id: string;
+  participants: string[];
+  created_at: number;
+}
+
 export interface BuzzAgentConfig {
   agent_id: string;
   name: string;
@@ -95,6 +101,10 @@ export async function buzzOpenDm(pubkeys: string[]): Promise<BuzzDmResult> {
   return invoke<BuzzDmResult>("buzz_open_dm", { pubkeys });
 }
 
+export async function buzzListDms(): Promise<BuzzDmConversation[]> {
+  return invoke<BuzzDmConversation[]>("buzz_list_dms");
+}
+
 export async function buzzListAgents(): Promise<BuzzAgentConfig[]> {
   return invoke<BuzzAgentConfig[]>("buzz_list_agents");
 }
@@ -107,6 +117,10 @@ export async function buzzHasIdentity(): Promise<boolean> {
   return invoke<boolean>("buzz_has_identity");
 }
 
+export async function buzzGetPubkey(): Promise<string> {
+  return invoke<string>("buzz_get_pubkey");
+}
+
 export async function buzzGenerateIdentity(): Promise<string> {
   return invoke<string>("buzz_generate_identity");
 }
@@ -117,4 +131,28 @@ export async function buzzImportIdentity(key: string): Promise<void> {
 
 export async function buzzClearIdentity(): Promise<void> {
   return invoke<void>("buzz_clear_identity");
+}
+
+export async function buzzSetProfile(
+  name: string,
+  about?: string,
+  avatar?: string,
+): Promise<void> {
+  return invoke<void>("buzz_set_profile", { name, about, avatar });
+}
+
+export async function buzzGetMyProfile(): Promise<BuzzUserProfile | null> {
+  return invoke<BuzzUserProfile | null>("buzz_get_my_profile");
+}
+
+export async function buzzSubscribeLive(channelId: string): Promise<void> {
+  return invoke<void>("buzz_subscribe_live", { channelId });
+}
+
+export async function buzzUnsubscribeLive(): Promise<void> {
+  return invoke<void>("buzz_unsubscribe_live");
+}
+
+export async function buzzLiveStatus(): Promise<[string, string] | null> {
+  return invoke<[string, string] | null>("buzz_live_status");
 }

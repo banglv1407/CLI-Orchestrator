@@ -105,6 +105,14 @@ function BuzzIcon() {
   );
 }
 
+function GameIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9h4m-2-2v4M15 9h.01M18 9h.01M15 13h.01M18 13h.01M7.5 3h9a4.5 4.5 0 0 1 4.5 4.5v9a4.5 4.5 0 0 1-4.5 4.5h-9A4.5 4.5 0 0 1 3 16.5v-9A4.5 4.5 0 0 1 7.5 3Z" />
+    </svg>
+  );
+}
+
 
 function FolderArrowIcon({ isExpanded }: { isExpanded: boolean }) {
   return (
@@ -207,7 +215,7 @@ interface CliSidebarProps {
   onLogsTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'cli-manager' | 'quickapps' | 'buzz' | 'settings' | 'ai-chat' | 'apiclient' | 'dashboard';
+type SidebarTab = 'cli-manager' | 'quickapps' | 'buzz' | 'game' | 'settings' | 'ai-chat' | 'apiclient' | 'dashboard';
 
 const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['settings']);
 
@@ -378,9 +386,18 @@ export function CliSidebar({
   // Pet state (for Settings picker)
   const [petId, setPetIdLocal] = useState(getActivePetId);
   const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
+  const [buzzUnreadCount, setBuzzUnreadCount] = useState<number>(0);
+
+  useEffect(() => {
+    const handleBuzzUnread = (e: Event) => {
+      setBuzzUnreadCount((e as CustomEvent<number>).detail || 0);
+    };
+    window.addEventListener('buzz-unread-count', handleBuzzUnread);
+    return () => window.removeEventListener('buzz-unread-count', handleBuzzUnread);
+  }, []);
 
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
-    const tabsWithNoLeftArea = new Set(['quickapps', 'buzz', 'settings', 'dashboard']);
+    const tabsWithNoLeftArea = new Set(['quickapps', 'buzz', 'game', 'settings', 'dashboard']);
     
     if (tabsWithNoLeftArea.has(tab)) {
       setIsSidebarCollapsed(true);
@@ -390,6 +407,10 @@ export function CliSidebar({
       if (tab === 'quickapps' && onQuickAppsTabChange) onQuickAppsTabChange(true);
       else if (tab === 'buzz') {
         window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'buzz' }));
+        window.dispatchEvent(new CustomEvent('buzz-mark-current-read'));
+      }
+      else if (tab === 'game') {
+        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'game' }));
       }
       else if (tab === 'settings') {
         if (onQuickAppsTabChange) onQuickAppsTabChange(false);
@@ -451,6 +472,10 @@ export function CliSidebar({
             const quickIdx = list.indexOf('quickapps');
             list.splice(quickIdx >= 0 ? quickIdx + 1 : list.length, 0, 'buzz');
           }
+          if (!list.includes('game')) {
+            const buzzIdx = list.indexOf('buzz');
+            list.splice(buzzIdx >= 0 ? buzzIdx + 1 : list.length, 0, 'game');
+          }
           return [
             ...list.filter((t) => !PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
             ...list.filter((t) => PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
@@ -460,7 +485,7 @@ export function CliSidebar({
         // ignore
       }
     }
-    return ['dashboard', 'cli-manager', 'quickapps', 'buzz', 'apiclient', 'settings'];
+    return ['dashboard', 'cli-manager', 'quickapps', 'buzz', 'game', 'apiclient', 'settings'];
   });
 
   const handleTabDragStart = (e: React.DragEvent, tab: SidebarTab) => {
@@ -531,6 +556,32 @@ export function CliSidebar({
             title="Buzz Workspace"
           >
             <BuzzIcon />
+            {buzzUnreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-md ring-2 ring-slate-900 animate-pulse">
+                {buzzUnreadCount > 99 ? '99+' : buzzUnreadCount}
+              </span>
+            )}
+          </div>
+        );
+      case 'game':
+        return (
+          <div
+            key="game"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'game')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'game')}
+            onClick={() => handleSetActiveTab('game')}
+            className={`group relative flex h-10 w-10 items-center justify-center rounded-xl text-xs font-semibold cursor-pointer transition-all duration-200 ${
+              activeTab === 'game'
+                ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/25 ring-1 ring-fuchsia-400/30'
+                : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
+            }`}
+            title="NES Multiplayer"
+          >
+            <GameIcon />
           </div>
         );
       case 'quickapps':

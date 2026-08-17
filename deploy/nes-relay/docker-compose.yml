@@ -1,0 +1,34 @@
+name: clx-nes-session
+
+services:
+  nes-session:
+    image: clx/nes-session:${NES_SESSION_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: deploy/nes-relay/Dockerfile
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    environment:
+      NES_SESSION_BIND: 0.0.0.0:8080
+      NES_SIGNAL_URL: wss://${NES_PUBLIC_HOST}/v1/signal
+      RUST_LOG: ${NES_RUST_LOG:-nes_session=info,tower_http=info}
+    ports:
+      - 127.0.0.1:${NES_SESSION_PORT:-18080}:8080
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

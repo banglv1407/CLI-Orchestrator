@@ -62,6 +62,20 @@ async fn send_authed(
     req.send().await.map_err(|e| format!("Request failed: {e}"))
 }
 
+async fn send_public(
+    config: &NesRelayConfigV1,
+    method: reqwest::Method,
+    path: &str,
+) -> Result<reqwest::Response, String> {
+    let base = service_base(config)?;
+    let url = format!("{base}{path}");
+    client()?
+        .request(method, url)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))
+}
+
 pub async fn create_room(
     config: &NesRelayConfigV1,
     guest_pubkey: &str,
@@ -97,7 +111,7 @@ pub async fn create_public_room(
 }
 
 pub async fn list_rooms(config: &NesRelayConfigV1) -> Result<Vec<NesRoomDirectoryEntryV1>, String> {
-    let resp = send_authed(config, reqwest::Method::GET, "/v1/rooms", None).await?;
+    let resp = send_public(config, reqwest::Method::GET, "/v1/rooms").await?;
     if !resp.status().is_success() {
         return Err(format!("Server returned HTTP {}", resp.status()));
     }
@@ -108,11 +122,10 @@ pub async fn join_room(
     config: &NesRelayConfigV1,
     room_id: &str,
 ) -> Result<NesConnectionBundleV1, String> {
-    let resp = send_authed(
+    let resp = send_public(
         config,
         reqwest::Method::POST,
         &format!("/v1/rooms/{room_id}/join"),
-        None,
     )
     .await?;
     if !resp.status().is_success() {

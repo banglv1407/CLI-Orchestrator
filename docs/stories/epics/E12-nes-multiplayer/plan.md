@@ -2,8 +2,10 @@
 
 ## Goal
 
-Two authenticated CLX Windows clients play the same NES title while each runs
-its own local JSNES emulator and local ROM. A small Linux service owns room
+Two CLX Windows clients play the same NES title while each runs its own local
+JSNES emulator and local ROM. The host authenticates room creation; Player 2
+can discover and atomically claim a public room without sharing an identity. A
+small Linux service owns room
 discovery, authentication, and WSS input relay. It never stores or transports
 game content or rendered media.
 
@@ -29,7 +31,9 @@ game content or rendered media.
 
 ## Protocol
 
-- HTTP room operations remain NIP-98 authenticated.
+- Host/create and owner lifecycle operations remain NIP-98 authenticated.
+  Public room discovery and the one-time Player 2 claim are intentionally
+  unauthenticated; the returned role ticket still gates WSS signaling.
 - WebSocket tickets are role-specific, short-lived, and single-use.
 - Allowed messages: `rom_ready`, `input`, `state_hash`, `pause`, `resume`,
   `reset`, `peer_left`, `end`, `error`.

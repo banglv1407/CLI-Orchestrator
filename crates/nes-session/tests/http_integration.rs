@@ -45,8 +45,6 @@ async fn connection_bundle_uses_configured_wss_and_no_turn_servers() {
 
 // A fixed test identity (do not use in production).
 const TEST_KEY: &str = "0000000000000000000000000000000000000000000000000000000000000001";
-const GUEST_KEY: &str = "0000000000000000000000000000000000000000000000000000000000000002";
-const OTHER_KEY: &str = "0000000000000000000000000000000000000000000000000000000000000003";
 
 fn auth_for(private_key: &str, url: &str, method: &str, body: &[u8]) -> String {
     let event = sign_nip98(
@@ -172,12 +170,7 @@ async fn public_room_is_listed_and_only_one_guest_can_claim_it() {
         .to_string();
     assert!(created_json.get("invite").is_none());
 
-    let listed = client
-        .get(&rooms_url)
-        .header("authorization", auth_for(GUEST_KEY, &rooms_url, "GET", b""))
-        .send()
-        .await
-        .unwrap();
+    let listed = client.get(&rooms_url).send().await.unwrap();
     assert_eq!(listed.status(), 200);
     let directory: serde_json::Value = listed.json().await.unwrap();
     assert_eq!(directory[0]["room_id"], room_id);
@@ -186,23 +179,13 @@ async fn public_room_is_listed_and_only_one_guest_can_claim_it() {
     assert!(directory[0].get("ticket").is_none());
 
     let join_url = format!("{base}/v1/rooms/{room_id}/join");
-    let joined = client
-        .post(&join_url)
-        .header("authorization", auth_for(GUEST_KEY, &join_url, "POST", b""))
-        .send()
-        .await
-        .unwrap();
+    let joined = client.post(&join_url).send().await.unwrap();
     assert_eq!(joined.status(), 200);
     let joined_json: serde_json::Value = joined.json().await.unwrap();
     assert_eq!(joined_json["role"], "guest");
     assert!(joined_json["room"]["guest_pubkey"].is_string());
 
-    let rejected = client
-        .post(&join_url)
-        .header("authorization", auth_for(OTHER_KEY, &join_url, "POST", b""))
-        .send()
-        .await
-        .unwrap();
+    let rejected = client.post(&join_url).send().await.unwrap();
     assert_eq!(rejected.status(), 409);
 }
 
@@ -227,12 +210,7 @@ async fn signaling_fans_out_between_authenticated_room_roles() {
     let host_ticket = host_bundle["bundle"]["ticket"].as_str().unwrap();
 
     let join_url = format!("{base}/v1/rooms/{room_id}/join");
-    let joined = client
-        .post(&join_url)
-        .header("authorization", auth_for(GUEST_KEY, &join_url, "POST", b""))
-        .send()
-        .await
-        .unwrap();
+    let joined = client.post(&join_url).send().await.unwrap();
     let guest_bundle: serde_json::Value = joined.json().await.unwrap();
     let guest_ticket = guest_bundle["ticket"].as_str().unwrap();
 

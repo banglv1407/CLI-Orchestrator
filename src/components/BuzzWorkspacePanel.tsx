@@ -93,6 +93,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
   const [agents, setAgents] = useState<BuzzAgentConfig[]>([]);
   const [dms, setDms] = useState<BuzzDmConversation[]>([]);
   const [dmProfiles, setDmProfiles] = useState<Record<string, BuzzUserProfile>>({});
+  const [messageProfiles, setMessageProfiles] = useState<Record<string, BuzzUserProfile>>({});
   const [myPubkey, setMyPubkey] = useState<string>("");
   const [unreadByConversation, setUnreadByConversation] = useState<Record<string, number>>({});
   const selectedChannelRef = useRef<BuzzChannel | null>(null);
@@ -105,6 +106,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
   const threadMessagesRef = useRef<HTMLDivElement>(null);
   const mainWasAtBottomRef = useRef(true);
   const threadWasAtBottomRef = useRef(true);
+  const pendingInitialScrollRef = useRef<string | null>(null);
 
   // Separate composer buffers for the main channel vs the thread panel.
   const [mainInput, setMainInput] = useState("");
@@ -445,6 +447,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
     setMessages([]);
     setMembers([]);
     mainWasAtBottomRef.current = true;
+    pendingInitialScrollRef.current = ch.channel_id;
     if (isVisibleRef.current) markConversationRead(ch.channel_id);
     fetchMessages(ch.channel_id);
     fetchMembers(ch.channel_id);
@@ -457,10 +460,39 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
       rememberMessages(channelId, msgs);
       initializedConversationsRef.current.add(channelId);
       setMessages(msgs);
+      void resolveMessageAuthors(msgs);
     } catch (e: any) {
       setError(String(e));
     } finally {
       setLoadingMessages(false);
+    }
+  }
+
+  async function resolveMessageAuthors(incoming: BuzzMessage[]) {
+    const pubkeys = [...new Set(incoming.map((message) => message.pubkey).filter(Boolean))];
+    if (pubkeys.length === 0) return;
+
+    try {
+      const profiles = await buzzResolveUsers(pubkeys);
+      if (profiles.length === 0) return;
+      const byPubkey: Record<string, BuzzUserProfile> = {};
+      for (const profile of profiles) byPubkey[profile.pubkey] = profile;
+
+      setMessageProfiles((current) => ({ ...current, ...byPubkey }));
+      setDmProfiles((current) => ({ ...current, ...byPubkey }));
+      setMembers((current) =>
+        current.map((member) => {
+          const profile = byPubkey[member.pubkey];
+          if (!profile) return member;
+          return {
+            ...member,
+            display_name: profile.display_name || profile.name || member.display_name,
+            picture: profile.picture || member.picture,
+          };
+        }),
+      );
+    } catch (e) {
+      console.warn("Failed to resolve Buzz message authors:", e);
     }
   }
 
@@ -493,6 +525,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
       const unseen = rememberMessages(channelId, msgs);
       initializedConversationsRef.current.add(channelId);
       setMessages((prev) => mergeMessages(prev, msgs));
+      void resolveMessageAuthors(msgs);
       if (wasInitialized) countUnreadMessages(channelId, unseen);
     } catch {
       // Silent — background poll failures must not spam the error banner.
@@ -508,6 +541,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
       const root = replies.find((r) => r.id === msg.id) ?? msg;
       const rest = replies.filter((r) => r.id !== msg.id);
       setActiveThread({ root, replies: rest });
+      void resolveMessageAuthors(replies);
     } catch (e: any) {
       setError(`Failed to load thread: ${e}`);
     } finally {
@@ -522,8 +556,19 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       const viewport = mainMessagesRef.current;
-      if (viewport && mainWasAtBottomRef.current) {
+      const channelId = selectedChannel?.channel_id;
+      const forceInitialScroll = Boolean(
+        channelId &&
+          pendingInitialScrollRef.current === channelId &&
+          !loadingMessages &&
+          initializedConversationsRef.current.has(channelId),
+      );
+      if (viewport && (forceInitialScroll || mainWasAtBottomRef.current)) {
         viewport.scrollTop = viewport.scrollHeight;
+        mainWasAtBottomRef.current = true;
+      }
+      if (forceInitialScroll) {
+        pendingInitialScrollRef.current = null;
       }
     });
     return () => window.cancelAnimationFrame(frame);
@@ -975,11 +1020,16 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
         <div className="flex-1 flex flex-col bg-slate-900">
           {selectedChannel ? (
             <>
-              <div className="px-4 py-2 border-b border-slate-800 text-sm font-semibold flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  {selectedChannel.description === "Direct message" ? "@" : "#"} {selectedChannel.name}
-                  <LiveIndicator state={liveState} error={liveError} />
-                </span>
+              <div className="px-4 py-2 border-b border-slate-800 text-sm font-semibold flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="flex items-center gap-2">
+                    {selectedChannel.description === "Direct message" ? "@" : "#"} {selectedChannel.name}
+                    <LiveIndicator state={liveState} error={liveError} />
+                  </span>
+                  <div className="truncate font-mono text-[9px] font-normal text-slate-500" title={selectedChannel.channel_id}>
+                    Channel ID: {selectedChannel.channel_id}
+                  </div>
+                </div>
                 <button onClick={() => fetchMessages(selectedChannel.channel_id)} className="text-xs text-slate-400 hover:text-slate-200">
                   Refresh
                 </button>
@@ -1002,6 +1052,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                       key={msg.id}
                       msg={msg}
                       members={members}
+                      profiles={messageProfiles}
                       replyCount={(repliesByRoot[msg.id] ?? []).length}
                       replyAuthors={(repliesByRoot[msg.id] ?? []).map((r) => r.pubkey)}
                       onOpenThread={() => openThread(msg)}
@@ -1053,6 +1104,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                   <MessageCard
                     msg={activeThread.root}
                     members={members}
+                    profiles={messageProfiles}
                     onOpenThread={() => {}}
                     onOpenDm={(pubkey) => void openDmWithUser(pubkey)}
                     myPubkey={myPubkey}
@@ -1063,6 +1115,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                       key={r.id}
                       msg={r}
                       members={members}
+                      profiles={messageProfiles}
                       onOpenThread={() => {}}
                       onOpenDm={(pubkey) => void openDmWithUser(pubkey)}
                       myPubkey={myPubkey}
@@ -1299,6 +1352,7 @@ function Avatar({
 function MessageCard({
   msg,
   members,
+  profiles,
   replyCount,
   replyAuthors,
   onOpenThread,
@@ -1308,6 +1362,7 @@ function MessageCard({
 }: {
   msg: BuzzMessage;
   members: BuzzMember[];
+  profiles: Record<string, BuzzUserProfile>;
   replyCount?: number;
   replyAuthors?: string[];
   onOpenThread: () => void;
@@ -1316,7 +1371,9 @@ function MessageCard({
   isRoot?: boolean;
 }) {
   const member = members.find((m) => m.pubkey === msg.pubkey);
-  const displayName = member?.display_name || msg.pubkey.slice(0, 12);
+  const profile = profiles[msg.pubkey];
+  const displayName =
+    profile?.display_name || profile?.name || member?.display_name || msg.pubkey.slice(0, 12);
   const hasReplyTag = msg.tags.some((t) => t[0] === "e" && t[3] === "reply");
   const authors = replyAuthors ?? [];
   const uniqueAuthors = [...new Set(authors)].slice(0, 4);
@@ -1324,21 +1381,26 @@ function MessageCard({
 
   return (
     <div className={`flex gap-2 bg-slate-950/40 p-2.5 rounded border ${isRoot ? "border-amber-500/40" : "border-slate-800/60"}`}>
-      <Avatar name={displayName} picture={member?.picture} size="md" />
+      <Avatar name={displayName} picture={profile?.picture || member?.picture} size="md" />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-          {canOpenDm ? (
-            <button
-              type="button"
-              onClick={() => onOpenDm(msg.pubkey)}
-              title={`Open direct message with ${displayName}`}
-              className="font-mono text-amber-400 hover:text-amber-200 hover:underline"
-            >
-              {displayName}
-            </button>
-          ) : (
-            <span className="font-mono text-amber-400">{displayName}</span>
-          )}
+        <div className="flex items-start justify-between gap-2 text-[11px] text-slate-400 mb-1">
+          <div className="min-w-0">
+            {canOpenDm ? (
+              <button
+                type="button"
+                onClick={() => onOpenDm(msg.pubkey)}
+                title={`Open direct message with ${displayName}`}
+                className="block font-mono text-amber-400 hover:text-amber-200 hover:underline"
+              >
+                {displayName}
+              </button>
+            ) : (
+              <span className="block font-mono text-amber-400">{displayName}</span>
+            )}
+            <span className="block max-w-64 truncate font-mono text-[9px] text-slate-600" title={msg.pubkey}>
+              User ID: {msg.pubkey}
+            </span>
+          </div>
           <span>{new Date(msg.created_at * 1000).toLocaleTimeString()}</span>
         </div>
         <div className="text-xs text-slate-200 whitespace-pre-wrap break-words">{msg.content}</div>

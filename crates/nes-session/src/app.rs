@@ -37,14 +37,13 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
         .route("/metrics", get(metrics))
-        .route(
-            "/v1/rooms",
-            get(list_rooms).post(create_room).layer(authed.clone()),
-        )
-        .route(
-            "/v1/rooms/{room_id}/join",
-            post(join_room).layer(authed.clone()),
-        )
+        // Public room discovery and atomic P2 claim intentionally do not use
+        // NIP-98. Two CLX windows may share one Buzz identity, which makes
+        // same-second signatures identical and trips replay protection. The
+        // returned one-role ticket still gates the signaling WebSocket.
+        .route("/v1/rooms", get(list_rooms))
+        .route("/v1/rooms", post(create_room).layer(authed.clone()))
+        .route("/v1/rooms/{room_id}/join", post(join_room))
         .route(
             "/v1/invites/{token}/accept",
             post(accept_invite).layer(authed.clone()),
@@ -242,27 +241,17 @@ async fn accept_invite(
     Json(bundle).into_response()
 }
 
-async fn join_room(
-    State(state): State<AppState>,
-    Path(room_id): Path<String>,
-    Extension(guest): Extension<String>,
-) -> Response {
+async fn join_room(State(state): State<AppState>, Path(room_id): Path<String>) -> Response {
+    // The public claim is represented by a server-generated participant id.
+    // Authorization after this point is the short-lived, role-bound ticket.
+    let guest = format!("guest:{}", uuid::Uuid::new_v4());
     let signal_url = state.signal_url().to_owned();
     let mut rooms = state.rooms();
     let Some(room) = rooms.get_mut(&room_id) else {
         return (StatusCode::NOT_FOUND, "room not found").into_response();
     };
-    if room.host_pubkey == guest {
-        return (StatusCode::BAD_REQUEST, "host cannot join as player 2").into_response();
-    }
     if room.is_expired() || room.state != RoomState::Waiting || room.guest_pubkey.is_some() {
         return (StatusCode::CONFLICT, "room is no longer joinable").into_response();
-    }
-    {
-        let active = state.active_by_pubkey();
-        if active.contains_key(&guest) {
-            return (StatusCode::CONFLICT, "player already has an active room").into_response();
-        }
     }
 
     room.guest_pubkey = Some(guest.clone());
@@ -278,8 +267,6 @@ async fn join_room(
         ticket: guest_ticket,
         ticket_expires_at,
     };
-    drop(rooms);
-    state.active_by_pubkey().insert(guest, room_id);
     Json(bundle).into_response()
 }
 

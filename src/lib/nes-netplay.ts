@@ -87,9 +87,8 @@ export class NesNetplaySession {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.options.bundle.signal_url);
       this.ws = ws;
-      const timeout = window.setTimeout(() => reject(new Error("Room WebSocket timed out")), 10_000);
+      // Allow host and guest to wait indefinitely for connections
       ws.onopen = () => {
-        window.clearTimeout(timeout);
         ws.send(JSON.stringify({
           ticket: this.options.bundle.ticket,
           room_id: this.options.bundle.room.room_id,
@@ -99,7 +98,6 @@ export class NesNetplaySession {
         resolve();
       };
       ws.onerror = () => {
-        window.clearTimeout(timeout);
         reject(new Error("Room WebSocket connection failed"));
       };
       ws.onmessage = (event) => this.handleMessage(String(event.data));

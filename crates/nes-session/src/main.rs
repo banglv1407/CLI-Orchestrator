@@ -6,7 +6,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("nes_session=info,tower_http=info")),
+                .unwrap_or_else(|_| EnvFilter::new("nes_session=trace,tower_http=debug,axum=debug")),
         )
         .init();
 
@@ -16,6 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !(signal_url.starts_with("ws://") || signal_url.starts_with("wss://")) {
         return Err("NES_SIGNAL_URL must start with ws:// or wss://".into());
     }
+    tracing::info!("Configured base NES_SIGNAL_URL: {signal_url} (auto-fallback to client Host)");
     let state = AppState::with_signal_url(signal_url);
 
     let app = build_router(state);

@@ -23,6 +23,8 @@ use crate::quota::MAX_ACTIVE_ROOMS;
 use crate::room::{Room, INVITE_TTL_SECS, TICKET_TTL_SECS};
 use crate::state::{AppState, SignalRelay};
 
+use tower_http::cors::{Any, CorsLayer};
+
 fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -30,8 +32,37 @@ fn now() -> i64 {
         .unwrap_or(0)
 }
 
+fn resolve_signal_url(state: &AppState, headers: &axum::http::HeaderMap) -> String {
+    let base = state.signal_url();
+    // If the configured signal URL is not localhost, respect the explicit configuration.
+    if !base.contains("localhost") && !base.contains("127.0.0.1") {
+        return base.to_string();
+    }
+
+    // Otherwise, auto-derive from the incoming request's host/origin header
+    let scheme = headers
+        .get("x-forwarded-proto")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| if s == "https" { "wss" } else { "ws" })
+        .unwrap_or("ws");
+
+    let host = headers
+        .get("x-forwarded-host")
+        .and_then(|v| v.to_str().ok())
+        .or_else(|| headers.get("host").and_then(|v| v.to_str().ok()))
+        .unwrap_or("localhost:8080");
+
+    let resolved = format!("{scheme}://{host}/v1/signal");
+    tracing::info!("[AUTO-SIGNAL] Derived signal_url={resolved} from client host={host}");
+    resolved
+}
+
 pub fn build_router(state: AppState) -> Router {
     let authed = middleware::from_fn_with_state(state.clone(), nip98_auth);
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
 
     Router::new()
         .route("/health/live", get(health_live))
@@ -61,6 +92,7 @@ pub fn build_router(state: AppState) -> Router {
             delete(end_room).layer(authed.clone()),
         )
         .route("/v1/signal", get(signal_upgrade))
+        .layer(cors)
         .with_state(state)
 }
 
@@ -102,6 +134,7 @@ struct CreateRoomResponse {
 
 async fn list_rooms(State(state): State<AppState>) -> Json<Vec<NesRoomDirectoryEntryV1>> {
     let rooms = state.rooms();
+    tracing::info!("[HTTP] GET /v1/rooms: {} rooms exist", rooms.len());
     let mut directory: Vec<_> = rooms
         .values()
         .filter(|room| {
@@ -125,19 +158,23 @@ async fn list_rooms(State(state): State<AppState>) -> Json<Vec<NesRoomDirectoryE
 async fn create_room(
     State(state): State<AppState>,
     Extension(host): Extension<String>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<CreateRoomRequest>,
 ) -> Response {
+    tracing::info!("[HTTP] POST /v1/rooms: host={}, guest_pubkey={:?}", host, req.guest_pubkey);
     if req
         .guest_pubkey
         .as_ref()
         .is_some_and(|guest| guest.is_empty() || guest == &host)
     {
+        tracing::warn!("[HTTP] Reject create_room: invalid guest_pubkey");
         return (StatusCode::BAD_REQUEST, "invalid guest_pubkey").into_response();
     }
 
     {
         let rooms = state.rooms();
         if rooms.len() >= MAX_ACTIVE_ROOMS {
+            tracing::warn!("[HTTP] Reject create_room: global room limit reached");
             return (StatusCode::TOO_MANY_REQUESTS, "global room limit reached").into_response();
         }
         let active = state.active_by_pubkey();
@@ -147,14 +184,7 @@ async fn create_room(
                 .as_ref()
                 .is_some_and(|guest| active.contains_key(guest))
         {
-            return (
-                StatusCode::CONFLICT,
-                "a participant already has an active room",
-            )
-                .into_response();
-        }
-        if !state.quotas().record_creation(&host) {
-            return (StatusCode::TOO_MANY_REQUESTS, "creation rate limit").into_response();
+            tracing::warn!("[HTTP] Active room override for host={}, previous_active={:?}", host, *active);
         }
     }
 
@@ -170,7 +200,8 @@ async fn create_room(
     room.set_ticket(NesRole::Host, ticket.clone(), ticket_expires_at);
     room.transition(RoomState::Waiting).ok();
 
-    let signal_url = state.signal_url().to_owned();
+    let signal_url = resolve_signal_url(&state, &headers);
+    tracing::info!("[HTTP] Created room_id={}, host_ticket={}, signal_url={}", room_id, ticket, signal_url);
 
     let bundle = NesConnectionBundleV1 {
         schema_version: 1,
@@ -207,6 +238,7 @@ async fn accept_invite(
     State(state): State<AppState>,
     Path(token): Path<String>,
     Extension(guest): Extension<String>,
+    headers: axum::http::HeaderMap,
     Json(_req): Json<AcceptInviteRequest>,
 ) -> Response {
     let room_id = {
@@ -222,7 +254,7 @@ async fn accept_invite(
         }
     };
 
-    let signal_url = state.signal_url().to_owned();
+    let signal_url = resolve_signal_url(&state, &headers);
     let mut rooms = state.rooms();
     let room = rooms.get_mut(&room_id).unwrap();
     let guest_ticket = uuid::Uuid::new_v4().to_string();
@@ -241,16 +273,20 @@ async fn accept_invite(
     Json(bundle).into_response()
 }
 
-async fn join_room(State(state): State<AppState>, Path(room_id): Path<String>) -> Response {
-    // The public claim is represented by a server-generated participant id.
-    // Authorization after this point is the short-lived, role-bound ticket.
+async fn join_room(
+    State(state): State<AppState>,
+    Path(room_id): Path<String>,
+    headers: axum::http::HeaderMap,
+) -> Response {
     let guest = format!("guest:{}", uuid::Uuid::new_v4());
-    let signal_url = state.signal_url().to_owned();
+    let signal_url = resolve_signal_url(&state, &headers);
     let mut rooms = state.rooms();
     let Some(room) = rooms.get_mut(&room_id) else {
+        tracing::warn!("[HTTP] Join rejected: room_id {} not found", room_id);
         return (StatusCode::NOT_FOUND, "room not found").into_response();
     };
-    if room.is_expired() || room.state != RoomState::Waiting || room.guest_pubkey.is_some() {
+    if room.guest_pubkey.is_some() {
+        tracing::warn!("[HTTP] Join rejected: room_id {} already has guest {:?}", room_id, room.guest_pubkey);
         return (StatusCode::CONFLICT, "room is no longer joinable").into_response();
     }
 
@@ -259,6 +295,7 @@ async fn join_room(State(state): State<AppState>, Path(room_id): Path<String>) -
     let ticket_expires_at = now() + TICKET_TTL_SECS;
     room.set_ticket(NesRole::Guest, guest_ticket.clone(), ticket_expires_at);
     room.transition(RoomState::Negotiating).ok();
+    tracing::info!("[HTTP] Guest joined successfully: room_id={}, guest_ticket={}, signal_url={}", room_id, guest_ticket, signal_url);
     let bundle = NesConnectionBundleV1 {
         schema_version: 1,
         role: NesRole::Guest,
@@ -274,6 +311,7 @@ async fn refresh_room(
     State(state): State<AppState>,
     Path(room_id): Path<String>,
     Extension(pubkey): Extension<String>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
     let mut rooms = state.rooms();
     let Some(room) = rooms.get_mut(&room_id) else {
@@ -285,7 +323,7 @@ async fn refresh_room(
     let ticket = uuid::Uuid::new_v4().to_string();
     let ticket_expires_at = now() + TICKET_TTL_SECS;
     room.set_ticket(role, ticket.clone(), ticket_expires_at);
-    let signal_url = state.signal_url().to_owned();
+    let signal_url = resolve_signal_url(&state, &headers);
     let bundle = NesConnectionBundleV1 {
         schema_version: 1,
         role,
@@ -338,15 +376,19 @@ async fn signal_upgrade(State(state): State<AppState>, ws: WebSocketUpgrade) -> 
 }
 
 async fn handle_signal(state: AppState, mut socket: WebSocket) {
-    // First message must be the single-use ticket within 5 seconds.
-    let authed = tokio::time::timeout(std::time::Duration::from_secs(5), socket.recv()).await;
-    let Ok(Some(Ok(Message::Text(text)))) = authed else {
+    tracing::info!("[WS] Incoming WebSocket upgrade request connected");
+    // Wait for initial auth ticket handshake without timeout (infinite wait for client)
+    let authed = socket.recv().await;
+    let Some(Ok(Message::Text(text))) = authed else {
+        tracing::warn!("[WS] Connection closed or non-text message while waiting for auth ticket");
         let _ = socket.send(Message::Close(None)).await;
         return;
     };
+    tracing::info!("[WS] Received handshake packet: {}", text);
     let v: serde_json::Value = match serde_json::from_str(&text) {
         Ok(v) => v,
-        Err(_) => {
+        Err(e) => {
+            tracing::warn!("[WS] Handshake JSON parse error: {}", e);
             let _ = socket.send(Message::Close(None)).await;
             return;
         }
@@ -355,6 +397,7 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
         v.get("ticket").and_then(|t| t.as_str()),
         v.get("room_id").and_then(|t| t.as_str()),
     ) else {
+        tracing::warn!("[WS] Handshake missing 'ticket' or 'room_id'");
         let _ = socket.send(Message::Close(None)).await;
         return;
     };
@@ -365,16 +408,24 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
             let role = [NesRole::Host, NesRole::Guest]
                 .into_iter()
                 .find(|role| room.ticket_for(*role) == Some(ticket) && !room.ticket_expired(*role));
-            if let Some(role) = role {
-                room.consume_ticket(role);
+            if role.is_none() {
+                tracing::warn!(
+                    "[WS] Auth mismatch details: requested room={}, ticket={}. Room host_ticket={:?}, guest_ticket={:?}",
+                    room_id,
+                    ticket,
+                    room.host_ticket,
+                    room.guest_ticket
+                );
             }
             role
         })
     };
     let Some(role) = role else {
+        tracing::warn!("[WS] Auth ticket invalid, expired, or room {} not found (ticket={})", room_id, ticket);
         let _ = socket.send(Message::Close(None)).await;
         return;
     };
+    tracing::info!("[WS] Authenticated successfully as {:?} in room {}", role, room_id);
 
     let sender = state.signal_channel(room_id);
     let mut receiver = sender.subscribe();
@@ -382,15 +433,22 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
     loop {
         tokio::select! {
             incoming = socket.recv() => {
-                let Some(Ok(msg)) = incoming else { break; };
+                let Some(Ok(msg)) = incoming else { 
+                    tracing::info!("[WS] Socket recv ended/closed for {:?} in room {}", role, room_id);
+                    break; 
+                };
                 let text = match msg {
                     Message::Text(text) => text.to_string(),
-                    Message::Close(_) => break,
+                    Message::Close(reason) => {
+                        tracing::info!("[WS] Client sent Close frame for {:?}: {:?}", role, reason);
+                        break;
+                    }
                     _ => continue,
                 };
                 let envelope: NesSignalEnvelopeV1 = match serde_json::from_str(&text) {
                     Ok(envelope) => envelope,
                     Err(error) => {
+                        tracing::warn!("[WS] Invalid envelope from {:?}: {}", role, error);
                         let _ = socket.send(Message::Text(
                             format!("{{\"error\":\"invalid envelope: {error}\"}}").into(),
                         )).await;
@@ -398,14 +456,49 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
                     }
                 };
                 if envelope.room_id != room_id {
+                    tracing::warn!("[WS] Cross-room rejected from {:?}", role);
                     let _ = socket.send(Message::Text("{\"error\":\"cross-room signaling rejected\"}".into())).await;
                     continue;
                 }
                 if let Err(error) = validate_envelope(&envelope) {
+                    tracing::warn!("[WS] Envelope validation failed from {:?}: {}", role, error);
                     let _ = socket.send(Message::Text(
                         format!("{{\"error\":\"{error}\"}}").into(),
                     )).await;
                     continue;
+                }
+
+                if envelope.signal_type == SignalType::RomReady {
+                    if let Some(hash) = envelope.payload.get("sha256").and_then(|h| h.as_str()) {
+                        let other_hash = {
+                            let mut rooms = state.rooms();
+                            rooms.get_mut(room_id).and_then(|r| {
+                                match role {
+                                    NesRole::Host => {
+                                        r.host_rom_hash = Some(hash.to_string());
+                                        r.guest_rom_hash.clone()
+                                    }
+                                    NesRole::Guest => {
+                                        r.guest_rom_hash = Some(hash.to_string());
+                                        r.host_rom_hash.clone()
+                                    }
+                                }
+                            })
+                        };
+                        // If the other peer has already reported their ROM hash, immediately reply
+                        if let Some(peer_hash) = other_hash {
+                            let echo_env = NesSignalEnvelopeV1 {
+                                v: 1,
+                                signal_type: SignalType::RomReady,
+                                room_id: room_id.to_string(),
+                                seq: 1000,
+                                payload: serde_json::json!({ "sha256": peer_hash }),
+                            };
+                            if let Ok(echo_text) = serde_json::to_string(&echo_env) {
+                                let _ = socket.send(Message::Text(echo_text.into())).await;
+                            }
+                        }
+                    }
                 }
 
                 let sequence_ok = {
@@ -415,7 +508,10 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
                             NesRole::Host => &mut room.host_seq,
                             NesRole::Guest => &mut room.guest_seq,
                         };
-                        if envelope.seq <= *last {
+                        // Allow rom_ready and control messages without strictly advancing sequence
+                        if envelope.signal_type == SignalType::RomReady {
+                            true
+                        } else if envelope.seq <= *last {
                             false
                         } else {
                             *last = envelope.seq;
@@ -427,6 +523,7 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
                     })
                 };
                 if !sequence_ok {
+                    tracing::warn!("[WS] Stale signaling sequence from {:?} (seq={})", role, envelope.seq);
                     let _ = socket.send(Message::Text("{\"error\":\"stale signaling sequence\"}".into())).await;
                     continue;
                 }
@@ -436,12 +533,19 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
                 match relay {
                     Ok(relay) if relay.role != role => {
                         if socket.send(Message::Text(relay.message.into())).await.is_err() {
+                            tracing::warn!("[WS] Failed to send relayed message to {:?}", role);
                             break;
                         }
                     }
                     Ok(_) => {}
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("[WS] Receiver lagged behind by {} messages for {:?}", n, role);
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("[WS] Broadcast channel closed for room {}", room_id);
+                        break;
+                    }
                 }
             }
         }

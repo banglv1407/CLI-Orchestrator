@@ -29,11 +29,9 @@ import {
 import { RemoteMonitorWidget } from './RemoteMonitorWidget';
 import { SshFileTransferDialog } from './SshFileTransferDialog';
 import { save } from '@tauri-apps/plugin-dialog';
-import { QuickAppsPanel } from './QuickAppsPanel';
+import { ModuleMainPanel } from './ModuleMainPanel';
 import { BuzzWorkspacePanel } from './BuzzWorkspacePanel';
 import { NesWorkspacePanel } from './NesWorkspacePanel';
-import { ApiClientPanel } from './ApiClientPanel';
-import { ProxyPanel } from './ProxyPanel';
 import { SystemLogPanel } from './SystemLogPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
@@ -2462,7 +2460,9 @@ export function TerminalPanel({
                   </div>
                 ))}
                 {/* Sub-view overlays */}
-                {activeMainView === 'quickapps' && <QuickAppsPanel />}
+                {activeMainView === 'quickapps' && (
+                    <ModuleMainPanel moduleId="clx.quickapps" contributionId="quickapps.main" />
+                )}
                 <div
                   className={`absolute inset-0 z-[4] ${
                     activeMainView === 'buzz' ? 'block' : 'hidden pointer-events-none'
@@ -2477,7 +2477,9 @@ export function TerminalPanel({
                 >
                   <NesWorkspacePanel isVisible={activeMainView === 'game'} />
                 </div>
-                {activeMainView === 'apiclient' && <ApiClientPanel />}
+                {activeMainView === 'apiclient' && (
+                  <ModuleMainPanel moduleId="clx.api-client" contributionId="api-client.main" />
+                )}
                 {activeMainView === 'settings' && <SettingsPanel theme={theme!} setTheme={setTheme!} />}
                 {/* Heavy UI surfaces own work only while selected and visible. */}
                 {uiActive && activeMainView === 'dashboard' && (

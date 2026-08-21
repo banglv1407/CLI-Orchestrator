@@ -156,14 +156,16 @@ export function Dashboard() {
       systemPrompt = 'Generate a very short, concise title (max 5 words) for the following text. Do not put quotes around the title. Output ONLY the title itself.';
     }
     try {
-      // 1. Try AI Companion endpoint first (uses companion.json config from backend)
-      const reply = await invoke<string>('send_companion_chat', {
-        request: {
-          systemPrompt: systemPrompt,
-          messages: [{ role: 'user', content: text }],
+      // 1. Try AI Companion module first
+      const reply = await invoke<string>('module_call', {
+        moduleId: 'clx.ai-companion',
+        method: 'clx.ai-companion.send',
+        params: {
+          message: text,
+          toolsEnabled: false,
         },
       });
-      setRewriteModal(prev => prev ? { ...prev, resultText: reply.trim(), loading: false } : null);
+      setRewriteModal(prev => prev ? { ...prev, resultText: typeof reply === 'string' ? reply.trim() : JSON.stringify(reply), loading: false } : null);
     } catch (companionErr) {
       console.warn('Companion LLM failed, falling back to configured LLM:', companionErr);
 

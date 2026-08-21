@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.cli-proxy",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    { "id": "cli-proxy.main", "kind": "mainPanel", "entrypoint": "ui/index.js", "export": "registerMain" },
+    { "id": "cli-proxy.settings", "kind": "settingsSection", "entrypoint": "ui/index.js", "export": "registerSettings" }
+  ],
+  "sidecar": { "path": "bin/clx-cli-proxy-sidecar.exe", "protocolVersion": 1 },
+  "requestedCapabilities": ["networkRequest", "localServer"],
+  "dependencies": [],
+  "entitlementId": "clx.cli-proxy",
+  "backgroundActivation": "onDemand",
+  "files": [],
+  "licenses": [{ "name": "MIT", "path": "NOTICE.txt" }],
+  "signature": { "algorithm": "ed25519", "keyId": "clx-release-v1", "value": "" }
+}

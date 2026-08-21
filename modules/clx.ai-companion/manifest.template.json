@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.ai-companion",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    { "id": "ai-companion.main", "kind": "mainPanel", "entrypoint": "ui/index.js", "export": "registerMain" },
+    { "id": "ai-companion.settings", "kind": "settingsSection", "entrypoint": "ui/index.js", "export": "registerSettings" }
+  ],
+  "sidecar": { "path": "bin/clx-ai-companion-sidecar.exe", "protocolVersion": 1 },
+  "requestedCapabilities": ["networkRequest", "processLaunch"],
+  "dependencies": [],
+  "entitlementId": "clx.ai-companion",
+  "backgroundActivation": "onDemand",
+  "files": [],
+  "licenses": [{ "name": "MIT", "path": "NOTICE.txt" }],
+  "signature": { "algorithm": "ed25519", "keyId": "clx-release-v1", "value": "" }
+}

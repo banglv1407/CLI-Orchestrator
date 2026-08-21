@@ -1,10 +1,57 @@
 # Architecture
 
-No application stack is selected yet.
+CLX is a Windows-first Tauri 2 desktop application with a React/Vite frontend,
+a Rust Core process, local and SSH terminal/file capabilities, and optional
+native services. The repository is a Cargo workspace rooted at `Cargo.toml`;
+the desktop application lives in `src-tauri` and the Core frontend lives in
+`src`.
 
-No application code exists yet. This document defines generic architecture
-questions and boundary rules that future implementation should adapt after a
-user-provided spec and stack decision exist.
+## Current Modular Boundary
+
+E13 introduces signed, versioned first-party modules without adding online
+downloads or third-party trust. Core owns discovery, verification,
+entitlement, capability checks, contribution slots, and sidecar lifecycle.
+Optional code lives under `modules/<module-id>` and its shared/runtime crates
+live under `crates/`.
+
+```text
+NSIS Setup
+  -> CLX Core (required)
+  -> modules/<module-id>/<version> (optional signed packs)
+
+CLX Core
+  -> clx-module-contracts (manifest, state, entitlement types)
+  -> clx-module-host (verify, authorize, load UI, supervise sidecars)
+  -> clx-module:// verified local UI assets
+  -> JSON-RPC 2.0 / Content-Length / stdio
+       -> clx-quickapps-sidecar (first extracted pilot)
+       -> clx-api-client-sidecar (HTTP request and bounded stream polling)
+```
+
+Core accepts only a pinned Ed25519 publisher key, checks the signed file
+inventory before activation, and resolves the newest valid compatible version.
+If an interrupted upgrade leaves a newer invalid pack, the last verified
+version remains usable. Module enabled state and user data remain under the
+existing `.ai-cli-manager` data root; installer add/remove operations affect
+pack code only.
+
+The Core Tauri surface for optional features is generic:
+`module_catalog`, `module_set_enabled`, `module_call`, and `module_restart`.
+The Core frontend must not statically import optional UI bundles. Signed UI is
+served through the traversal-safe `clx-module` protocol only after integrity,
+compatibility, entitlement, and enabled-state checks pass. Sidecars receive a
+per-launch token, are started by exact verified path, and stop on disable,
+restart, protocol failure, or application exit.
+
+Production distribution is current-user Windows x64 NSIS. Core is mandatory,
+fresh installs select no optional modules, and rerunning Setup is the supported
+file-level add/remove path. WebView2 110.0.1531.0 or newer is an external
+prerequisite; Setup does not download or embed it.
+
+## General Boundary Guidance
+
+The remaining sections retain the repository's general layering guidance and
+apply to Core and future module extractions.
 
 ## Discovery Before Shape
 

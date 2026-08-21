@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.api-client",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    { "id": "api-client.main", "kind": "mainPanel", "entrypoint": "ui/index.js", "export": "registerMain" },
+    { "id": "api-client.history", "kind": "mainPanel", "entrypoint": "ui/index.js", "export": "registerHistory" }
+  ],
+  "sidecar": { "path": "bin/clx-api-client-sidecar.exe", "protocolVersion": 1 },
+  "requestedCapabilities": ["networkRequest"],
+  "dependencies": [],
+  "entitlementId": "clx.api-client",
+  "backgroundActivation": "never",
+  "files": [],
+  "licenses": [{ "name": "MIT", "path": "NOTICE.txt" }],
+  "signature": { "algorithm": "ed25519", "keyId": "clx-release-v1", "value": "" }
+}

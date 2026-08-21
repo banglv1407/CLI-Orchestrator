@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import {
   dashboardGetResourceUsage,
@@ -17,12 +18,8 @@ import {
 } from '../lib/tauri';
 import {
   getSystemLogs,
-  proxyStatus,
-  proxyStart,
-  proxyStop,
-  proxyGetRecentLogs,
 } from '../lib/tauri';
-import type { ProxyStatus, ProxyLogEntry, SystemLogEntry } from '../types';
+import type { SystemLogEntry } from '../types';
 import { MonitorEditorModal } from './MonitorEditorModal';
 import { MonitorLogDrawer } from './MonitorLogDrawer';
 
@@ -254,8 +251,8 @@ export function DashboardPanel() {
   const [sysLogErr, setSysLogErr] = useState<string | null>(null);
 
   // ═══ Proxy ═══
-  const [pxyStatus, setPxyStatus] = useState<ProxyStatus | null>(null);
-  const [pxyLogs, setPxyLogs] = useState<ProxyLogEntry[]>([]);
+  const [pxyStatus, setPxyStatus] = useState<{ running: boolean; port: number; activeBackends: number; totalRequests: number } | null>(null);
+  const [pxyLogs, setPxyLogs] = useState<any[]>([]);
   const [pxyErr, setPxyErr] = useState<string | null>(null);
   const [pxyLoading, setPxyLoading] = useState(false);
 
@@ -300,9 +297,25 @@ export function DashboardPanel() {
     // Proxy
     if (widgets.proxy) {
       try {
-        setPxyStatus(await proxyStatus());
-        setPxyLogs(await proxyGetRecentLogs(10));
-        setPxyErr(null);
+        const res = await invoke<{ running: boolean; port: number; activeBackends: number; totalRequests: number }>('module_call', {
+          moduleId: 'clx.cli-proxy',
+          method: 'clx.cli-proxy.status',
+          params: {},
+        }).catch(() => null);
+        if (res) {
+          setPxyStatus(res as any);
+          const logs = await invoke<any[]>('module_call', {
+            moduleId: 'clx.cli-proxy',
+            method: 'clx.cli-proxy.getRecentLogs',
+            params: { limit: 10 },
+          }).catch(() => []);
+          setPxyLogs(logs || []);
+          setPxyErr(null);
+        } else {
+          setPxyStatus(null);
+          setPxyLogs([]);
+          setPxyErr('CliProxyAI module is not running or not installed');
+        }
       } catch (e) { setPxyErr(String(e)); }
     }
 
@@ -428,9 +441,9 @@ export function DashboardPanel() {
     setPxyErr(null);
     try {
       if (pxyStatus?.running) {
-        await proxyStop();
+        await invoke('module_call', { moduleId: 'clx.cli-proxy', method: 'clx.cli-proxy.stop', params: {} });
       } else {
-        await proxyStart();
+        await invoke('module_call', { moduleId: 'clx.cli-proxy', method: 'clx.cli-proxy.start', params: {} });
       }
       await refreshAll();
     } catch (e) {

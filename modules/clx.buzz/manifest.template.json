@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.buzz",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    { "id": "buzz.settings", "kind": "settingsSection", "entrypoint": "ui/index.js", "export": "registerSettings" }
+  ],
+  "sidecar": { "path": "bin/clx-buzz-sidecar.exe", "protocolVersion": 1 },
+  "requestedCapabilities": ["networkRequest"],
+  "dependencies": [],
+  "entitlementId": "clx.buzz",
+  "backgroundActivation": "onDemand",
+  "files": [],
+  "licenses": [{ "name": "MIT", "path": "NOTICE.txt" }],
+  "signature": { "algorithm": "ed25519", "keyId": "clx-release-v1", "value": "" }
+}

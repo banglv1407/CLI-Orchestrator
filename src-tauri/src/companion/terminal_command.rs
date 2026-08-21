@@ -10,12 +10,98 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     app_state::AppState,
     commands::cli_commands::{run_ssh_command, SshConnection},
-    core::proxy_server::{
-        build_upstream_body, build_upstream_headers, chat_completions_url, ChatCompletionRequest,
-        ChatMessage, ProxyBackend, ProxyConfig, ProxyLogEntry,
-    },
     terminal::session_manager::SessionRuntimeInfo,
 };
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyBackend {
+    pub id: Option<String>,
+    pub name: String,
+    pub url: String,
+    pub api_key: String,
+    pub model: String,
+    pub weight: u32,
+    pub max_retries: u32,
+    pub headers: HashMap<String, String>,
+    pub custom_user_agent: Option<String>,
+    #[serde(default)]
+    pub enable_rtk: bool,
+    #[serde(default)]
+    pub enable_ponytail: bool,
+    #[serde(default)]
+    pub reasoning_effort: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyConfig {
+    pub port: u16,
+    pub backends: Vec<ProxyBackend>,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: serde_json::Value,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatCompletionRequest {
+    pub model: String,
+    pub messages: Vec<ChatMessage>,
+    #[serde(default)]
+    pub stream: bool,
+    #[serde(default)]
+    pub temperature: Option<f32>,
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+fn chat_completions_url(base: &str) -> String {
+    let trimmed = base.trim_end_matches('/');
+    if trimmed.ends_with("/chat/completions") {
+        trimmed.to_string()
+    } else {
+        format!("{}/chat/completions", trimmed)
+    }
+}
+
+fn build_upstream_headers(backend: &ProxyBackend) -> reqwest::header::HeaderMap {
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        reqwest::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    if !backend.api_key.is_empty() {
+        if let Ok(value) = HeaderValue::from_str(&format!("Bearer {}", backend.api_key)) {
+            headers.insert(reqwest::header::AUTHORIZATION, value);
+        }
+    }
+    for (k, v) in &backend.headers {
+        if let (Ok(name), Ok(val)) = (HeaderName::from_bytes(k.as_bytes()), HeaderValue::from_str(v)) {
+            headers.insert(name, val);
+        }
+    }
+    headers
+}
+
+fn build_upstream_body(
+    request: &ChatCompletionRequest,
+    backend: &ProxyBackend,
+) -> serde_json::Value {
+    let mut body = serde_json::to_value(request).unwrap_or_default();
+    if let Some(obj) = body.as_object_mut() {
+        obj.insert("model".into(), serde_json::Value::String(backend.model.clone()));
+    }
+    body
+}
 
 const MAX_VISIBLE_LINES: usize = 20;
 const MAX_CONTEXT_BYTES: usize = 8 * 1024;
@@ -24,7 +110,6 @@ const MAX_PROVIDER_BODY_BYTES: usize = 512 * 1024;
 const TOTAL_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(12);
 const VALIDATION_TIMEOUT: Duration = Duration::from_secs(12);
-const PRIVATE_LOG_PLACEHOLDER: &str = "[redacted: inline terminal command assistant]";
 
 static ACTIVE_REQUESTS: LazyLock<Mutex<HashMap<String, CancellationToken>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -232,9 +317,10 @@ async fn generate_suggestion(
     }
     let messages = build_messages(&sanitized_request, &environment, &context);
 
-    let proxy_config = state.proxy_server.state.config.read().await.clone();
-    // The saved Proxy backend list is the routing contract. Calling backends
-    // directly keeps Command Assistant available while the HTTP proxy is stopped.
+    // Backend list is read from the persisted proxy config file. Calling
+    // backends directly keeps Command Assistant available while the HTTP
+    // proxy (now a module sidecar) is stopped or not installed.
+    let proxy_config = load_proxy_config();
     let sources = configured_backend_sources(proxy_config);
 
     let mut failures = Vec::new();
@@ -311,6 +397,21 @@ fn configured_backend_sources(proxy_config: ProxyConfig) -> Vec<(ProviderSource,
         .into_iter()
         .map(|backend| (ProviderSource::Backend(backend.name.clone()), backend))
         .collect()
+}
+
+fn load_proxy_config() -> ProxyConfig {
+    let home = std::env::var_os("USERPROFILE").map(std::path::PathBuf::from);
+    let path = std::env::var_os("CLX_PROXY_CONFIG")
+        .map(std::path::PathBuf::from)
+        .or(home.map(|h| h.join(".ai-cli-manager").join("proxy.json")));
+    if let Some(path) = path {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            if let Ok(config) = serde_json::from_str::<ProxyConfig>(&content) {
+                return config;
+            }
+        }
+    }
+    ProxyConfig::default()
 }
 
 async fn detect_environment(
@@ -681,14 +782,17 @@ async fn call_backend_direct(
         backend,
     );
 
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("failed to create http client: {e}"))?;
+
     let mut failures = Vec::new();
     for _ in 0..backend.max_retries.max(1) {
         let start = std::time::Instant::now();
         let response = match tokio::select! {
             _ = cancel.cancelled() => return Err("cancelled".to_string()),
-            result = state
-                .companion
-                .http_client
+            result = client
                 .post(&target_url)
                 .headers(headers.clone())
                 .json(&body)
@@ -767,34 +871,15 @@ async fn log_terminal_command_call(
     success: bool,
     error: Option<&str>,
 ) {
-    use std::sync::atomic::Ordering;
-    let log_id = state
-        .proxy_server
-        .state
-        .counter
-        .fetch_add(1, Ordering::Relaxed)
-        + 1;
-    state
-        .proxy_server
-        .state
-        .add_log(ProxyLogEntry {
-            id: log_id,
-            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
-            backend: format!("terminal-cmd:{}", backend_label),
-            model: model.to_string(),
-            request_json: PRIVATE_LOG_PLACEHOLDER.to_string(),
-            response_json: PRIVATE_LOG_PLACEHOLDER.to_string(),
-            status,
-            duration_ms,
-            success,
-            error_msg: error.map(compact_error),
-            prompt_tokens: 0,
-            completion_tokens: 0,
-            total_tokens: 0,
-            normalized_response_json: String::new(),
-            response_truncated: false,
-        })
-        .await;
+    let mut message = format!(
+        "terminal-command-assistant → backend:{backend_label} model:{model} status:{status} duration_ms:{duration_ms} success:{success}"
+    );
+    if let Some(error) = error {
+        message.push_str(" error:");
+        message.push_str(&compact_error(error));
+    }
+    let level = if success { "INFO" } else { "ERROR" };
+    state.logger.log(level, "terminal-command", &message).await;
 }
 
 fn extract_provider_content(parsed: &serde_json::Value) -> Option<String> {
@@ -1206,17 +1291,33 @@ async fn run_process_capture_with_cancel(
 }
 
 async fn collect_known_secrets(state: &AppState) -> Vec<String> {
-    let companion = state.companion.config.read().await;
-    let mut values = vec![companion.api_key.clone()];
-    values.extend(companion.custom_headers.values().cloned());
-    drop(companion);
+    let mut values: Vec<String> = Vec::new();
 
-    let proxy = state.proxy_server.state.config.read().await;
-    for backend in &proxy.backends {
+    let companion_path = state
+        .registry
+        .data_dirs()
+        .root_dir
+        .join("companion.json");
+    if let Ok(content) = std::fs::read_to_string(companion_path) {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(key) = json.get("api_key").and_then(|v| v.as_str()) {
+                values.push(key.to_string());
+            }
+            if let Some(headers) = json.get("custom_headers").and_then(|v| v.as_object()) {
+                for (_, v) in headers {
+                    if let Some(s) = v.as_str() {
+                        values.push(s.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    let config = load_proxy_config();
+    for backend in &config.backends {
         values.push(backend.api_key.clone());
         values.extend(backend.headers.values().cloned());
     }
-    drop(proxy);
 
     let ssh_path = state
         .registry

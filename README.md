@@ -128,7 +128,8 @@ Example configuration:
 ### Prerequisites
 - **Node.js**: v18+ 
 - **Rust**: Latest stable toolchain via [rustup](https://rustup.rs/)
-- **WebView2** (Windows) or appropriate WebKit libraries (Linux)
+- **WebView2 110.0.1531.0+** on Windows (external prerequisite; Setup does not download it)
+- **Visual C++ build tools and NASM** for the current `russh`/AWS-LC native dependency
 
 ### Installation & Development
 
@@ -144,16 +145,39 @@ Example configuration:
 
 3. **Build for Production**:
    ```bash
-   npm run build:production
+   npm.cmd run build:production
    ```
 
-   The production build appends the local build date in `MMDD` format to both
-   the window title and executable name, for example `CLX (0808).exe`.
+   Production builds require `CLX_MODULE_SIGNING_KEY`, a base64-encoded 32-byte
+   Ed25519 seed held outside the repository. The pipeline builds optional UI and
+   sidecars, signs and stages immutable packs, generates NSIS Components
+   sections, verifies Core/module boundaries, and emits
+   `CLX_<version>_x64-setup.exe`. Product and binary identity remain stable as
+   `CLX` and `clx.exe`.
+
+   Silent release validation can choose exact components with
+   `/CLXMODULES=none`, `/CLXMODULES=all`, or a comma-separated module ID list
+   such as `/CLXMODULES=clx.quickapps`. Fresh interactive installs still default
+   to Core only, while setup reruns preselect packs already installed.
+
+   For local module development only:
+
+   ```bash
+   npm.cmd run build:modules
+   npm.cmd run stage:modules:dev
+   npm.cmd run generate:modules-nsh
+   npm.cmd run verify:core-boundaries
+   ```
+
+   The development signing key is deterministic and is never accepted by a
+   production Core build.
 
 ## 📂 Project Structure
 
 - `src/`: React frontend components and hooks.
 - `src-tauri/`: Rust backend logic, commands, and core engine.
+- `crates/clx-module-*`: signed manifest contracts, host, and module sidecars.
+- `modules/`: shared TypeScript module SDK and separately bundled module UI.
 - `~/.ai-cli-manager/`: 
   - `clis/`: CLI configuration files.
   - `logs/`: Runtime session logs.

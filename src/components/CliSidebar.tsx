@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry, SpecialConfigFile } from '../types';
-import { loadApiHistory, clearApiHistory, type ApiHistoryEntry, METHOD_COLORS } from '../lib/api-history';
 import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled } from '../lib/mythical-pets';
 import { getContextMenuPosition } from '../lib/contextMenu';
-import { ProxyPanel } from './ProxyPanel';
-import { AIChatPanel } from './AIChatPanel';
+import { moduleCatalog } from '../lib/modules';
+import { ModuleMainPanel } from './ModuleMainPanel';
 import { loadSpecialConfigFiles, saveSpecialConfigFile, deleteSpecialConfigFile } from '../lib/configFiles';
 import { SpecialConfigModal } from './SpecialConfigModal';
 
@@ -256,92 +255,6 @@ function joinWorkspacePath(rootPath: string, relativePath: string): string {
 }
 
 
-function ApiHistoryList() {
-  const [history, setHistory] = useState<ApiHistoryEntry[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => { setHistory(loadApiHistory()); }, []);
-
-  const handlerRef = useRef<EventListener>(null!);
-  if (!handlerRef.current) {
-    handlerRef.current = (e: Event) => {
-      setHistory((e as CustomEvent<ApiHistoryEntry[]>).detail);
-    };
-  }
-  useEffect(() => {
-    window.addEventListener('apiclient-history-changed', handlerRef.current);
-    return () => window.removeEventListener('apiclient-history-changed', handlerRef.current);
-  }, []);
-
-  const handleClear = () => { clearApiHistory(); setHistory([]); };
-  const handleSelect = (entry: ApiHistoryEntry) => {
-    window.dispatchEvent(new CustomEvent('apiclient-history-select', { detail: entry }));
-  };
-
-  const filteredHistory = useMemo(() => {
-    if (!searchQuery.trim()) return history;
-    const q = searchQuery.toLowerCase();
-    return history.filter((entry) =>
-      entry.url.toLowerCase().includes(q) ||
-      entry.method.toLowerCase().includes(q)
-    );
-  }, [history, searchQuery]);
-
-  return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
-        <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">API History</h2>
-        <button type="button" onClick={handleClear} className="rounded border border-cyber-line/40 px-2 py-0.5 text-[9px] font-semibold text-slate-400 hover:text-red-400 hover:border-red-400/40 transition uppercase">Clear</button>
-      </div>
-      {/* Search Box */}
-      <div className="shrink-0 p-2 border-b border-cyber-line/50">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search URL or method..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white text-xs"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {history.length === 0 ? (
-          <div className="p-6 text-center text-[11px] text-slate-600">No requests yet.<br/><span className="text-[10px]">Send a request from the API Client to see it here.</span></div>
-        ) : filteredHistory.length === 0 ? (
-          <div className="p-6 text-center text-[11px] text-slate-600">No results for "{searchQuery}".</div>
-        ) : (
-          filteredHistory.map((entry, idx) => (
-            <button key={entry.url + entry.method + idx} type="button" onClick={() => handleSelect(entry)} className="w-full text-left px-4 py-2.5 border-b border-cyber-line/20 hover:bg-cyber-neon/5 transition flex items-start gap-2 group">
-              <span className="text-[10px] font-bold font-mono mt-px shrink-0 min-w-[44px]" style={{ color: METHOD_COLORS[entry.method] }}>{entry.method}</span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] text-slate-300 truncate font-mono leading-tight">{entry.url}</div>
-                <div className="text-[9px] text-slate-600 mt-0.5 flex items-center gap-2">
-                  <span>{new Date(entry.timestamp).toLocaleString()}</span>
-                  {entry.headers?.length > 0 && <span className="text-cyber-electric/60">{entry.headers.length}h</span>}
-                  {entry.params?.length > 0 && <span className="text-cyber-neon/60">{entry.params.length}p</span>}
-                  {entry.body && <span className="text-slate-500">{'·'} body</span>}
-                </div>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-
-
 export function CliSidebar({
   clis,
   sessions,
@@ -387,6 +300,28 @@ export function CliSidebar({
   const [petId, setPetIdLocal] = useState(getActivePetId);
   const [petEnabled, setPetEnabledLocal] = useState(getPetEnabled);
   const [buzzUnreadCount, setBuzzUnreadCount] = useState<number>(0);
+  const [quickAppsAvailable, setQuickAppsAvailable] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const refreshModules = () => {
+      void moduleCatalog().then((catalog) => {
+        if (!active) return;
+        const quickApps = catalog.find((module) => module.moduleId === 'clx.quickapps');
+        setQuickAppsAvailable(Boolean(
+          quickApps
+          && (quickApps.state === 'ready' || quickApps.state === 'running')
+          && quickApps.uiContributions.some((item) => item.id === 'quickapps.main'),
+        ));
+      }).catch(() => active && setQuickAppsAvailable(false));
+    };
+    refreshModules();
+    window.addEventListener('clx-modules-changed', refreshModules);
+    return () => {
+      active = false;
+      window.removeEventListener('clx-modules-changed', refreshModules);
+    };
+  }, []);
 
   useEffect(() => {
     const handleBuzzUnread = (e: Event) => {
@@ -585,6 +520,7 @@ export function CliSidebar({
           </div>
         );
       case 'quickapps':
+        if (!quickAppsAvailable) return null;
         return (
           <div
             key="quickapps"
@@ -1200,14 +1136,16 @@ export function CliSidebar({
     }
 
     try {
-      // 1. Try AI Companion endpoint first (uses companion.json config from backend)
-      const reply = await invoke<string>('send_companion_chat', {
-        request: {
-          systemPrompt: systemPrompt,
-          messages: [{ role: 'user', content: text.trim() }],
+      // 1. Try AI Companion module first
+      const reply = await invoke<string>('module_call', {
+        moduleId: 'clx.ai-companion',
+        method: 'clx.ai-companion.send',
+        params: {
+          message: text.trim(),
+          toolsEnabled: false,
         },
       });
-      setRewriteModal(prev => prev ? { ...prev, resultText: reply.trim(), loading: false } : null);
+      setRewriteModal(prev => prev ? { ...prev, resultText: typeof reply === 'string' ? reply.trim() : JSON.stringify(reply), loading: false } : null);
     } catch (companionErr) {
       console.warn('Companion LLM failed, falling back to configured LLM:', companionErr);
 
@@ -2829,7 +2767,9 @@ export function CliSidebar({
         )}
 
         {/* Active Tab: API Client (History & saved queries) */}
-        {activeTab === 'apiclient' && <ApiHistoryList />}
+        {activeTab === 'apiclient' && (
+          <ModuleMainPanel moduleId="clx.api-client" contributionId="api-client.history" />
+        )}
       </aside>
       )}
 

@@ -16,11 +16,11 @@ import {
   setPetTuning,
   type MythicalPet,
 } from '../lib/mythical-pets';
-import { ProxyPanel } from './ProxyPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
 import { SystemLogPanel } from './SystemLogPanel';
 import { BuzzNesSettings } from './BuzzNesSettings';
 import { PetPreviewStage } from './MythicalPet';
+import { ModuleManager } from './ModuleManager';
 
 function PetPickerThumbnail({ pet }: { pet: MythicalPet }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -86,6 +86,7 @@ interface SettingsPanelProps {
 
 type SettingsSection =
   | 'appearance'
+  | 'modules'
   | 'mythical-pet'
   | 'ai-companion'
   | 'local-llm'
@@ -97,6 +98,7 @@ type SettingsSection =
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string; desc: string }[] = [
   { id: 'appearance', label: 'Appearance', icon: '🎨', desc: 'Theme and visuals configuration' },
+  { id: 'modules', label: 'Modules', icon: '🧩', desc: 'Installed packs, integrity, and runtime state' },
   { id: 'mythical-pet', label: 'Mythical Pet', icon: '🐉', desc: 'Interact with your desktop companions' },
   { id: 'ai-companion', label: 'AI Companion', icon: '🤖', desc: 'Configure cloud LLM endpoints and settings' },
   { id: 'local-llm', label: 'Local LLM', icon: '🧠', desc: 'Manage offline inference fallbacks' },
@@ -263,14 +265,22 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
 
   useEffect(() => {
     // Load config
-    invoke<BuiltinLlmConfig>('builtin_llm_get_config')
+    invoke<BuiltinLlmConfig>('module_call', {
+      moduleId: 'clx.local-llm',
+      method: 'clx.local-llm.getConfig',
+      params: {},
+    })
       .then((cfg) => setBuiltinLlmConfig(cfg))
-      .catch((err) => console.error('Failed to get built-in config:', err));
+      .catch(() => {});
 
     // Load status
-    invoke<BuiltinLlmStatus>('builtin_llm_status')
+    invoke<BuiltinLlmStatus>('module_call', {
+      moduleId: 'clx.local-llm',
+      method: 'clx.local-llm.status',
+      params: {},
+    })
       .then((stat) => setBuiltinLlmStatus(stat))
-      .catch((err) => console.error('Failed to get built-in status:', err));
+      .catch(() => {});
 
     // Load cloud LLM config
     const savedLlm = localStorage.getItem('ai-cli-llm-config');
@@ -292,8 +302,16 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
   const handleLoadBuiltinLlm = async () => {
     setIsBuiltinLlmLoading(true);
     try {
-      await invoke('builtin_llm_load');
-      const status = await invoke<BuiltinLlmStatus>('builtin_llm_status');
+      await invoke('module_call', {
+        moduleId: 'clx.local-llm',
+        method: 'clx.local-llm.loadModel',
+        params: {},
+      });
+      const status = await invoke<BuiltinLlmStatus>('module_call', {
+        moduleId: 'clx.local-llm',
+        method: 'clx.local-llm.status',
+        params: {},
+      });
       setBuiltinLlmStatus(status);
     } catch (err) {
       console.error('Failed to load built-in LLM:', err);
@@ -304,8 +322,16 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
 
   const handleUnloadBuiltinLlm = async () => {
     try {
-      await invoke('builtin_llm_unload');
-      const status = await invoke<BuiltinLlmStatus>('builtin_llm_status');
+      await invoke('module_call', {
+        moduleId: 'clx.local-llm',
+        method: 'clx.local-llm.unloadModel',
+        params: {},
+      });
+      const status = await invoke<BuiltinLlmStatus>('module_call', {
+        moduleId: 'clx.local-llm',
+        method: 'clx.local-llm.status',
+        params: {},
+      });
       setBuiltinLlmStatus(status);
     } catch (err) {
       console.error('Failed to unload built-in LLM:', err);
@@ -317,7 +343,11 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
       const file = await invoke<string | null>('pick_file');
       if (file) {
         const newCfg = { ...builtinLlmConfig, modelPath: file };
-        await invoke('builtin_llm_save_config', { config: newCfg });
+        await invoke('module_call', {
+          moduleId: 'clx.local-llm',
+          method: 'clx.local-llm.saveConfig',
+          params: newCfg,
+        });
         setBuiltinLlmConfig(newCfg);
       }
     } catch (err) {
@@ -330,7 +360,11 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
       const file = await invoke<string | null>('pick_file');
       if (file) {
         const newCfg = { ...builtinLlmConfig, tokenizerPath: file };
-        await invoke('builtin_llm_save_config', { config: newCfg });
+        await invoke('module_call', {
+          moduleId: 'clx.local-llm',
+          method: 'clx.local-llm.saveConfig',
+          params: newCfg,
+        });
         setBuiltinLlmConfig(newCfg);
       }
     } catch (err) {
@@ -343,7 +377,11 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
       const file = await invoke<string | null>('pick_file');
       if (file) {
         const newCfg = { ...builtinLlmConfig, serverPath: file };
-        await invoke('builtin_llm_save_config', { config: newCfg });
+        await invoke('module_call', {
+          moduleId: 'clx.local-llm',
+          method: 'clx.local-llm.saveConfig',
+          params: newCfg,
+        });
         setBuiltinLlmConfig(newCfg);
       }
     } catch (err) {
@@ -354,10 +392,18 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
   const handleUpdateBuiltinConfig = async (updates: Partial<BuiltinLlmConfig>) => {
     const newCfg = { ...builtinLlmConfig, ...updates };
     try {
-      await invoke('builtin_llm_save_config', { config: newCfg });
+      await invoke('module_call', {
+        moduleId: 'clx.local-llm',
+        method: 'clx.local-llm.saveConfig',
+        params: newCfg,
+      });
       setBuiltinLlmConfig(newCfg);
       setTimeout(async () => {
-        const status = await invoke<BuiltinLlmStatus>('builtin_llm_status');
+        const status = await invoke<BuiltinLlmStatus>('module_call', {
+          moduleId: 'clx.local-llm',
+          method: 'clx.local-llm.status',
+          params: {},
+        });
         setBuiltinLlmStatus(status);
       }, 500);
     } catch (err) {
@@ -971,13 +1017,21 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
             </div>
           )}
 
+          {activeSection === 'modules' && <ModuleManager />}
+
           {/* Buzz & NES Section */}
           {activeSection === 'buzz-nes' && <BuzzNesSettings />}
 
           {/* CliProxyAI Section */}
           {activeSection === 'proxy' && (
             <div className="space-y-4 h-full flex flex-col">
-              <ProxyPanel />
+              <div className="rounded-xl border border-cyber-line/30 bg-cyber-panel/10 p-6 text-center text-slate-400">
+                <div className="text-2xl mb-2">🔀</div>
+                <div className="font-bold text-slate-200">CliProxyAI Module</div>
+                <p className="text-xs mt-1 text-slate-500">
+                  CliProxyAI is distributed as a modular pack. Enable it in <button type="button" onClick={() => setActiveSection('modules')} className="text-cyber-neon underline font-semibold">Settings → Modules</button> or rerun setup to install.
+                </p>
+              </div>
             </div>
           )}
 

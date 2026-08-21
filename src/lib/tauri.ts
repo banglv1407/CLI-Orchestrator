@@ -17,7 +17,6 @@ import type {
   SshConnection,
   RemoteSystemStats,
   GitStatusEntry,
-  QuickApp,
   RipgrepMatch,
   ProxyBackend,
   ProxyBackendUsage,
@@ -192,26 +191,6 @@ export function getGitDiff(repoPath: string, filePath: string, isUntracked: bool
   return invoke('get_git_diff', { repoPath, filePath, isUntracked });
 }
 
-export function listQuickapps(): Promise<QuickApp[]> {
-  return invoke('list_quickapps');
-}
-
-export function upsertQuickapp(app: QuickApp): Promise<QuickApp> {
-  return invoke('upsert_quickapp', { app });
-}
-
-export function deleteQuickapp(id: string): Promise<void> {
-  return invoke('delete_quickapp', { id });
-}
-
-export function reextractQuickappIcons(): Promise<QuickApp[]> {
-  return invoke('reextract_icons');
-}
-
-export function launchQuickapp(id: string): Promise<number> {
-  return invoke('launch_quickapp', { id });
-}
-
 export function ripgrepSearch(path: string, query: string): Promise<RipgrepMatch[]> {
   return invoke('ripgrep_search', { path, query });
 }
@@ -224,15 +203,27 @@ export interface SshServerStatus {
 }
 
 export function startSshServer(port: number): Promise<void> {
-  return invoke('start_ssh_server', { port });
+  return invoke('module_call', {
+    moduleId: 'clx.ssh',
+    method: 'clx.ssh.startServer',
+    params: { port },
+  });
 }
 
 export function stopSshServer(): Promise<void> {
-  return invoke('stop_ssh_server');
+  return invoke('module_call', {
+    moduleId: 'clx.ssh',
+    method: 'clx.ssh.stopServer',
+    params: {},
+  });
 }
 
 export function getSshServerStatus(): Promise<SshServerStatus> {
-  return invoke('get_ssh_server_status');
+  return invoke('module_call', {
+    moduleId: 'clx.ssh',
+    method: 'clx.ssh.getServerStatus',
+    params: {},
+  });
 }
 
 export interface SshServerConfig {
@@ -242,96 +233,19 @@ export interface SshServerConfig {
 }
 
 export function getSshServerConfig(): Promise<SshServerConfig> {
-  return invoke('get_ssh_server_config');
+  return invoke('module_call', {
+    moduleId: 'clx.ssh',
+    method: 'clx.ssh.getServerConfig',
+    params: {},
+  });
 }
 
 export function saveSshServerConfig(config: SshServerConfig): Promise<void> {
-  return invoke('save_ssh_server_config', { config });
-}
-
-export interface ApiProxyRequest {
-  method: string;
-  url: string;
-  headers: [string, string][];
-  body?: string | null;
-  requestId?: string | null;
-}
-
-export interface ApiProxyResponse {
-  status: number;
-  statusText: string;
-  headers: [string, string][];
-  body: string;
-  duration: number;
-  requestId?: string | null;
-}
-
-export interface ApiProxyStreamChunk {
-  requestId: string;
-  chunk: string;
-  eventType: 'start' | 'data' | 'done' | 'error';
-  status?: number | null;
-  statusText?: string | null;
-  headers?: [string, string][] | null;
-  error?: string | null;
-}
-
-export function apiProxyRequest(request: ApiProxyRequest): Promise<ApiProxyResponse> {
-  return invoke('api_proxy_request', { request });
-}
-
-export function apiProxyStream(request: ApiProxyRequest): Promise<string> {
-  return invoke('api_proxy_stream', { request });
-}
-
-export function apiProxyAbort(requestId: string): Promise<void> {
-  return invoke('api_proxy_abort', { requestId });
-}
-
-// ── CliProxyAI ────────────────────────────────────────────
-
-export function proxyStatus(): Promise<ProxyStatus> {
-  return invoke('proxy_status');
-}
-
-export function proxyStart(): Promise<ProxyStatus> {
-  return invoke('proxy_start');
-}
-
-export function proxyStop(): Promise<ProxyStatus> {
-  return invoke('proxy_stop');
-}
-
-export function proxyGetConfig(): Promise<ProxyConfig> {
-  return invoke('proxy_get_config');
-}
-
-export function proxySaveConfig(config: ProxyConfig): Promise<ProxyConfig> {
-  return invoke('proxy_save_config', { config });
-}
-
-export function proxyAddBackend(backend: ProxyBackend): Promise<ProxyConfig> {
-  return invoke('proxy_add_backend', { backend });
-}
-
-export function proxyRemoveBackend(name: string): Promise<ProxyConfig> {
-  return invoke('proxy_remove_backend', { name });
-}
-
-export function proxyGetLogs(): Promise<ProxyLogEntry[]> {
-  return invoke('proxy_get_logs');
-}
-
-export function proxyGetRecentLogs(limit = 10): Promise<ProxyLogEntry[]> {
-  return invoke('proxy_get_recent_logs', { limit });
-}
-
-export function proxyGetUsage(id: string): Promise<ProxyBackendUsage> {
-  return invoke('proxy_get_usage', { id });
-}
-
-export function proxyResetUsage(id: string): Promise<void> {
-  return invoke('proxy_reset_usage', { id });
+  return invoke('module_call', {
+    moduleId: 'clx.ssh',
+    method: 'clx.ssh.saveServerConfig',
+    params: config,
+  });
 }
 
 export interface RtkStatusResponse {
@@ -606,54 +520,4 @@ export function dashboardKillProcesses(
   sudoPassword?: string,
 ): Promise<MonitorKillResult> {
   return invoke('dashboard_kill_processes', { request: { monitorId, processes, mode, sudoPassword } });
-}
-
-// ── Companion ───────────────────────────────────────────────────
-
-export function companionGetCatalog(): Promise<CatalogResponse> {
-  return invoke('companion_get_catalog');
-}
-
-export function companionHelpSearch(query: string): Promise<FeatureEntry[]> {
-  return invoke('companion_help_search', { query });
-}
-
-export function companionGetHelp(featureId: string): Promise<HelpDetail> {
-  return invoke('companion_get_help', { featureId });
-}
-
-export function companionGetSafeContext(): Promise<SafeAppContext> {
-  return invoke('companion_get_safe_context');
-}
-
-export function companionSend(message: string): Promise<{ runId: string }> {
-  return invoke('companion_send', { message });
-}
-
-export function companionCancel(runId: string): Promise<void> {
-  return invoke('companion_cancel', { runId });
-}
-
-export function companionGetConfig(): Promise<CompanionConfigView> {
-  return invoke('companion_get_config');
-}
-
-export function companionSaveConfig(update: CompanionConfigUpdate): Promise<CompanionConfigView> {
-  return invoke('companion_save_config', { update });
-}
-
-export function companionGetHistory(): Promise<any[]> {
-  return invoke('companion_get_history');
-}
-
-export function companionClearHistory(): Promise<void> {
-  return invoke('companion_clear_history');
-}
-
-export function companionSetActionsEnabled(enabled: boolean): Promise<void> {
-  return invoke('companion_set_actions_enabled', { enabled });
-}
-
-export function companionImportLegacy(legacy: any): Promise<{ configImported: boolean; historyImported: number; errors: string[] }> {
-  return invoke('companion_import_legacy', { legacy });
 }

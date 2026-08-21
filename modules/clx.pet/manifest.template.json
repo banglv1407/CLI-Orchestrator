@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.pet",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    { "id": "pet.settings", "kind": "settingsSection", "entrypoint": "ui/index.js", "export": "registerSettings" }
+  ],
+  "requestedCapabilities": [],
+  "dependencies": [],
+  "entitlementId": "clx.pet",
+  "backgroundActivation": "never",
+  "files": [],
+  "licenses": [{ "name": "MIT", "path": "NOTICE.txt" }],
+  "signature": { "algorithm": "ed25519", "keyId": "clx-release-v1", "value": "" }
+}

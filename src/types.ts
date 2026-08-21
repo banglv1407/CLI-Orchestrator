@@ -65,19 +65,6 @@ export interface UpsertCliRequest {
 
 export type AppTheme = 'cyberpunk' | 'kawaii' | 'light';
 
-export interface QuickApp {
-  id: string;
-  name: string;
-  command: string;
-  args: string[];
-  workingDir?: string;
-  iconPath?: string;
-  order: number;
-  iconDataUrl?: string;
-  iconMissing: boolean;
-  group?: string;
-}
-
 export interface FileEntry {
   name: string;
   path: string;

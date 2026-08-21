@@ -5,6 +5,9 @@ node_modules/
 
 # Build outputs
 dist/
+dist-modules/
+dist-packs/
+src-tauri/windows/modules.nsh
 dist-ssr/
 *.local
 

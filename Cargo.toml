@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/clx-module-contracts",
+  "crates/clx-module-host",
+  "crates/clx-api-client-sidecar",
+  "crates/clx-ai-companion-sidecar",
+  "crates/clx-buzz-sidecar",
+  "crates/clx-cli-proxy-sidecar",
+  "crates/clx-local-llm-sidecar",
+  "crates/clx-ssh-client",
+  "crates/clx-ssh-sidecar",
+  "crates/clx-nes-sidecar",
+  "crates/clx-quickapps-sidecar",
+  "crates/nes-protocol",
+  "crates/nes-session",
+  "src-tauri",
+]

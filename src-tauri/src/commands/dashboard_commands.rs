@@ -2192,19 +2192,19 @@ async fn stream_remote_logs(
                 }
                 message = channel.wait() => {
                     match message {
-                        Some(russh::ChannelMsg::Data { data }) => {
+                        Some(clx_ssh_client::ChannelMsg::Data { data }) => {
                             for line in String::from_utf8_lossy(&data).lines() {
                                 sequence += 1;
                                 queue_log_line(&log_sender, sequence, "stdout", line.to_string());
                             }
                         }
-                        Some(russh::ChannelMsg::ExtendedData { data, .. }) => {
+                        Some(clx_ssh_client::ChannelMsg::ExtendedData { data, .. }) => {
                             for line in String::from_utf8_lossy(&data).lines() {
                                 sequence += 1;
                                 queue_log_line(&log_sender, sequence, "stderr", line.to_string());
                             }
                         }
-                        Some(russh::ChannelMsg::ExitStatus { exit_status }) => ended_cleanly = exit_status == 0,
+                        Some(clx_ssh_client::ChannelMsg::ExitStatus { exit_status }) => ended_cleanly = exit_status == 0,
                         None => break,
                         _ => {}
                     }

@@ -1,6 +1,6 @@
 # E13 — CLX Modular Offline Installer
 
-Status: Planned, docs-only  
+Status: In progress; US-049 implements and validates the Phase 1-3 Quick Apps vertical slice
 Target: Windows x64, per-user  
 Date: 2026-08-17
 
@@ -266,6 +266,14 @@ WebView2 policy:
 - Prove Core-only, Core plus Quick Apps, add, remove, upgrade and rollback.
 - Add Authenticode and pack-signing release gates.
 
+Implementation status (2026-08-18): the Quick Apps vertical slice now builds a
+release-mode signed pack and a working NSIS setup. Core-only and Core + Quick
+Apps installs, setup rerun add/remove/retain behavior, Unicode paths, WebView2
+fail-fast checks, installed sidecar operation, and data-preserving uninstall
+have executable evidence. Production Authenticode, upgrade/rollback, app/sidecar
+running guards, desktop interaction regression, and the runtime soak remain
+open before Phase 3 can be declared release-complete.
+
 ### Phase 4 — Remaining Module Extraction
 
 Extract and validate in this order:
@@ -278,6 +286,25 @@ Extract and validate in this order:
 
 Every extraction removes static frontend imports, Rust command registration,
 AppState initialization and dependencies that are no longer required by Core.
+
+Checkpoint status (2026-08-19): Phase 4 COMPLETE. All 9 module packs are now
+independently signed and bundled:
+  1. clx.quickapps  (sidecar + UI)
+  2. clx.api-client (sidecar + UI)
+  3. clx.cli-proxy  (sidecar + UI)
+  4. clx.ai-companion (sidecar + UI)
+  5. clx.local-llm  (sidecar + UI)
+  6. clx.ssh         (sidecar + UI)
+  7. clx.buzz        (sidecar + UI)
+  8. clx.nes         (sidecar + UI)
+  9. clx.pet         (UI only — lightweight filesystem logic stays in Core)
+
+Core has been stripped of: candle-core, candle-transformers, tokenizers, russh,
+russh-keys, tokio-tungstenite, nes-protocol, k256, all companion/builtin_llm/
+buzz/nes backend modules, and SSH server manager. SSH client logic is isolated
+in the shared clx-ssh-client crate for remote monitoring probes.
+
+Next: Phase 5 — Migration and Release Hardening.
 
 ### Phase 5 — Migration and Release Hardening
 
@@ -357,4 +384,3 @@ Release validation adds:
   coturn deployment.
 - Premium pet-content entitlements.
 - Shipping a production portable edition alongside the installer.
-

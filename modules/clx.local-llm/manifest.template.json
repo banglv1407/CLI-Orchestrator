@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.local-llm",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    { "id": "local-llm.settings", "kind": "settingsSection", "entrypoint": "ui/index.js", "export": "registerSettings" }
+  ],
+  "sidecar": { "path": "bin/clx-local-llm-sidecar.exe", "protocolVersion": 1 },
+  "requestedCapabilities": ["processLaunch"],
+  "dependencies": [],
+  "entitlementId": "clx.local-llm",
+  "backgroundActivation": "onDemand",
+  "files": [],
+  "licenses": [{ "name": "MIT", "path": "NOTICE.txt" }],
+  "signature": { "algorithm": "ed25519", "keyId": "clx-release-v1", "value": "" }
+}

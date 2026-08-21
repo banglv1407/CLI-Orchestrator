@@ -1,7 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app_state;
-mod builtin_llm;
 mod commands;
 mod companion;
 mod core;
@@ -10,23 +9,17 @@ mod terminal;
 
 use app_state::AppState;
 use commands::{
-    api_proxy::{api_proxy_abort, api_proxy_request, api_proxy_stream},
-    builtin_llm_commands::{
-        builtin_llm_generate, builtin_llm_get_config, builtin_llm_load, builtin_llm_save_config,
-        builtin_llm_status, builtin_llm_unload,
-    },
-    buzz_commands::*,
     cli_commands::{
         backend_logs_path, create_directory, create_file_content, create_rdp_session,
         create_ssh_session, create_terminal_session, delete_cli, delete_file_or_dir,
         delete_ssh_file_or_dir, detect_installed_clis, download_ssh_file, get_git_diff,
-        get_git_status, get_remote_system_stats, get_ssh_server_config, get_ssh_server_status,
+        get_git_status, get_remote_system_stats,
         list_all_files_recursive, list_clis, list_directory_files, list_project_tags,
         list_sessions, list_ssh_directory_files, list_ssh_files_recursive, load_ssh_connections,
         open_backend_logs_folder, open_workspace_folder, pick_file, pick_folder, read_file_content,
         read_ssh_file_content, resize_cli, reveal_in_file_manager, ripgrep_search, save_cli_tag,
-        save_project_tag, save_ssh_connections, save_ssh_server_config, send_cli_input,
-        send_llm_chat, start_ssh_server, stop_cli, stop_ssh_server, upload_ssh_file, upsert_cli,
+        save_project_tag, save_ssh_connections, send_cli_input,
+        send_llm_chat, stop_cli, upload_ssh_file, upsert_cli,
         write_file_content, write_ssh_file_content,
     },
     dashboard_commands::{
@@ -37,42 +30,65 @@ use commands::{
         dashboard_start_log_stream, dashboard_stop_log_stream, dashboard_test_monitor,
         dashboard_upsert_monitor,
     },
-    nes_commands::{
-        nes_accept_invite, nes_create_public_room, nes_create_room_and_invite, nes_end_room,
-        nes_get_config, nes_get_pubkey, nes_join_room, nes_leave_room, nes_list_rooms,
-        nes_open_rom, nes_refresh_connection, nes_save_config, nes_test_server,
-    },
+    module_commands::{module_call, module_catalog, module_restart, module_set_enabled},
     notepad_commands::{get_notepad, save_notepad},
     pet_commands::{pet_install_pack, pet_list_packs, pet_load_asset},
-    proxy_commands::{
-        proxy_add_backend, proxy_get_config, proxy_get_logs, proxy_get_recent_logs,
-        proxy_get_usage, proxy_remove_backend, proxy_reset_usage, proxy_save_config, proxy_start,
-        proxy_status, proxy_stop,
-    },
-    quickapps_commands::{
-        delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
-    },
     rtk_commands::rtk_get_status,
     system_commands::get_system_logs,
-};
-use companion::commands::{
-    companion_cancel, companion_clear_history, companion_get_catalog, companion_get_config,
-    companion_get_help, companion_get_history, companion_get_safe_context, companion_help_search,
-    companion_import_legacy, companion_save_config, companion_send, companion_set_actions_enabled,
-    send_companion_chat,
 };
 use companion::terminal_command::{
     terminal_command_cancel, terminal_command_detect_environment, terminal_command_suggest,
 };
 use tauri::{Emitter, Manager};
 
+fn module_asset_response(
+    modules: &crate::core::module_host::ModuleHost,
+    request: tauri::http::Request<Vec<u8>>,
+) -> tauri::http::Response<Vec<u8>> {
+    let path = request.uri().path().trim_start_matches('/');
+    let mut segments = path.splitn(3, '/');
+    let module_id = segments.next().unwrap_or_default();
+    let version = segments.next().unwrap_or_default();
+    let relative_path = segments.next().unwrap_or_default();
+    if module_id.is_empty()
+        || version.is_empty()
+        || relative_path.is_empty()
+        || path.contains('%')
+        || request.method() != tauri::http::Method::GET
+    {
+        return tauri::http::Response::builder()
+            .status(tauri::http::StatusCode::BAD_REQUEST)
+            .body(b"invalid module asset request".to_vec())
+            .expect("static module asset response");
+    }
+    match modules.read_asset(module_id, version, relative_path) {
+        Ok(asset) => tauri::http::Response::builder()
+            .status(tauri::http::StatusCode::OK)
+            .header(tauri::http::header::CONTENT_TYPE, asset.content_type)
+            .header(tauri::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+            .header("X-Content-Type-Options", "nosniff")
+            .header(tauri::http::header::CACHE_CONTROL, "no-store")
+            .body(asset.bytes)
+            .expect("verified module asset response"),
+        Err(_) => tauri::http::Response::builder()
+            .status(tauri::http::StatusCode::NOT_FOUND)
+            .header(
+                tauri::http::header::CONTENT_TYPE,
+                "text/plain; charset=utf-8",
+            )
+            .header("X-Content-Type-Options", "nosniff")
+            .body(b"module asset unavailable".to_vec())
+            .expect("static module asset error response"),
+    }
+}
+
 fn cleanup_for_exit(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
-    let companion = state.companion.clone();
     let monitoring = state.monitoring.clone();
+    let modules = state.modules.clone();
     tauri::async_runtime::block_on(async move {
-        let _ = companion.cancel("").await;
         monitoring.stop_all_streams().await;
+        modules.shutdown().await;
     });
 }
 
@@ -84,60 +100,19 @@ fn main() {
             std::process::exit(1);
         }
     };
+    let module_assets = state.modules.clone();
 
     tauri::Builder::default()
+        .register_uri_scheme_protocol("clx-module", move |_context, request| {
+            module_asset_response(&module_assets, request)
+        })
         .plugin(tauri_plugin_dialog::init())
-        .manage(state.api_proxy.clone())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
-            buzz_get_config,
-            buzz_set_config,
-            buzz_list_channels,
-            buzz_get_messages,
-            buzz_get_thread,
-            buzz_send_message,
-            buzz_list_members,
-            buzz_resolve_users,
-            buzz_open_dm,
-            buzz_list_dms,
-            buzz_list_agents,
-            buzz_add_agent,
-            buzz_has_identity,
-            buzz_get_pubkey,
-            buzz_generate_identity,
-            buzz_import_identity,
-            buzz_clear_identity,
-            buzz_set_profile,
-            buzz_get_my_profile,
-            buzz_subscribe_live,
-            buzz_unsubscribe_live,
-            buzz_live_status,
-            nes_get_config,
-            nes_save_config,
-            nes_test_server,
-            nes_open_rom,
-            nes_get_pubkey,
-            nes_create_room_and_invite,
-            nes_create_public_room,
-            nes_list_rooms,
-            nes_join_room,
-            nes_accept_invite,
-            nes_refresh_connection,
-            nes_leave_room,
-            nes_end_room,
-            companion_get_catalog,
-            companion_help_search,
-            companion_get_help,
-            companion_get_safe_context,
-            companion_send,
-            companion_cancel,
-            companion_get_config,
-            companion_save_config,
-            companion_get_history,
-            companion_clear_history,
-            companion_set_actions_enabled,
-            companion_import_legacy,
-            send_companion_chat,
+            module_catalog,
+            module_set_enabled,
+            module_call,
+            module_restart,
             terminal_command_detect_environment,
             terminal_command_suggest,
             terminal_command_cancel,
@@ -179,31 +154,7 @@ fn main() {
             upload_ssh_file,
             list_all_files_recursive,
             list_ssh_files_recursive,
-            list_quickapps,
-            upsert_quickapp,
-            delete_quickapp,
-            reextract_icons,
-            launch_quickapp,
             ripgrep_search,
-            start_ssh_server,
-            stop_ssh_server,
-            get_ssh_server_status,
-            get_ssh_server_config,
-            save_ssh_server_config,
-            api_proxy_request,
-            api_proxy_stream,
-            api_proxy_abort,
-            proxy_status,
-            proxy_start,
-            proxy_stop,
-            proxy_get_config,
-            proxy_save_config,
-            proxy_add_backend,
-            proxy_remove_backend,
-            proxy_get_logs,
-            proxy_get_recent_logs,
-            proxy_get_usage,
-            proxy_reset_usage,
             rtk_get_status,
             get_system_logs,
             get_notepad,
@@ -213,12 +164,6 @@ fn main() {
             pet_load_asset,
             create_directory,
             create_file_content,
-            builtin_llm_status,
-            builtin_llm_load,
-            builtin_llm_unload,
-            builtin_llm_generate,
-            builtin_llm_get_config,
-            builtin_llm_save_config,
             dashboard_get_resource_usage,
             dashboard_probe_ports,
             dashboard_probe_port,
@@ -237,24 +182,6 @@ fn main() {
             dashboard_get_all_connections,
         ])
         .setup(|app| {
-            // Initialize companion with app handle for event emission
-            if let Some(state) = app.try_state::<AppState>() {
-                state.companion.set_app_handle(app.handle().clone());
-                // Inject service refs
-                let mut ps = state.companion.proxy_server.blocking_write();
-                *ps = Some(state.proxy_server.clone());
-                drop(ps);
-                let mut cr = state.companion.cli_registry.blocking_write();
-                *cr = Some(state.registry.clone());
-                drop(cr);
-                let mut sm = state.companion.session_manager.blocking_write();
-                *sm = Some(state.session_manager.clone());
-                drop(sm);
-                let mut qa = state.companion.quickapps.blocking_write();
-                *qa = Some(state.quickapps.clone());
-                drop(qa);
-            }
-
             if let Some(window) = app.get_webview_window("main") {
                 if let Ok(Some(monitor)) = window.primary_monitor() {
                     let size = monitor.size();

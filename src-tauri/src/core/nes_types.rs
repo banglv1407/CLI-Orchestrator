@@ -5,6 +5,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use super::buzz_proxy::BuzzProxyConfig;
+
 pub const NES_RELAY_CONFIG_SCHEMA_VERSION: u32 = 1;
 
 /// Persisted client configuration. Only this shape is allowed on disk.
@@ -14,6 +16,9 @@ pub const NES_RELAY_CONFIG_SCHEMA_VERSION: u32 = 1;
 pub struct NesRelayConfigV1 {
     pub schema_version: u32,
     pub service_base_url: String,
+    /// Optional outbound hop: SSH dynamic SOCKS5 or HTTP CONNECT.
+    #[serde(default)]
+    pub proxy: Option<BuzzProxyConfig>,
 }
 
 impl Default for NesRelayConfigV1 {
@@ -21,6 +26,7 @@ impl Default for NesRelayConfigV1 {
         Self {
             schema_version: NES_RELAY_CONFIG_SCHEMA_VERSION,
             service_base_url: String::new(),
+            proxy: None,
         }
     }
 }
@@ -67,6 +73,8 @@ pub struct NesRomPayloadV1 {
     pub name: String,
     pub size_bytes: u64,
     pub sha256: String,
+    /// "nes" or "snes" — detected from ROM content, not extension.
+    pub console: String,
 }
 
 /// Result of opening a ROM: metadata plus the ROM bytes (base64) handed to the

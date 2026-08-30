@@ -3,11 +3,13 @@
 ## Product Contract
 
 NES multiplayer supports exactly two authenticated CLX desktop players. Both
-players select and run the same `.nes` ROM locally. The service never receives
-ROM bytes, filenames, emulator snapshots, video, or audio.
+players select and run the same `.nes` ROM locally. The service receives only
+the host's display-only ROM filename (basename plus extension); it never
+receives ROM bytes, paths, hashes, emulator snapshots, video, or audio.
 
-Online traffic is input-only over the authenticated room WebSocket. There is
-no WebRTC media path and no coturn dependency.
+Online traffic uses input lockstep plus fixed, ephemeral emoji reactions over the
+authenticated room WebSocket. Reactions are not chat, are rate-limited, and are
+never persisted. There is no WebRTC media path and no coturn dependency.
 
 ## Room Discovery and Join
 
@@ -16,7 +18,9 @@ no WebRTC media path and no coturn dependency.
 - Clicking Join opens a Player 2 setup view before claiming the room. Player 2
   must select a local ROM explicitly.
 - The first authenticated join succeeds atomically; later joins fail.
-- Room directory entries contain no ROM metadata or connection secrets.
+- Room directory entries include the host's complete ROM filename (basename
+  plus extension) so Player 2 can choose a matching local file. They never
+  include a ROM path, bytes, hash, emulator state, or connection secret.
 
 ## ROM Boundary
 
@@ -35,9 +39,16 @@ no WebRTC media path and no coturn dependency.
 - Every 300 completed frames, peers compare an eight-character state hash. A
   mismatch pauses the session and reports failure; v1 does not transfer a
   snapshot to repair divergence.
-- The controller state itself is one byte per player per frame. The current
-  JSON room envelope plus WebSocket/TLS framing makes real traffic typically
-  single-digit to low-tens of KiB/s per client, depending on transport behavior.
+- The controller wire value is a 12-bit mask: the original NES buttons plus
+  SNES X/Y/L/R. In particular, `2048` is the valid SNES R bit, not a 255-byte
+  payload violation. The JSON room envelope plus WebSocket/TLS framing makes
+  real traffic typically single-digit to low-tens of KiB/s per client.
+
+## Shared reactions
+
+- While a two-player room is synchronized or paused, either player can choose one of eight fixed emoji reactions.
+- The sender and peer each see the same short-lived P1/P2 overlay; no reaction history is stored.
+- Reactions are validated by emoji ID and limited to one per player every 800 ms, so they cannot alter input lockstep or state hashes.
 
 ## Solo
 

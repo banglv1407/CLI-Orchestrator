@@ -9,6 +9,9 @@ import {
   nesJoinRoom,
   nesLeaveRoom,
   nesEndRoom,
+  nesSaveState,
+  nesLoadState,
+  nesHasState,
   NesConnectionBundleV1,
   NesRelayConfigV1,
   NesRoomDirectoryEntryV1,
@@ -19,8 +22,9 @@ import {
   NES_NATIVE_HEIGHT,
   NES_NATIVE_WIDTH,
 } from "../lib/nes-emulator";
+import { SnesEmulator } from "../lib/snes-emulator";
 import { NesControllerInput, NesKeyMapping } from "../lib/nes-input";
-import { NesNetplaySession, NesNetplayStatus } from "../lib/nes-netplay";
+import { NES_REACTIONS, NesNetplaySession, NesNetplayStatus, NesReactionId } from "../lib/nes-netplay";
 import { NesKeyConfigModal } from "./NesKeyConfigModal";
 import { pickFile } from "../lib/tauri";
 
@@ -41,11 +45,14 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
   const [serverError, setServerError] = useState<string | null>(null);
   const [testingServer, setTestingServer] = useState(false);
 
-  // ROM state stays local on both host and guest.
   const [romPayload, setRomPayload] = useState<NesRomPayloadV1 | null>(null);
   const [romData, setRomData] = useState<Uint8Array | null>(null);
   const [romError, setRomError] = useState<string | null>(null);
   const [romOpen, setRomOpen] = useState(false);
+
+  const [autoSavedNotice, setAutoSavedNotice] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string>("1");
+  const [hasSaveSlot, setHasSaveSlot] = useState<boolean>(false);
 
   // Emulator runtime
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -59,12 +66,74 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
   const wasRunningBeforeHiddenRef = useRef<boolean>(false);
   const netplayRef = useRef<NesNetplaySession | null>(null);
   const [pendingJoinRoomId, setPendingJoinRoomId] = useState<string | null>(null);
+  const [pendingHostRomName, setPendingHostRomName] = useState<string | null>(null);
   const [rooms, setRooms] = useState<NesRoomDirectoryEntryV1[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomError, setRoomError] = useState<string | null>(null);
   const [activeBundle, setActiveBundle] = useState<NesConnectionBundleV1 | null>(null);
   const [netplayStatus, setNetplayStatus] = useState<NesNetplayStatus>("waiting");
   const [netplayDetail, setNetplayDetail] = useState<string | null>(null);
+  const [activeReaction, setActiveReaction] = useState<{ id: NesReactionId; sender: "host" | "guest" } | null>(null);
+  const reactionTimerRef = useRef<number | null>(null);
+
+  const showReaction = useCallback((id: NesReactionId, sender: "host" | "guest") => {
+    if (reactionTimerRef.current !== null) window.clearTimeout(reactionTimerRef.current);
+    setActiveReaction({ id, sender });
+    reactionTimerRef.current = window.setTimeout(() => {
+      setActiveReaction(null);
+      reactionTimerRef.current = null;
+    }, 2600);
+  }, []);
+
+  const handleReaction = useCallback((id: NesReactionId) => {
+    const bundle = activeBundle;
+    if (!bundle || !["synced", "paused"].includes(netplayStatus)) return;
+    if (netplayRef.current?.sendReaction(id)) showReaction(id, bundle.role);
+  }, [activeBundle, netplayStatus, showReaction]);
+
+  const checkSlotStatus = useCallback(async (slot: string, sha: string) => {
+    try {
+      const exists = await nesHasState(sha, slot);
+      setHasSaveSlot(exists);
+    } catch {
+      setHasSaveSlot(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (romPayload?.sha256) {
+      void checkSlotStatus(selectedSlot, romPayload.sha256);
+    }
+  }, [romPayload, selectedSlot, checkSlotStatus]);
+
+  const handleSaveState = useCallback(async (slot = selectedSlot) => {
+    const emu = emuRef.current;
+    if (!emu || !romPayload?.sha256) return;
+    try {
+      const json = emu.serialize();
+      if (!json) return;
+      await nesSaveState(romPayload.sha256, slot, json);
+      await checkSlotStatus(slot, romPayload.sha256);
+      setAutoSavedNotice(`Saved state to Slot ${slot.toUpperCase()}`);
+      setTimeout(() => setAutoSavedNotice(null), 3000);
+    } catch (e) {
+      console.warn("Failed to save state:", e);
+    }
+  }, [selectedSlot, romPayload, checkSlotStatus]);
+
+  const handleLoadState = useCallback(async (slot = selectedSlot) => {
+    const emu = emuRef.current;
+    if (!emu || !romPayload?.sha256) return;
+    try {
+      const json = await nesLoadState(romPayload.sha256, slot);
+      if (!json) return;
+      emu.deserialize(json);
+      setAutoSavedNotice(`Loaded state from Slot ${slot.toUpperCase()}`);
+      setTimeout(() => setAutoSavedNotice(null), 3000);
+    } catch (e) {
+      console.warn("Failed to load state:", e);
+    }
+  }, [selectedSlot, romPayload]);
 
   useEffect(() => {
     void loadConfig();
@@ -72,6 +141,7 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
       emuRef.current?.stop();
       emuRef.current = null;
       netplayRef.current?.stop();
+      if (reactionTimerRef.current !== null) window.clearTimeout(reactionTimerRef.current);
     };
   }, []);
 
@@ -162,7 +232,10 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
       }
       await nesSaveConfig(nextConfig);
       setConfig(nextConfig);
-      const bundle = await nesCreatePublicRoom(nextConfig);
+      if (!romPayload) {
+        throw new Error("Choose a local ROM before hosting a public room.");
+      }
+      const bundle = await nesCreatePublicRoom(nextConfig, romPayload.name);
       setActiveBundle(bundle);
       setNetplayStatus("connecting");
       setMode("host-game");
@@ -179,8 +252,9 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     setMode("host-game");
   }
 
-  async function handleJoinRoom(roomId: string) {
-    setPendingJoinRoomId(roomId);
+  async function handleJoinRoom(room: NesRoomDirectoryEntryV1) {
+    setPendingJoinRoomId(room.room_id);
+    setPendingHostRomName(room.host_rom_name);
     setRoomError(null);
     setMode("guest-invite");
   }
@@ -205,18 +279,48 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const emu = new NesEmulator(canvas, {
-      onStatus: (s) => setEmuStatus(s),
-    });
-    emuRef.current = emu;
+    const isSnes = romPayload?.console === "snes";
+    let cancelled = false;
 
-    if (romData) {
-      try {
-        emu.loadRom(romData);
-        setRomLoaded(true);
-      } catch (e) {
-        setEmuStatus(`Failed to load ROM: ${String(e)}`);
+    // Both engines expose the same surface the panel and netplay expect.
+    type Engine = NesEmulator | SnesEmulator;
+    let engine: Engine | null = null;
+    const setEngine = (e: Engine) => {
+      engine = e;
+      emuRef.current = e as NesEmulator;
+    };
+
+    if (!isSnes) {
+      const emu = new NesEmulator(canvas, {
+        onStatus: (s) => setEmuStatus(s),
+      });
+      setEngine(emu);
+      if (romData) {
+        try {
+          emu.loadRom(romData);
+          setRomLoaded(true);
+        } catch (e) {
+          setEmuStatus(`Failed to load ROM: ${String(e)}`);
+        }
       }
+    } else {
+      // SNES boots asynchronously; the panel unlocks once the core is ready.
+      setEmuStatus("Booting SNES core…");
+      const snes = new SnesEmulator(canvas, {
+        onStatus: (s) => setEmuStatus(s),
+      });
+      setEngine(snes);
+      void (async () => {
+        if (!romData || cancelled) return;
+        try {
+          await snes.loadRomAsync(romData);
+          if (cancelled) return;
+          setRomLoaded(true);
+          snes.start();
+        } catch (e) {
+          setEmuStatus(`Failed to load ROM: ${String(e)}`);
+        }
+      })();
     }
 
     const role = activeBundle?.role === "guest" ? "guest" : "host";
@@ -226,18 +330,19 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     const poll = activeBundle
       ? null
       : window.setInterval(() => {
-          emu.setPlayerInput(1, input.readBitmask());
+          engine?.setPlayerInput(1, input.readBitmask());
         }, 1000 / 60);
 
     return () => {
+      cancelled = true;
       if (poll !== null) window.clearInterval(poll);
       detach();
-      emu.stop();
+      engine?.stop();
       emuRef.current = null;
       inputRef.current = null;
       setRomLoaded(false);
     };
-  }, [mode, romData, activeBundle]);
+  }, [mode, romData, activeBundle, romPayload]);
 
   useEffect(() => {
     if (!activeBundle) return;
@@ -267,6 +372,21 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
         }
       },
     });
+    session.onReaction = (id, sender) => showReaction(id, sender);
+    session.onAutoSave = (reason: string) => {
+      if (!romPayload?.sha256) return;
+      try {
+        const json = emulator.serialize();
+        if (json) {
+          void nesSaveState(romPayload.sha256, "auto", json).then(() => {
+            void checkSlotStatus(selectedSlot, romPayload.sha256);
+            setAutoSavedNotice("Auto-saved stage upon player disconnect!");
+          });
+        }
+      } catch (err) {
+        console.warn("Auto-save failed on peer left:", err);
+      }
+    };
     netplayRef.current = session;
     void session.start().catch((error) => {
       setNetplayStatus("failed");
@@ -370,6 +490,11 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
           )}
         </div>
         <div className="flex items-center gap-2">
+          {autoSavedNotice && (
+            <span className="rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[11px] font-semibold text-emerald-300 animate-pulse">
+              ✨ {autoSavedNotice}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setShowKeyConfig(true)}
@@ -396,7 +521,7 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
             roomsLoading={roomsLoading}
             roomError={roomError}
             onRefreshRooms={() => void refreshRooms(config)}
-            onJoinRoom={(roomId) => void handleJoinRoom(roomId)}
+            onJoinRoom={(room) => void handleJoinRoom(room)}
           />
         )}
         {(mode === "host-setup" || mode === "waiting") && (
@@ -417,6 +542,7 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
           <HostGameView
             canvasRef={canvasRef}
             romPayload={romPayload}
+            isSnes={romPayload?.console === "snes"}
             emuStatus={emuStatus}
             running={running}
             paused={paused}
@@ -428,11 +554,19 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
             netplayStatus={netplayStatus}
             netplayDetail={netplayDetail}
             online={activeBundle?.role === "host"}
+            selectedSlot={selectedSlot}
+            onSelectSlot={setSelectedSlot}
+            hasSaveSlot={hasSaveSlot}
+            onSaveState={handleSaveState}
+            onLoadState={handleLoadState}
+            reaction={activeReaction}
+            onReact={handleReaction}
           />
         )}
         {mode === "guest-invite" && (
           <GuestInviteView
             roomId={pendingJoinRoomId}
+            hostRomName={pendingHostRomName}
             romPayload={romPayload}
             error={romError ?? roomError}
             onPickRom={handlePickRom}
@@ -453,6 +587,13 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
             onReset={handleReset}
             onLeave={handleBackHome}
             onOpenControls={() => setShowKeyConfig(true)}
+            selectedSlot={selectedSlot}
+            onSelectSlot={setSelectedSlot}
+            hasSaveSlot={hasSaveSlot}
+            onSaveState={handleSaveState}
+            onLoadState={handleLoadState}
+            reaction={activeReaction}
+            onReact={handleReaction}
           />
         )}
       </div>
@@ -481,7 +622,7 @@ function HomeView(props: {
   roomsLoading: boolean;
   roomError: string | null;
   onRefreshRooms: () => void;
-  onJoinRoom: (roomId: string) => void;
+  onJoinRoom: (room: NesRoomDirectoryEntryV1) => void;
 }) {
   const hasUrl = props.config.service_base_url.trim().length > 0;
   return (
@@ -563,10 +704,13 @@ function HomeView(props: {
                 <div className="mt-1 truncate font-mono text-[10px] text-slate-500" title={room.host_pubkey}>
                   Host {room.host_pubkey.slice(0, 12)}… · Room {room.room_id.slice(0, 8)}
                 </div>
+                <div className="mt-1 truncate font-mono text-[11px] text-emerald-300" title={room.host_rom_name}>
+                  ROM: {room.host_rom_name}
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => props.onJoinRoom(room.room_id)}
+                onClick={() => props.onJoinRoom(room)}
                 disabled={!room.joinable}
                 className="ml-3 rounded bg-cyber-electric px-3 py-1.5 text-[11px] font-bold text-white hover:bg-cyber-electric/80 disabled:bg-slate-700 disabled:text-slate-500"
               >
@@ -624,11 +768,16 @@ function HostSetupView(props: {
           onClick={props.onPickRom}
           className="mt-2 rounded border border-cyber-line/40 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:border-cyber-neon/40 transition"
         >
-          Choose .nes file…
+          Choose ROM (.nes / .sfc / .smc)…
         </button>
         {props.romPayload && (
           <div className="mt-3 rounded bg-cyber-base/60 px-3 py-2 text-[11px] font-mono text-slate-300">
-            <div className="text-emerald-400">{props.romPayload.name}</div>
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-cyber-neon/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-cyber-neon">
+                {props.romPayload.console}
+              </span>
+              <span className="text-emerald-400">{props.romPayload.name}</span>
+            </div>
             <div className="text-slate-500">
               {(props.romPayload.size_bytes / 1024).toFixed(1)} KiB · sha256 {props.romPayload.sha256.slice(0, 12)}…
             </div>
@@ -636,7 +785,7 @@ function HostSetupView(props: {
         )}
         {props.romError && <p className="mt-2 text-[11px] text-rose-400">{props.romError}</p>}
         <p className="mt-2 text-[10px] text-slate-500">
-          The ROM stays on this machine. It is never uploaded or shared. Only .nes files ≤ 16 MiB are accepted.
+          The ROM stays on this machine. It is never uploaded or shared. NES (.nes) and SNES (.sfc/.smc/.fig/.swc) files ≤ 16 MiB are accepted.
         </p>
       </div>
 
@@ -671,9 +820,57 @@ function HostSetupView(props: {
 
 type ResolutionMode = "auto" | "1x" | "2x" | "3x" | "4x" | "fit";
 
+type VisibleReaction = { id: NesReactionId; sender: "host" | "guest" } | null;
+
+function NesReactionPicker(props: { enabled: boolean; onReact: (id: NesReactionId) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={!props.enabled}
+        onClick={() => setOpen((value) => !value)}
+        className="rounded border border-fuchsia-400/40 bg-fuchsia-500/10 px-3 py-1.5 text-[12px] font-semibold text-fuchsia-200 hover:bg-fuchsia-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+        aria-expanded={open}
+      >
+        😀 Reactions
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-2 flex w-56 flex-wrap gap-1 rounded-lg border border-fuchsia-400/30 bg-slate-950/95 p-2 shadow-xl">
+          {NES_REACTIONS.map((reaction) => (
+            <button
+              key={reaction.id}
+              type="button"
+              className="rounded px-2 py-1 text-lg hover:bg-fuchsia-500/20"
+              title={reaction.label}
+              aria-label={reaction.label}
+              onClick={() => { props.onReact(reaction.id); setOpen(false); }}
+            >
+              {reaction.emoji}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NesReactionOverlay({ reaction }: { reaction: VisibleReaction }) {
+  if (!reaction) return null;
+  const item = NES_REACTIONS.find((candidate) => candidate.id === reaction.id);
+  if (!item) return null;
+  const player = reaction.sender === "host" ? "P1" : "P2";
+  return (
+    <div className={`pointer-events-none absolute top-5 z-10 flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/80 px-3 py-2 text-2xl shadow-lg ${reaction.sender === "host" ? "left-5" : "right-5"}`}>
+      <span>{item.emoji}</span><span className="text-[10px] font-bold text-slate-200">{player}</span>
+    </div>
+  );
+}
+
 function HostGameView(props: {
   canvasRef: React.Ref<HTMLCanvasElement>;
   romPayload: NesRomPayloadV1 | null;
+  isSnes: boolean;
   emuStatus: string;
   running: boolean;
   paused: boolean;
@@ -685,6 +882,13 @@ function HostGameView(props: {
   netplayStatus: NesNetplayStatus;
   netplayDetail: string | null;
   online: boolean;
+  selectedSlot: string;
+  onSelectSlot: (slot: string) => void;
+  hasSaveSlot: boolean;
+  onSaveState: (slot?: string) => void;
+  onLoadState: (slot?: string) => void;
+  reaction: VisibleReaction;
+  onReact: (id: NesReactionId) => void;
 }) {
   const [resMode, setResMode] = useState<ResolutionMode>(() => {
     return (localStorage.getItem("clx-nes-res-mode") as ResolutionMode) || "auto";
@@ -715,6 +919,7 @@ function HostGameView(props: {
 
   // The canvas backing store remains 256x240. Only its CSS dimensions change,
   // so every fixed/auto mode performs exactly one nearest-neighbor scale.
+  const isSnes = props.romPayload?.console === "snes";
   const canvasDimensions = useMemo(() => {
     if (resMode === "1x") return { width: NES_NATIVE_WIDTH, height: NES_NATIVE_HEIGHT };
     if (resMode === "2x") return { width: NES_NATIVE_WIDTH * 2, height: NES_NATIVE_HEIGHT * 2 };
@@ -778,6 +983,41 @@ function HostGameView(props: {
             ⌨️ Controls
           </button>
 
+          <NesReactionPicker enabled={props.online && ["synced", "paused"].includes(props.netplayStatus)} onReact={props.onReact} />
+
+          {/* Save / Load State Controls */}
+          <div className="flex items-center gap-1.5 ml-1 rounded border border-cyber-line/40 bg-cyber-base/40 px-2 py-1 text-xs">
+            <span className="text-[10px] text-slate-400 font-mono">Slot:</span>
+            <select
+              value={props.selectedSlot}
+              onChange={(e) => props.onSelectSlot(e.target.value)}
+              className="bg-transparent text-[11px] font-semibold text-cyber-neon outline-none cursor-pointer"
+            >
+              <option value="1" className="bg-slate-900 text-slate-200">Slot 1</option>
+              <option value="2" className="bg-slate-900 text-slate-200">Slot 2</option>
+              <option value="3" className="bg-slate-900 text-slate-200">Slot 3</option>
+              <option value="auto" className="bg-slate-900 text-slate-200">Auto Save</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => props.onSaveState(props.selectedSlot)}
+              disabled={!props.romLoaded}
+              className="rounded bg-indigo-600/80 hover:bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white transition disabled:opacity-40"
+              title="Save snapshot to current slot"
+            >
+              💾 Save
+            </button>
+            <button
+              type="button"
+              onClick={() => props.onLoadState(props.selectedSlot)}
+              disabled={!props.romLoaded || !props.hasSaveSlot}
+              className="rounded border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300 transition disabled:opacity-40"
+              title="Load snapshot from current slot"
+            >
+              📂 Load
+            </button>
+          </div>
+
           {/* Resolution Selector */}
           <div className="flex items-center gap-1 ml-2 rounded border border-cyber-line/40 bg-cyber-base/40 px-2 py-1 text-xs">
             <span className="text-[10px] text-slate-400 font-mono">Res:</span>
@@ -809,7 +1049,7 @@ function HostGameView(props: {
 
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 rounded-xl border border-cyber-line/40 bg-black/90 p-2 flex items-center justify-center overflow-hidden"
+        className="flex-1 min-h-0 rounded-xl border border-cyber-line/40 bg-black/90 p-2 flex items-center justify-center overflow-hidden relative"
       >
         <canvas
           ref={props.canvasRef}
@@ -819,8 +1059,10 @@ function HostGameView(props: {
           style={{
             ...canvasDimensions,
             imageRendering: "pixelated",
+            ...(isSnes ? { display: "none" } : {}),
           }}
         />
+        <NesReactionOverlay reaction={props.reaction} />
       </div>
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
         <span>{props.online ? props.netplayDetail ?? "Player 1: local ROM · waiting for Player 2 ROM hash" : "Player 1: Keyboard + Gamepad · local solo session"}</span>
@@ -834,6 +1076,7 @@ function GuestInviteView(props: {
   roomId: string | null;
   romPayload: NesRomPayloadV1 | null;
   error: string | null;
+  hostRomName: string | null;
   onPickRom: () => void;
   onJoin: () => void;
 }) {
@@ -844,12 +1087,18 @@ function GuestInviteView(props: {
         <p className="mt-1 font-mono text-[10px] text-slate-500">Room {props.roomId?.slice(0, 8) ?? "unknown"}</p>
       </div>
       <div className="rounded border border-cyber-line/30 bg-cyber-base/50 p-4">
+        {props.hostRomName && (
+          <p className="mt-2 font-mono text-[11px] text-emerald-300" title={props.hostRomName}>
+            Host ROM: {props.hostRomName}
+          </p>
+        )}
         <p className="text-[11px] text-slate-300">Choose your own local copy of the ROM.</p>
         <button type="button" onClick={props.onPickRom} className="mt-3 rounded border border-cyber-line/40 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:border-cyber-neon/40 hover:text-white">
-          Choose .nes file…
+          Choose ROM (.nes / .sfc / .smc)…
         </button>
         {props.romPayload && (
           <div className="mt-3 rounded bg-cyber-base px-3 py-2 font-mono text-[10px] text-emerald-400">
+            <span className="mr-2 rounded bg-cyber-neon/20 px-1.5 py-0.5 font-bold uppercase text-cyber-neon">{props.romPayload.console}</span>
             {props.romPayload.name} · sha256 {props.romPayload.sha256.slice(0, 12)}…
           </div>
         )}
@@ -876,6 +1125,13 @@ function GuestGameView(props: {
   onReset: () => void;
   onLeave: () => void;
   onOpenControls: () => void;
+  selectedSlot: string;
+  onSelectSlot: (slot: string) => void;
+  hasSaveSlot: boolean;
+  onSaveState: (slot?: string) => void;
+  onLoadState: (slot?: string) => void;
+  reaction: VisibleReaction;
+  onReact: (id: NesReactionId) => void;
 }) {
   return (
     <div className="flex h-full flex-col gap-3">
@@ -886,7 +1142,12 @@ function GuestGameView(props: {
             Room {props.room?.room_id.slice(0, 8) ?? "connecting"} · {props.detail ?? props.status}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {props.room?.host_rom_name && (
+            <p className="mt-1 font-mono text-[11px] text-emerald-300" title={props.room.host_rom_name}>
+              Host ROM: {props.room.host_rom_name}
+            </p>
+          )}
           <button type="button" onClick={props.onToggleRun} disabled={!props.romLoaded || !["synced", "paused"].includes(props.status)} className="rounded bg-cyber-electric px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40">
             {props.running ? "Pause" : props.paused ? "Resume" : "Play"}
           </button>
@@ -896,12 +1157,48 @@ function GuestGameView(props: {
           <button type="button" onClick={props.onOpenControls} className="rounded border border-amber-400/40 px-3 py-1.5 text-[11px] font-semibold text-amber-300">
             ⌨️ P2 Controls
           </button>
+
+          <NesReactionPicker enabled={["synced", "paused"].includes(props.status)} onReact={props.onReact} />
+
+          {/* Save / Load State for Guest */}
+          <div className="flex items-center gap-1.5 rounded border border-cyber-line/40 bg-cyber-base/40 px-2 py-1 text-xs">
+            <span className="text-[10px] text-slate-400 font-mono">Slot:</span>
+            <select
+              value={props.selectedSlot}
+              onChange={(e) => props.onSelectSlot(e.target.value)}
+              className="bg-transparent text-[11px] font-semibold text-cyber-neon outline-none cursor-pointer"
+            >
+              <option value="1" className="bg-slate-900 text-slate-200">Slot 1</option>
+              <option value="2" className="bg-slate-900 text-slate-200">Slot 2</option>
+              <option value="3" className="bg-slate-900 text-slate-200">Slot 3</option>
+              <option value="auto" className="bg-slate-900 text-slate-200">Auto Save</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => props.onSaveState(props.selectedSlot)}
+              disabled={!props.romLoaded}
+              className="rounded bg-indigo-600/80 hover:bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white transition disabled:opacity-40"
+              title="Save snapshot to current slot"
+            >
+              💾 Save
+            </button>
+            <button
+              type="button"
+              onClick={() => props.onLoadState(props.selectedSlot)}
+              disabled={!props.romLoaded || !props.hasSaveSlot}
+              className="rounded border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300 transition disabled:opacity-40"
+              title="Load snapshot from current slot"
+            >
+              📂 Load
+            </button>
+          </div>
+
           <button type="button" onClick={props.onLeave} className="rounded border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300">
             Leave Room
           </button>
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-cyber-line/40 bg-black/90 p-2">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-cyber-line/40 bg-black/90 p-2">
         <canvas
           ref={props.canvasRef}
           width={NES_NATIVE_WIDTH}
@@ -909,6 +1206,7 @@ function GuestGameView(props: {
           className="max-h-full max-w-full bg-black shadow-2xl"
           style={{ imageRendering: "pixelated", aspectRatio: "256 / 240", width: "auto", height: "100%" }}
         />
+        <NesReactionOverlay reaction={props.reaction} />
       </div>
       <div className="flex items-center justify-between text-[10px] text-slate-500">
         <span>{props.romPayload?.name ?? "Local ROM"} · only P2 input and state hashes leave this machine.</span>

@@ -4,10 +4,10 @@ use thiserror::Error;
 pub enum NesProtocolError {
     #[error("unknown protocol version: {0}")]
     UnknownVersion(u32),
-    #[error("invalid controller bitmask: {0:#04x}")]
-    InvalidBitmask(u8),
-    #[error("impossible opposing directions in bitmask: {0:#04x}")]
-    OpposingDirections(u8),
+    #[error("invalid controller bitmask: {0:#06x}")]
+    InvalidBitmask(u16),
+    #[error("impossible opposing directions in bitmask: {0:#06x}")]
+    OpposingDirections(u16),
     #[error("invalid signaling type")]
     InvalidSignalType,
     #[error("missing required field: {0}")]

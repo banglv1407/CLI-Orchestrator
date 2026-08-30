@@ -129,10 +129,12 @@ pub fn buzz_generate_identity(state: State<'_, AppState>) -> Result<String, Stri
     let key = buzz_identity::generate_private_key();
     buzz_identity::vault_set(&key)?;
     // Update the stored pubkey reference in config via a fresh CLI lookup.
+    let existing = state.buzz.get_config();
     let _ = state.buzz.set_config(BuzzRelayConfig {
-        relay_url: state.buzz.get_config().relay_url,
-        allow_insecure: state.buzz.get_config().allow_insecure,
+        relay_url: existing.relay_url,
+        allow_insecure: existing.allow_insecure,
         identity_pubkey: None,
+        proxy: existing.proxy,
     });
     Ok(key)
 }

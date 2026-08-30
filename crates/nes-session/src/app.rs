@@ -32,6 +32,13 @@ fn now() -> i64 {
         .unwrap_or(0)
 }
 
+fn now_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
 fn resolve_signal_url(state: &AppState, headers: &axum::http::HeaderMap) -> String {
     let base = state.signal_url();
     // If the configured signal URL is not localhost, respect the explicit configuration.
@@ -123,9 +130,26 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
 struct CreateRoomRequest {
     #[serde(default)]
     guest_pubkey: Option<String>,
+    /// A display-only basename sent by current desktop clients. Keep this
+    /// optional for older clients, which will appear as "Unknown ROM".
+    #[serde(default)]
+    host_rom_name: String,
 }
 
+fn normalized_host_rom_name(raw: &str) -> Result<String, &'static str> {
+    if raw.is_empty() {
+        return Ok("Unknown ROM".to_string());
+    }
+    if raw.len() > 255 || raw.chars().any(char::is_control) {
+        return Err("invalid host ROM filename");
+    }
+    if raw.contains('/') || raw.contains('\\') || raw.trim().is_empty() {
+        return Err("host ROM name must be a filename, not a path");
+    }
+    Ok(raw.to_string())
+}
 #[derive(Serialize)]
+
 struct CreateRoomResponse {
     bundle: NesConnectionBundleV1,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,6 +170,7 @@ async fn list_rooms(State(state): State<AppState>) -> Json<Vec<NesRoomDirectoryE
             host_pubkey: room.host_pubkey.clone(),
             state: room.state,
             participant_count: if room.guest_pubkey.is_some() { 2 } else { 1 },
+            host_rom_name: room.host_rom_name.clone(),
             joinable: room.state == RoomState::Waiting && room.guest_pubkey.is_none(),
             created_at: room.created_at,
             expires_at: room.expires_at,
@@ -161,7 +186,11 @@ async fn create_room(
     headers: axum::http::HeaderMap,
     Json(req): Json<CreateRoomRequest>,
 ) -> Response {
-    tracing::info!("[HTTP] POST /v1/rooms: host={}, guest_pubkey={:?}", host, req.guest_pubkey);
+    tracing::info!(
+        "[HTTP] POST /v1/rooms: host={}, guest_pubkey={:?}",
+        host,
+        req.guest_pubkey
+    );
     if req
         .guest_pubkey
         .as_ref()
@@ -171,6 +200,10 @@ async fn create_room(
         return (StatusCode::BAD_REQUEST, "invalid guest_pubkey").into_response();
     }
 
+    let host_rom_name = match normalized_host_rom_name(&req.host_rom_name) {
+        Ok(name) => name,
+        Err(error) => return (StatusCode::BAD_REQUEST, error).into_response(),
+    };
     {
         let rooms = state.rooms();
         if rooms.len() >= MAX_ACTIVE_ROOMS {
@@ -184,7 +217,11 @@ async fn create_room(
                 .as_ref()
                 .is_some_and(|guest| active.contains_key(guest))
         {
-            tracing::warn!("[HTTP] Active room override for host={}, previous_active={:?}", host, *active);
+            tracing::warn!(
+                "[HTTP] Active room override for host={}, previous_active={:?}",
+                host,
+                *active
+            );
         }
     }
 
@@ -192,6 +229,7 @@ async fn create_room(
     let invite_token = uuid::Uuid::new_v4().to_string();
     let ticket = uuid::Uuid::new_v4().to_string();
     let mut room = Room::new(room_id.clone(), host.clone(), req.guest_pubkey.clone());
+    room.host_rom_name = host_rom_name;
     if req.guest_pubkey.is_some() {
         room.invite_token = Some(invite_token.clone());
         room.invite_expires_at = Some(now() + INVITE_TTL_SECS);
@@ -201,7 +239,12 @@ async fn create_room(
     room.transition(RoomState::Waiting).ok();
 
     let signal_url = resolve_signal_url(&state, &headers);
-    tracing::info!("[HTTP] Created room_id={}, host_ticket={}, signal_url={}", room_id, ticket, signal_url);
+    tracing::info!(
+        "[HTTP] Created room_id={}, host_ticket={}, signal_url={}",
+        room_id,
+        ticket,
+        signal_url
+    );
 
     let bundle = NesConnectionBundleV1 {
         schema_version: 1,
@@ -286,7 +329,11 @@ async fn join_room(
         return (StatusCode::NOT_FOUND, "room not found").into_response();
     };
     if room.guest_pubkey.is_some() {
-        tracing::warn!("[HTTP] Join rejected: room_id {} already has guest {:?}", room_id, room.guest_pubkey);
+        tracing::warn!(
+            "[HTTP] Join rejected: room_id {} already has guest {:?}",
+            room_id,
+            room.guest_pubkey
+        );
         return (StatusCode::CONFLICT, "room is no longer joinable").into_response();
     }
 
@@ -295,7 +342,12 @@ async fn join_room(
     let ticket_expires_at = now() + TICKET_TTL_SECS;
     room.set_ticket(NesRole::Guest, guest_ticket.clone(), ticket_expires_at);
     room.transition(RoomState::Negotiating).ok();
-    tracing::info!("[HTTP] Guest joined successfully: room_id={}, guest_ticket={}, signal_url={}", room_id, guest_ticket, signal_url);
+    tracing::info!(
+        "[HTTP] Guest joined successfully: room_id={}, guest_ticket={}, signal_url={}",
+        room_id,
+        guest_ticket,
+        signal_url
+    );
     let bundle = NesConnectionBundleV1 {
         schema_version: 1,
         role: NesRole::Guest,
@@ -421,11 +473,19 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
         })
     };
     let Some(role) = role else {
-        tracing::warn!("[WS] Auth ticket invalid, expired, or room {} not found (ticket={})", room_id, ticket);
+        tracing::warn!(
+            "[WS] Auth ticket invalid, expired, or room {} not found (ticket={})",
+            room_id,
+            ticket
+        );
         let _ = socket.send(Message::Close(None)).await;
         return;
     };
-    tracing::info!("[WS] Authenticated successfully as {:?} in room {}", role, room_id);
+    tracing::info!(
+        "[WS] Authenticated successfully as {:?} in room {}",
+        role,
+        room_id
+    );
 
     let sender = state.signal_channel(room_id);
     let mut receiver = sender.subscribe();
@@ -433,9 +493,9 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
     loop {
         tokio::select! {
             incoming = socket.recv() => {
-                let Some(Ok(msg)) = incoming else { 
+                let Some(Ok(msg)) = incoming else {
                     tracing::info!("[WS] Socket recv ended/closed for {:?} in room {}", role, room_id);
-                    break; 
+                    break;
                 };
                 let text = match msg {
                     Message::Text(text) => text.to_string(),
@@ -466,6 +526,20 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
                         format!("{{\"error\":\"{error}\"}}").into(),
                     )).await;
                     continue;
+                }
+
+                if envelope.signal_type == SignalType::Reaction {
+                    let accepted = {
+                        let mut rooms = state.rooms();
+                        rooms
+                            .get_mut(room_id)
+                            .is_some_and(|room| room.allow_reaction(role, now_millis()))
+                    };
+                    if !accepted {
+                        tracing::warn!("[WS] Reaction cooldown hit for {:?}", role);
+                        let _ = socket.send(Message::Text("{\"error\":\"reaction rate limited\"}".into())).await;
+                        continue;
+                    }
                 }
 
                 if envelope.signal_type == SignalType::RomReady {
@@ -509,7 +583,7 @@ async fn handle_signal(state: AppState, mut socket: WebSocket) {
                             NesRole::Guest => &mut room.guest_seq,
                         };
                         // Allow rom_ready and control messages without strictly advancing sequence
-                        if envelope.signal_type == SignalType::RomReady {
+                if envelope.signal_type == SignalType::RomReady {
                             true
                         } else if envelope.seq <= *last {
                             false
@@ -573,6 +647,7 @@ fn snapshot(room: &Room) -> NesRoomSnapshotV1 {
         guest_pubkey: room.guest_pubkey.clone(),
         state: room.state,
         created_at: room.created_at,
+        host_rom_name: room.host_rom_name.clone(),
         expires_at: room.expires_at,
     }
 }

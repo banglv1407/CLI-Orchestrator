@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.ai-companion",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    {
+      "id": "ai-companion.main",
+      "kind": "mainPanel",
+      "entrypoint": "ui/index.js",
+      "export": "registerMain"
+    },
+    {
+      "id": "ai-companion.settings",
+      "kind": "settingsSection",
+      "entrypoint": "ui/index.js",
+      "export": "registerSettings"
+    }
+  ],
+  "sidecar": {
+    "path": "bin/clx-ai-companion-sidecar.exe",
+    "protocolVersion": 1
+  },
+  "requestedCapabilities": [
+    "networkRequest",
+    "processLaunch"
+  ],
+  "dependencies": [],
+  "entitlementId": "clx.ai-companion",
+  "backgroundActivation": "onDemand",
+  "files": [
+    {
+      "path": "bin/clx-ai-companion-sidecar.exe",
+      "size": 9814528,
+      "sha256": "74dcc0fb1f5cacec5abf5304e440de48b3955110dc3b9ddf4ce591496494df31"
+    },
+    {
+      "path": "ui/index.js",
+      "size": 758748,
+      "sha256": "651cf23cedd5a26c94869d8062eaa0dd75b9c8c319313a4f5dbb71730c2e1edc"
+    },
+    {
+      "path": "NOTICE.txt",
+      "size": 598,
+      "sha256": "5fc1dce770d4cdcb08b12b8c02ab1ea44f63f31408503f91651947af30d63225"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "MIT",
+      "path": "NOTICE.txt"
+    }
+  ],
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "clx-development-v1",
+    "value": "9xcjyQGnb+iNPB8kSo6My5hB/Pz4rreCYz+wRcWSNbgx5umsrn/qrnekZqnvSR1N62GRplSd1AJj/FbIMaY0Cw=="
+  }
+}

@@ -1,0 +1,2 @@
+CLX Quick Apps module. Copyright CLX contributors. Licensed under MIT.
+

@@ -16,9 +16,16 @@ fn service_base(config: &NesRelayConfigV1) -> Result<String, String> {
     Ok(base.to_string())
 }
 
-fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
+/// HTTP client honoring the optional NES hop (SSH SOCKS5 / HTTP CONNECT).
+fn client(config: &NesRelayConfigV1) -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10));
+    if let Some(proxy_cfg) = config.proxy.as_ref() {
+        if let Some(proxy) = proxy_cfg.reqwest_proxy(None)? {
+            builder = builder.proxy(proxy);
+        }
+    }
+    builder
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {e}"))
 }
@@ -54,7 +61,7 @@ async fn send_authed(
     let method_str = method.as_str();
     let header = auth_header(&reqwest::Client::new(), &url, method_str, &payload)?;
 
-    let client = client()?;
+    let client = client(config)?;
     let mut req = client.request(method, &url).header("authorization", header);
     if let Some(b) = body {
         req = req.json(&b);
@@ -69,7 +76,7 @@ async fn send_public(
 ) -> Result<reqwest::Response, String> {
     let base = service_base(config)?;
     let url = format!("{base}{path}");
-    client()?
+    client(config)?
         .request(method, url)
         .send()
         .await
@@ -98,8 +105,15 @@ pub async fn create_room(
 
 pub async fn create_public_room(
     config: &NesRelayConfigV1,
+    host_rom_name: &str,
 ) -> Result<NesConnectionBundleV1, String> {
-    let resp = send_authed(config, reqwest::Method::POST, "/v1/rooms", Some(json!({}))).await?;
+    let resp = send_authed(
+        config,
+        reqwest::Method::POST,
+        "/v1/rooms",
+        Some(json!({ "host_rom_name": host_rom_name })),
+    )
+    .await?;
     if !resp.status().is_success() {
         return Err(format!("Server returned HTTP {}", resp.status()));
     }

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.buzz",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    {
+      "id": "buzz.settings",
+      "kind": "settingsSection",
+      "entrypoint": "ui/index.js",
+      "export": "registerSettings"
+    }
+  ],
+  "sidecar": {
+    "path": "bin/clx-buzz-sidecar.exe",
+    "protocolVersion": 1
+  },
+  "requestedCapabilities": [
+    "networkRequest"
+  ],
+  "dependencies": [],
+  "entitlementId": "clx.buzz",
+  "backgroundActivation": "onDemand",
+  "files": [
+    {
+      "path": "bin/clx-buzz-sidecar.exe",
+      "size": 1404416,
+      "sha256": "a868ecb3703664bb561acaff09b39b238412bb466a7baf5c7ed6216fc39fee5a"
+    },
+    {
+      "path": "ui/index.js",
+      "size": 749872,
+      "sha256": "20928424cc0113fb6865d4e4a1327b087d587b94125582200f79ed19253e9b80"
+    },
+    {
+      "path": "NOTICE.txt",
+      "size": 598,
+      "sha256": "5fc1dce770d4cdcb08b12b8c02ab1ea44f63f31408503f91651947af30d63225"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "MIT",
+      "path": "NOTICE.txt"
+    }
+  ],
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "clx-development-v1",
+    "value": "Z6mt6fgJxWLRpWPVPWk0NgbDhodC74JqsHvFrjScZV45YgllGWc2m/3ptLgbyq3+jrg1CLwSGbeLHG35hY/CCQ=="
+  }
+}

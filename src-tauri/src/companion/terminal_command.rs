@@ -662,7 +662,7 @@ async fn call_backend_direct(
 ) -> Result<String, String> {
     let target_url = chat_completions_url(&backend.url);
 
-    let headers = build_upstream_headers(backend);
+    let headers = build_upstream_headers(backend, state.proxy_server.state.oauth.as_ref()).await?;
     let messages = messages
         .iter()
         .cloned()

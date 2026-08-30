@@ -12,6 +12,11 @@ export const NES_BIT_A = 0x10;
 export const NES_BIT_B = 0x20;
 export const NES_BIT_SELECT = 0x40;
 export const NES_BIT_START = 0x80;
+// SNES extensions — low eight bits stay byte-compatible with NES masks.
+export const SNES_BIT_X = 0x100;
+export const SNES_BIT_Y = 0x200;
+export const SNES_BIT_L = 0x400;
+export const SNES_BIT_R = 0x800;
 
 // bit -> JSNES Controller button index
 export const BIT_TO_JSNES_BUTTON: Record<number, number> = {
@@ -49,6 +54,11 @@ export interface NesKeyMapping {
   turboB: string[];
   select: string[];
   start: string[];
+  /** SNES-only extras; unused by the NES engine. */
+  x?: string[];
+  y?: string[];
+  l?: string[];
+  r?: string[];
 }
 
 export const DEFAULT_KEY_MAPPING: NesKeyMapping = {
@@ -62,6 +72,11 @@ export const DEFAULT_KEY_MAPPING: NesKeyMapping = {
   turboB: ["v", "V", "i", "I"],
   select: ["Shift", "Tab"],
   start: ["Enter", " "],
+  // SNES extras (shared defaults; remappable per role like the rest)
+  x: ["l", "L"],
+  y: ["o", "O"],
+  l: ["q", "Q"],
+  r: ["e", "E"],
 };
 
 const MAPPING_KEY = (role: NesRole) => `clx-nes-keymapping-${role}`;
@@ -158,6 +173,13 @@ export class NesControllerInput {
     if (this.keyHeld(this.mapping.select)) mask |= NES_BIT_SELECT;
     if (this.keyHeld(this.mapping.start)) mask |= NES_BIT_START;
 
+    // SNES-only face/shoulder buttons (no-op on NES; extra bits are masked
+    // out by the engine before reaching JSNES).
+    if (this.keyHeld(this.mapping.x ?? [])) mask |= SNES_BIT_X;
+    if (this.keyHeld(this.mapping.y ?? [])) mask |= SNES_BIT_Y;
+    if (this.keyHeld(this.mapping.l ?? [])) mask |= SNES_BIT_L;
+    if (this.keyHeld(this.mapping.r ?? [])) mask |= SNES_BIT_R;
+
     // Gamepad API (standard mapping):
     // D-Pad: 12=Up, 13=Down, 14=Left, 15=Right
     // Buttons: 0=A (South), 1=B (East), 2=Turbo B / X (West), 3=Turbo A / Y (North)
@@ -179,6 +201,12 @@ export class NesControllerInput {
 
         if (b(8)) mask |= NES_BIT_SELECT;
         if (b(9)) mask |= NES_BIT_START;
+
+        // SNES extras: 2=Y (west), 3=X (north), 4=L, 5=R
+        if (b(3)) mask |= SNES_BIT_X;
+        if (b(2)) mask |= SNES_BIT_Y;
+        if (b(4)) mask |= SNES_BIT_L;
+        if (b(5)) mask |= SNES_BIT_R;
       }
     }
     return mask;

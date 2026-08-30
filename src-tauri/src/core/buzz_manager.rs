@@ -1,5 +1,6 @@
 use crate::core::buzz_identity;
 use crate::core::buzz_live::BuzzLiveClient;
+use crate::core::buzz_proxy::{run_ssh_socks_listener, BuzzProxyKind};
 use crate::core::buzz_types::{
     BuzzAgentConfig, BuzzChannel, BuzzDmConversation, BuzzDmResult, BuzzMember, BuzzMessage,
     BuzzRelayConfig, BuzzUserProfile,
@@ -34,6 +35,17 @@ impl BuzzManager {
     }
 
     pub fn set_config(&self, cfg: BuzzRelayConfig) {
+        // SSH hop: (re)start the dynamic SOCKS5 listener when the config changes.
+        if let Some(proxy) = cfg.proxy.as_ref() {
+            if proxy.kind == BuzzProxyKind::Ssh && proxy.is_enabled() {
+                let proxy_clone = proxy.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = run_ssh_socks_listener(proxy_clone).await {
+                        eprintln!("Buzz SSH proxy hop failed to start: {e}");
+                    }
+                });
+            }
+        }
         *self.config.lock().unwrap() = cfg;
     }
 

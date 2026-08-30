@@ -33,6 +33,8 @@ pub struct NesRoomSnapshotV1 {
     pub schema_version: u32,
     pub room_id: String,
     pub host_pubkey: String,
+    /// Display-only host filename, never a local path or ROM hash.
+    pub host_rom_name: String,
     /// Empty while a public room is waiting for player 2.
     pub guest_pubkey: Option<String>,
     pub state: RoomState,
@@ -47,6 +49,7 @@ pub struct NesRoomDirectoryEntryV1 {
     pub schema_version: u32,
     pub room_id: String,
     pub host_pubkey: String,
+    pub host_rom_name: String,
     pub state: RoomState,
     pub participant_count: u8,
     pub joinable: bool,

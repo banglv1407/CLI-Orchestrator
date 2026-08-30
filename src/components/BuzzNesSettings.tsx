@@ -10,6 +10,8 @@ import {
   buzzGenerateIdentity,
   buzzImportIdentity,
   buzzClearIdentity,
+  type BuzzProxyConfig,
+  type BuzzProxyKind,
 } from "../lib/buzz";
 import { nesGetConfig, nesSaveConfig } from "../lib/nes";
 import { NesKeyConfigModal } from "./NesKeyConfigModal";
@@ -21,6 +23,16 @@ export function BuzzNesSettings() {
   const [savingRelay, setSavingRelay] = useState(false);
   const [relayMsg, setRelayMsg] = useState<string | null>(null);
 
+  // Buzz proxy hop (SSH dynamic SOCKS5 / HTTP CONNECT)
+  const [proxyKind, setProxyKind] = useState<BuzzProxyKind>("none");
+  const [proxyHost, setProxyHost] = useState("");
+  const [proxyPort, setProxyPort] = useState(22);
+  const [proxyUser, setProxyUser] = useState("");
+  const [proxySecret, setProxySecret] = useState("");
+  const [proxyAuthMode, setProxyAuthMode] = useState<"password" | "key">("password");
+  const [proxyKeyPath, setProxyKeyPath] = useState("");
+  const [hasSavedSecret, setHasSavedSecret] = useState(false);
+
   // Buzz identity
   const [hasIdentity, setHasIdentity] = useState(false);
   const [importKey, setImportKey] = useState("");
@@ -31,6 +43,15 @@ export function BuzzNesSettings() {
   const [savingNes, setSavingNes] = useState(false);
   const [nesMsg, setNesMsg] = useState<string | null>(null);
   const [showKeyConfig, setShowKeyConfig] = useState(false);
+
+  // NES proxy hop (SSH dynamic SOCKS5 / HTTP CONNECT)
+  const [nesProxyKind, setNesProxyKind] = useState<BuzzProxyKind>("none");
+  const [nesProxyHost, setNesProxyHost] = useState("");
+  const [nesProxyPort, setNesProxyPort] = useState(22);
+  const [nesProxyUser, setNesProxyUser] = useState("");
+  const [nesProxySecret, setNesProxySecret] = useState("");
+  const [nesProxyAuthMode, setNesProxyAuthMode] = useState<"password" | "key">("password");
+  const [nesProxyKeyPath, setNesProxyKeyPath] = useState("");
 
   // Background execution toggles
   const [nesKeepAlive, setNesKeepAlive] = useState<boolean>(() => {
@@ -58,11 +79,31 @@ export function BuzzNesSettings() {
       .then((cfg) => {
         if (cfg.relay_url) setRelayUrl(cfg.relay_url);
         setAllowInsecure(cfg.allow_insecure);
+        if (cfg.proxy && cfg.proxy.kind !== "none") {
+          setProxyKind(cfg.proxy.kind);
+          setProxyHost(cfg.proxy.host || "");
+          setProxyPort(cfg.proxy.port || (cfg.proxy.kind === "ssh" ? 22 : 8080));
+          setProxyUser(cfg.proxy.user || "");
+          setProxyAuthMode(cfg.proxy.auth_mode === "key" ? "key" : "password");
+          setProxyKeyPath(cfg.proxy.key_path || "");
+          // Backend never returns the secret; only report that one is stored.
+          setHasSavedSecret(Boolean(cfg.proxy.secret));
+        }
       })
       .catch((e) => console.warn("Failed to load Buzz config:", e));
     buzzHasIdentity().then(setHasIdentity).catch(() => {});
     nesGetConfig()
-      .then((cfg) => setNesUrl(cfg.service_base_url))
+      .then((cfg) => {
+        setNesUrl(cfg.service_base_url);
+        if (cfg.proxy && cfg.proxy.kind !== "none") {
+          setNesProxyKind(cfg.proxy.kind);
+          setNesProxyHost(cfg.proxy.host || "");
+          setNesProxyPort(cfg.proxy.port || (cfg.proxy.kind === "ssh" ? 22 : 8080));
+          setNesProxyUser(cfg.proxy.user || "");
+          setNesProxyAuthMode(cfg.proxy.auth_mode === "key" ? "key" : "password");
+          setNesProxyKeyPath(cfg.proxy.key_path || "");
+        }
+      })
       .catch((e) => console.warn("Failed to load NES config:", e));
   }, []);
 
@@ -71,10 +112,35 @@ export function BuzzNesSettings() {
     setSavingRelay(true);
     setRelayMsg(null);
     try {
+      let proxy: BuzzProxyConfig | null = null;
+      if (proxyKind !== "none" && proxyHost.trim()) {
+        proxy = {
+          kind: proxyKind,
+          host: proxyHost.trim(),
+          port: proxyPort,
+          user: proxyUser.trim() || null,
+          // Only send a fresh secret when typed; empty keeps the stored one.
+          secret: proxySecret.trim() ? proxySecret : null,
+          auth_mode: proxyAuthMode,
+          key_path: proxyAuthMode === "key" && proxyKeyPath.trim() ? proxyKeyPath.trim() : null,
+        };
+        if (proxyKind === "ssh") {
+          if (!proxy.user) throw new Error("SSH hop requires a username");
+          if (proxy.auth_mode === "password" && !proxy.secret && !hasSavedSecret) {
+            throw new Error("SSH hop password is required");
+          }
+          if (proxy.auth_mode === "key" && !proxy.key_path) {
+            throw new Error("SSH hop key path is required");
+          }
+        }
+      }
       await buzzSetConfig({
         relay_url: relayUrl.trim(),
         allow_insecure: allowInsecure,
+        proxy,
       });
+      setProxySecret("");
+      setHasSavedSecret(hasSavedSecret || Boolean(proxy));
       setRelayMsg("Saved.");
     } catch (err) {
       setRelayMsg(`Save failed: ${err}`);
@@ -127,7 +193,33 @@ export function BuzzNesSettings() {
     setSavingNes(true);
     setNesMsg(null);
     try {
-      await nesSaveConfig({ schema_version: 1, service_base_url: nesUrl.trim() });
+      let proxy: BuzzProxyConfig | null = null;
+      if (nesProxyKind !== "none" && nesProxyHost.trim()) {
+        proxy = {
+          kind: nesProxyKind,
+          host: nesProxyHost.trim(),
+          port: nesProxyPort,
+          user: nesProxyUser.trim() || null,
+          secret: nesProxySecret.trim() ? nesProxySecret : null,
+          auth_mode: nesProxyAuthMode,
+          key_path: nesProxyAuthMode === "key" && nesProxyKeyPath.trim() ? nesProxyKeyPath.trim() : null,
+        };
+        if (nesProxyKind === "ssh") {
+          if (!proxy.user) throw new Error("SSH hop requires a username");
+          if (proxy.auth_mode === "password" && !proxy.secret) {
+            throw new Error("SSH hop password is required");
+          }
+          if (proxy.auth_mode === "key" && !proxy.key_path) {
+            throw new Error("SSH hop key path is required");
+          }
+        }
+      }
+      await nesSaveConfig({
+        schema_version: 1,
+        service_base_url: nesUrl.trim(),
+        proxy,
+      });
+      setNesProxySecret("");
       setNesMsg("Saved.");
     } catch (err) {
       setNesMsg(`Save failed: ${err}`);
@@ -162,6 +254,115 @@ export function BuzzNesSettings() {
               className="rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-cyber-neon outline-none focus:border-cyber-neon w-72"
             />
           </label>
+
+          {/* Proxy Hop (SSH / HTTP) */}
+          <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-semibold text-xs text-slate-200">Connection Hop (Proxy)</span>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Route relay traffic through an SSH tunnel or HTTP proxy.
+                </p>
+              </div>
+              <select
+                value={proxyKind}
+                onChange={(e) => {
+                  const kind = e.target.value as BuzzProxyKind;
+                  setProxyKind(kind);
+                  if (kind === "ssh") setProxyPort(22);
+                  if (kind === "http") setProxyPort(8080);
+                }}
+                className="rounded border border-cyber-line bg-cyber-base px-2 py-1 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+              >
+                <option value="none">Direct (no hop)</option>
+                <option value="ssh">SSH Tunnel</option>
+                <option value="http">HTTP CONNECT Proxy</option>
+              </select>
+            </div>
+
+            {proxyKind !== "none" && (
+              <div className="space-y-2.5 border-t border-cyber-line/30 pt-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder={proxyKind === "ssh" ? "hop.example.com" : "proxy.example.com"}
+                    value={proxyHost}
+                    onChange={(e) => setProxyHost(e.target.value)}
+                    className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-cyber-neon outline-none focus:border-cyber-neon"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={proxyPort}
+                    onChange={(e) => setProxyPort(Number(e.target.value) || 0)}
+                    className="w-20 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                    title="Port"
+                  />
+                </div>
+
+                {proxyKind === "ssh" && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="SSH username"
+                        value={proxyUser}
+                        onChange={(e) => setProxyUser(e.target.value)}
+                        className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                      />
+                      <select
+                        value={proxyAuthMode}
+                        onChange={(e) => setProxyAuthMode(e.target.value === "key" ? "key" : "password")}
+                        className="rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                        title="Auth mode"
+                      >
+                        <option value="password">Password</option>
+                        <option value="key">Private Key</option>
+                      </select>
+                    </div>
+                    {proxyAuthMode === "password" ? (
+                      <input
+                        type="password"
+                        placeholder={hasSavedSecret ? "Password stored — type to replace" : "SSH password"}
+                        value={proxySecret}
+                        onChange={(e) => setProxySecret(e.target.value)}
+                        className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="C:\\path\\to\\id_ed25519 (passphrase below, optional)"
+                        value={proxyKeyPath}
+                        onChange={(e) => setProxyKeyPath(e.target.value)}
+                        className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon font-mono"
+                      />
+                    )}
+                    {proxyAuthMode === "key" && (
+                      <input
+                        type="password"
+                        placeholder={hasSavedSecret ? "Passphrase stored — type to replace" : "Key passphrase (optional)"}
+                        value={proxySecret}
+                        onChange={(e) => setProxySecret(e.target.value)}
+                        className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                      />
+                    )}
+                    <p className="text-[10px] text-slate-500">
+                      CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH
+                      server and routes all relay traffic via it.
+                    </p>
+                  </>
+                )}
+
+                {proxyKind === "http" && (
+                  <p className="text-[10px] text-slate-500">
+                    Relay requests are sent via HTTP CONNECT through this proxy host:port.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-2">
             <button
               type="submit"
@@ -247,6 +448,115 @@ export function BuzzNesSettings() {
               className="rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-cyber-neon outline-none focus:border-cyber-neon w-72"
             />
           </label>
+
+          {/* NES Proxy Hop (SSH / HTTP) */}
+          <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-semibold text-xs text-slate-200">Connection Hop (Proxy)</span>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Route session-service traffic through an SSH tunnel or HTTP proxy.
+                </p>
+              </div>
+              <select
+                value={nesProxyKind}
+                onChange={(e) => {
+                  const kind = e.target.value as BuzzProxyKind;
+                  setNesProxyKind(kind);
+                  if (kind === "ssh") setNesProxyPort(22);
+                  if (kind === "http") setNesProxyPort(8080);
+                }}
+                className="rounded border border-cyber-line bg-cyber-base px-2 py-1 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+              >
+                <option value="none">Direct (no hop)</option>
+                <option value="ssh">SSH Tunnel</option>
+                <option value="http">HTTP CONNECT Proxy</option>
+              </select>
+            </div>
+
+            {nesProxyKind !== "none" && (
+              <div className="space-y-2.5 border-t border-cyber-line/30 pt-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder={nesProxyKind === "ssh" ? "hop.example.com" : "proxy.example.com"}
+                    value={nesProxyHost}
+                    onChange={(e) => setNesProxyHost(e.target.value)}
+                    className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-cyber-neon outline-none focus:border-cyber-neon"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={nesProxyPort}
+                    onChange={(e) => setNesProxyPort(Number(e.target.value) || 0)}
+                    className="w-20 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                    title="Port"
+                  />
+                </div>
+
+                {nesProxyKind === "ssh" && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="SSH username"
+                        value={nesProxyUser}
+                        onChange={(e) => setNesProxyUser(e.target.value)}
+                        className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                      />
+                      <select
+                        value={nesProxyAuthMode}
+                        onChange={(e) => setNesProxyAuthMode(e.target.value === "key" ? "key" : "password")}
+                        className="rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                        title="Auth mode"
+                      >
+                        <option value="password">Password</option>
+                        <option value="key">Private Key</option>
+                      </select>
+                    </div>
+                    {nesProxyAuthMode === "password" ? (
+                      <input
+                        type="password"
+                        placeholder="SSH password"
+                        value={nesProxySecret}
+                        onChange={(e) => setNesProxySecret(e.target.value)}
+                        className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                      />
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="C:\\path\\to\\id_ed25519"
+                          value={nesProxyKeyPath}
+                          onChange={(e) => setNesProxyKeyPath(e.target.value)}
+                          className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon font-mono"
+                        />
+                        <input
+                          type="password"
+                          placeholder="Key passphrase (optional)"
+                          value={nesProxySecret}
+                          onChange={(e) => setNesProxySecret(e.target.value)}
+                          className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
+                        />
+                      </>
+                    )}
+                    <p className="text-[10px] text-slate-500">
+                      CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH
+                      server and routes all session-service traffic via it.
+                    </p>
+                  </>
+                )}
+
+                {nesProxyKind === "http" && (
+                  <p className="text-[10px] text-slate-500">
+                    Session-service requests are sent via HTTP CONNECT through this proxy host:port.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-2">
             <button
               type="submit"

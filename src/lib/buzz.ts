@@ -1,9 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 
+export type BuzzProxyKind = "none" | "ssh" | "http";
+
+export interface BuzzProxyConfig {
+  kind: BuzzProxyKind;
+  host: string;
+  port: number;
+  user?: string | null;
+  secret?: string | null;
+  auth_mode?: string;
+  key_path?: string | null;
+  local_port?: number;
+}
+
 export interface BuzzRelayConfig {
   relay_url: string;
   allow_insecure: boolean;
   identity_pubkey?: string;
+  proxy?: BuzzProxyConfig | null;
 }
 
 export interface BuzzChannel {

@@ -579,7 +579,7 @@ export function CliSidebar({
                 ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/25 ring-1 ring-fuchsia-400/30'
                 : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
             }`}
-            title="NES Multiplayer"
+            title="Entertainment"
           >
             <GameIcon />
           </div>

@@ -1,0 +1,3 @@
+CLX API Client module
+Copyright CLX contributors
+Licensed under MIT.

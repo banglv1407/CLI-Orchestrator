@@ -19,6 +19,9 @@ fn now() -> i64 {
 pub struct Room {
     pub room_id: String,
     pub host_pubkey: String,
+    /// Display-only local filename advertised in the lobby; never a path,
+    /// ROM hash, or ROM bytes.
+    pub host_rom_name: String,
     pub guest_pubkey: Option<String>,
     pub state: RoomState,
     pub created_at: i64,
@@ -33,6 +36,8 @@ pub struct Room {
     pub guest_seq: u64,
     pub host_rom_hash: Option<String>,
     pub guest_rom_hash: Option<String>,
+    pub host_last_reaction_at_ms: i64,
+    pub guest_last_reaction_at_ms: i64,
 }
 
 impl Room {
@@ -40,6 +45,7 @@ impl Room {
         let created = now();
         Self {
             room_id,
+            host_rom_name: "Unknown ROM".to_string(),
             host_pubkey,
             guest_pubkey,
             state: RoomState::Creating,
@@ -55,7 +61,22 @@ impl Room {
             guest_seq: 0,
             host_rom_hash: None,
             guest_rom_hash: None,
+            host_last_reaction_at_ms: 0,
+            guest_last_reaction_at_ms: 0,
         }
+    }
+
+    pub fn allow_reaction(&mut self, role: NesRole, now_ms: i64) -> bool {
+        const REACTION_COOLDOWN_MS: i64 = 800;
+        let last = match role {
+            NesRole::Host => &mut self.host_last_reaction_at_ms,
+            NesRole::Guest => &mut self.guest_last_reaction_at_ms,
+        };
+        if now_ms.saturating_sub(*last) < REACTION_COOLDOWN_MS {
+            return false;
+        }
+        *last = now_ms;
+        true
     }
 
     /// Legal transitions for the state machine. Returns the new state, or an

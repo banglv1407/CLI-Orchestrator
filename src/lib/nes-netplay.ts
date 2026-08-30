@@ -9,6 +9,7 @@ type SignalType =
   | "pause"
   | "resume"
   | "reset"
+  | "reaction"
   | "peer_left"
   | "end"
   | "error";
@@ -19,6 +20,23 @@ interface SignalEnvelope {
   room_id: string;
   seq: number;
   payload: Record<string, unknown>;
+}
+
+export const NES_REACTIONS = [
+  { id: "thumbs_up", emoji: "👍", label: "Thumbs up" },
+  { id: "clap", emoji: "👏", label: "Clap" },
+  { id: "laugh", emoji: "😂", label: "Laugh" },
+  { id: "wow", emoji: "😮", label: "Wow" },
+  { id: "cry", emoji: "😭", label: "Cry" },
+  { id: "fire", emoji: "🔥", label: "Fire" },
+  { id: "heart", emoji: "❤️", label: "Heart" },
+  { id: "gamepad", emoji: "🎮", label: "Gamepad" },
+] as const;
+
+export type NesReactionId = (typeof NES_REACTIONS)[number]["id"];
+
+function isNesReactionId(value: string): value is NesReactionId {
+  return NES_REACTIONS.some((reaction) => reaction.id === value);
 }
 
 export type NesNetplayStatus =
@@ -43,7 +61,9 @@ const INPUT_BUFFER_FRAMES = 3;
 const STATE_HASH_INTERVAL = 300;
 
 function normalizeMask(mask: number): number {
-  let value = mask & 0xff;
+  // 12-bit shared-controller mask: opposing d-pad bits cancel; the SNES
+  // face/shoulder extension bits (8-11) pass through untouched.
+  let value = mask & 0xfff;
   if ((value & 0x03) === 0x03) value &= ~0x03;
   if ((value & 0x0c) === 0x0c) value &= ~0x0c;
   return value;
@@ -77,6 +97,9 @@ export class NesNetplaySession {
   private romMatched = false;
   private paused = false;
   private stopped = false;
+  private lastReactionAt = 0;
+  public onReaction?: (reactionId: NesReactionId, sender: "host" | "guest") => void;
+  public onAutoSave?: (reason: string) => void;
 
   constructor(options: NesNetplayOptions) {
     this.options = options;
@@ -153,7 +176,7 @@ export class NesNetplaySession {
       const mask = Number(envelope.payload.mask);
       if (epoch !== this.epoch || !Number.isSafeInteger(frame) || frame < this.currentFrame) return;
       if (frame > this.currentFrame + INPUT_BUFFER_FRAMES + 2) return;
-      if (!Number.isInteger(mask) || mask < 0 || mask > 255) return;
+      if (!Number.isInteger(mask) || mask < 0 || mask > 0xfff) return;
       this.remoteInputs.set(frame, normalizeMask(mask));
       this.advanceReadyFrames();
       return;
@@ -169,6 +192,14 @@ export class NesNetplaySession {
       return;
     }
 
+    if (envelope.type === "reaction") {
+      const reactionId = String(envelope.payload.emoji_id ?? "");
+      if (!isNesReactionId(reactionId)) return;
+      const sender = this.options.bundle.role === "host" ? "guest" : "host";
+      this.onReaction?.(reactionId, sender);
+      return;
+    }
+
     if (envelope.type === "pause") {
       this.applyPause(true);
     } else if (envelope.type === "resume") {
@@ -178,6 +209,7 @@ export class NesNetplaySession {
       if (Number.isSafeInteger(epoch) && epoch > this.epoch) this.applyReset(epoch);
     } else if (envelope.type === "peer_left" || envelope.type === "end") {
       this.options.emulator.pause();
+      this.onAutoSave?.("peer_left");
       this.options.onStatus?.("peer-left", "The other player left the room");
       this.stopInputClock();
     } else if (envelope.type === "error") {
@@ -234,6 +266,15 @@ export class NesNetplaySession {
     }
   }
 
+  sendReaction(reactionId: NesReactionId): boolean {
+    if (!this.romMatched || this.stopped || !this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    const now = Date.now();
+    if (now - this.lastReactionAt < 800) return false;
+    this.lastReactionAt = now;
+    this.send("reaction", { emoji_id: reactionId });
+    return true;
+  }
+
   setPaused(paused: boolean): void {
     if (!this.romMatched || this.stopped) return;
     this.send(paused ? "pause" : "resume", { epoch: this.epoch });
@@ -279,6 +320,7 @@ export class NesNetplaySession {
     this.paused = true;
     this.stopInputClock();
     this.options.emulator.pause();
+    this.onAutoSave?.("disconnect_fail");
     this.options.onStatus?.("failed", detail);
   }
 

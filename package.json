@@ -12,7 +12,8 @@
     "build:production": "node scripts/build-production.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test:nes-patch": "node --test scripts/patch-jsnes-ppu.test.mjs"
+    "test:nes-patch": "node --test scripts/patch-jsnes-ppu.test.mjs",
+    "test:rogue-assets": "node scripts/validate-rogue-assets.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.0",

@@ -20,6 +20,7 @@ pub enum SignalType {
     Pause,
     Resume,
     Reset,
+    Reaction,
     PeerLeft,
     End,
     Error,
@@ -71,11 +72,34 @@ pub fn validate_envelope(envelope: &NesSignalEnvelopeV1) -> Result<(), NesProtoc
             validate_allowed_fields(&envelope.payload, &["epoch"])?;
             validate_epoch(&envelope.payload)
         }
+        SignalType::Reaction => validate_reaction(&envelope.payload),
         SignalType::PeerLeft | SignalType::End => validate_allowed_fields(&envelope.payload, &[]),
         SignalType::Error => validate_allowed_fields(&envelope.payload, &["message"]),
     }
 }
 
+fn validate_reaction(payload: &serde_json::Value) -> Result<(), NesProtocolError> {
+    const ALLOWED_REACTIONS: [&str; 8] = [
+        "thumbs_up",
+        "clap",
+        "laugh",
+        "wow",
+        "cry",
+        "fire",
+        "heart",
+        "gamepad",
+    ];
+
+    validate_allowed_fields(payload, &["emoji_id"])?;
+    let emoji_id = payload
+        .get("emoji_id")
+        .and_then(|value| value.as_str())
+        .ok_or(NesProtocolError::MissingField("emoji_id"))?;
+    if !ALLOWED_REACTIONS.contains(&emoji_id) {
+        return Err(NesProtocolError::MissingField("emoji_id"));
+    }
+    Ok(())
+}
 fn validate_allowed_fields(
     payload: &serde_json::Value,
     allowed: &[&str],
@@ -117,13 +141,13 @@ fn validate_input(payload: &serde_json::Value) -> Result<(), NesProtocolError> {
         .get("mask")
         .and_then(|value| value.as_u64())
         .ok_or(NesProtocolError::MissingField("mask"))?;
-    if mask > u8::MAX as u64 {
+    if mask > u16::MAX as u64 {
         return Err(NesProtocolError::PayloadTooLarge(
             mask as usize,
-            u8::MAX as usize,
+            u16::MAX as usize,
         ));
     }
-    crate::validate_bitmask(mask as u8)?;
+    crate::validate_bitmask(mask as u16)?;
     Ok(())
 }
 
@@ -176,6 +200,30 @@ mod tests {
             serde_json::json!({ "epoch": 1, "frame": 1, "mask": 245 }),
         ))
         .is_ok());
+        assert!(validate_envelope(&envelope(
+            SignalType::Input,
+            serde_json::json!({ "epoch": 1, "frame": 2, "mask": 2048 }),
+        ))
+        .is_ok());
+    }
+
+    #[test]
+    fn accepts_only_fixed_reaction_ids() {
+        assert!(validate_envelope(&envelope(
+            SignalType::Reaction,
+            serde_json::json!({ "emoji_id": "fire" }),
+        ))
+        .is_ok());
+        assert!(validate_envelope(&envelope(
+            SignalType::Reaction,
+            serde_json::json!({ "emoji_id": "free-form text" }),
+        ))
+        .is_err());
+        assert!(validate_envelope(&envelope(
+            SignalType::Reaction,
+            serde_json::json!({ "emoji_id": "fire", "extra": true }),
+        ))
+        .is_err());
     }
 
     #[test]

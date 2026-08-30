@@ -150,7 +150,7 @@ async fn public_room_is_listed_and_only_one_guest_can_claim_it() {
     let (_addr, base) = spawn_test_server().await;
     let client = reqwest::Client::new();
     let rooms_url = format!("{base}/v1/rooms");
-    let create_body = b"{}";
+    let create_body = br#"{"host_rom_name":"Super Mario Bros. 3 (USA).nes"}"#;
     let created = client
         .post(&rooms_url)
         .header(
@@ -176,6 +176,10 @@ async fn public_room_is_listed_and_only_one_guest_can_claim_it() {
     assert_eq!(directory[0]["room_id"], room_id);
     assert_eq!(directory[0]["participant_count"], 1);
     assert_eq!(directory[0]["joinable"], true);
+    assert_eq!(
+        directory[0]["host_rom_name"],
+        "Super Mario Bros. 3 (USA).nes"
+    );
     assert!(directory[0].get("ticket").is_none());
 
     let join_url = format!("{base}/v1/rooms/{room_id}/join");
@@ -257,4 +261,27 @@ async fn signaling_fans_out_between_authenticated_room_roles() {
     let relayed_json: serde_json::Value = serde_json::from_str(relayed.to_text().unwrap()).unwrap();
     assert_eq!(relayed_json["type"], "rom_ready");
     assert_eq!(relayed_json["room_id"], room_id);
+
+    let reaction = serde_json::json!({
+        "v": 1,
+        "type": "reaction",
+        "room_id": room_id,
+        "seq": 2,
+        "payload": { "emoji_id": "fire" }
+    });
+    guest_ws
+        .send(tokio_tungstenite::tungstenite::Message::Text(
+            reaction.to_string().into(),
+        ))
+        .await
+        .unwrap();
+    let relayed_reaction = tokio::time::timeout(std::time::Duration::from_secs(1), host_ws.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let relayed_reaction_json: serde_json::Value =
+        serde_json::from_str(relayed_reaction.to_text().unwrap()).unwrap();
+    assert_eq!(relayed_reaction_json["type"], "reaction");
+    assert_eq!(relayed_reaction_json["payload"]["emoji_id"], "fire");
 }

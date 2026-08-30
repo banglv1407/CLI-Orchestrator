@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.nes",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    {
+      "id": "nes.settings",
+      "kind": "settingsSection",
+      "entrypoint": "ui/index.js",
+      "export": "registerSettings"
+    }
+  ],
+  "sidecar": {
+    "path": "bin/clx-nes-sidecar.exe",
+    "protocolVersion": 1
+  },
+  "requestedCapabilities": [
+    "networkRequest"
+  ],
+  "dependencies": [],
+  "entitlementId": "clx.nes",
+  "backgroundActivation": "onDemand",
+  "files": [
+    {
+      "path": "bin/clx-nes-sidecar.exe",
+      "size": 1403392,
+      "sha256": "1a74ff310fe4b8f5ea29216aff6cae38784ed0534351b5567b01dae7615e61bf"
+    },
+    {
+      "path": "ui/index.js",
+      "size": 749509,
+      "sha256": "384ae3c7fcb895f8f503d5990a5e22b4a458f3ec4345ef81a89616eee55c3d78"
+    },
+    {
+      "path": "NOTICE.txt",
+      "size": 598,
+      "sha256": "5fc1dce770d4cdcb08b12b8c02ab1ea44f63f31408503f91651947af30d63225"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "MIT",
+      "path": "NOTICE.txt"
+    }
+  ],
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "clx-development-v1",
+    "value": "Phec5NdlK13Y5BPs6Ce0YjNN1eDRV2jLMKMnuEwDYx0xWqnzy6eUMCbOyNxtW0eO4XoOzH52TEPaYsMI0oaiBA=="
+  }
+}

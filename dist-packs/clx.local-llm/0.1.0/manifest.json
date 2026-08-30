@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.local-llm",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    {
+      "id": "local-llm.settings",
+      "kind": "settingsSection",
+      "entrypoint": "ui/index.js",
+      "export": "registerSettings"
+    }
+  ],
+  "sidecar": {
+    "path": "bin/clx-local-llm-sidecar.exe",
+    "protocolVersion": 1
+  },
+  "requestedCapabilities": [
+    "processLaunch"
+  ],
+  "dependencies": [],
+  "entitlementId": "clx.local-llm",
+  "backgroundActivation": "onDemand",
+  "files": [
+    {
+      "path": "bin/clx-local-llm-sidecar.exe",
+      "size": 25123328,
+      "sha256": "7215f645d7794867d609c92b6f7daa091f5d17940e634b2913f33902fb1c38ce"
+    },
+    {
+      "path": "ui/index.js",
+      "size": 755329,
+      "sha256": "0ed3c17f3512a83a0311b93f8e60103aa3858d24667c06929c9a6307120e8f41"
+    },
+    {
+      "path": "NOTICE.txt",
+      "size": 598,
+      "sha256": "5fc1dce770d4cdcb08b12b8c02ab1ea44f63f31408503f91651947af30d63225"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "MIT",
+      "path": "NOTICE.txt"
+    }
+  ],
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "clx-development-v1",
+    "value": "29KCIZw+8Xv+yPBWLRrQBFxopbhJvYZapzZ5pa1mWuyayeLWHG8tMyy6nsxmpIMyHs24UeDsa4e9goGpq+CKDg=="
+  }
+}

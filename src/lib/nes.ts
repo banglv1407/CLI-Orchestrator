@@ -1,14 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { BuzzProxyConfig } from "./buzz";
 
 export interface NesRelayConfigV1 {
   schema_version: number;
   service_base_url: string;
+  proxy?: BuzzProxyConfig | null;
 }
 
 export interface NesRomPayloadV1 {
   name: string;
   size_bytes: number;
   sha256: string;
+  /** "nes" or "snes" — detected from ROM content by the backend. */
+  console: string;
 }
 
 export interface NesRomOpenResult {
@@ -41,6 +45,7 @@ export interface NesRoomSnapshotV1 {
   schema_version: number;
   room_id: string;
   host_pubkey: string;
+  host_rom_name: string;
   guest_pubkey: string | null;
   state: string;
   created_at: number;
@@ -51,6 +56,7 @@ export interface NesRoomDirectoryEntryV1 {
   schema_version: number;
   room_id: string;
   host_pubkey: string;
+  host_rom_name: string;
   state: "waiting" | "negotiating" | "connected" | "reconnecting";
   participant_count: number;
   joinable: boolean;
@@ -90,8 +96,9 @@ export async function nesCreateRoomAndInvite(
 
 export async function nesCreatePublicRoom(
   config: NesRelayConfigV1,
+  hostRomName: string,
 ): Promise<NesConnectionBundleV1> {
-  return invoke<NesConnectionBundleV1>("nes_create_public_room", { config });
+  return invoke<NesConnectionBundleV1>("nes_create_public_room", { config, hostRomName });
 }
 
 export async function nesListRooms(
@@ -127,4 +134,26 @@ export async function nesLeaveRoom(config: NesRelayConfigV1, roomId: string): Pr
 
 export async function nesEndRoom(config: NesRelayConfigV1, roomId: string): Promise<void> {
   return invoke<void>("nes_end_room", { config, roomId });
+}
+
+export async function nesSaveState(
+  romSha256: string,
+  slot: string,
+  stateJson: string,
+): Promise<void> {
+  return invoke<void>("nes_save_state", { romSha256, slot, stateJson });
+}
+
+export async function nesLoadState(
+  romSha256: string,
+  slot: string,
+): Promise<string> {
+  return invoke<string>("nes_load_state", { romSha256, slot });
+}
+
+export async function nesHasState(
+  romSha256: string,
+  slot: string,
+): Promise<boolean> {
+  return invoke<boolean>("nes_has_state", { romSha256, slot });
 }

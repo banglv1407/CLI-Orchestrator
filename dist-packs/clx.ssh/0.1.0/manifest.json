@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.ssh",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    {
+      "id": "ssh.settings",
+      "kind": "settingsSection",
+      "entrypoint": "ui/index.js",
+      "export": "registerSettings"
+    }
+  ],
+  "sidecar": {
+    "path": "bin/clx-ssh-sidecar.exe",
+    "protocolVersion": 1
+  },
+  "requestedCapabilities": [
+    "networkRequest",
+    "processLaunch"
+  ],
+  "dependencies": [],
+  "entitlementId": "clx.ssh",
+  "backgroundActivation": "onDemand",
+  "files": [
+    {
+      "path": "bin/clx-ssh-sidecar.exe",
+      "size": 1682944,
+      "sha256": "3919aacc231f542a3ad35262ebb76d4431d8b5d6a741e814b62927e03ce86583"
+    },
+    {
+      "path": "ui/index.js",
+      "size": 754889,
+      "sha256": "97c11ae26c95cb947e5d88bbee9abf3d6f6c0a0c19a7c3417aa201e8e5634500"
+    },
+    {
+      "path": "NOTICE.txt",
+      "size": 598,
+      "sha256": "5fc1dce770d4cdcb08b12b8c02ab1ea44f63f31408503f91651947af30d63225"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "MIT",
+      "path": "NOTICE.txt"
+    }
+  ],
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "clx-development-v1",
+    "value": "YG1URouR6K1+Y5Sz4kijlxjZ2RSqwhXTISJPdHH4FrjpPuL3ucd8yVWkRiEsn1BJV6a41n+xDz3QrN6J5mL2Aw=="
+  }
+}

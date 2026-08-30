@@ -39,8 +39,10 @@ game content or rendered media.
   `reset`, `peer_left`, `end`, `error`.
 - Payload cap: 1 KiB with exact-field validation.
 - Room ID and strictly increasing per-role message sequence are enforced.
-- Directory responses never contain ROM hashes, tickets, or identities beyond
-  the host public key already required for room ownership.
+- Directory responses include only the host-selected ROM basename (including
+  its extension) to help Player 2 select the same local file; they never
+  contain ROM paths, hashes, bytes, tickets, or emulator state. The host public
+  key remains the only identity field.
 
 ## Linux Deployment
 

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.api-client",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    {
+      "id": "api-client.main",
+      "kind": "mainPanel",
+      "entrypoint": "ui/index.js",
+      "export": "registerMain"
+    },
+    {
+      "id": "api-client.history",
+      "kind": "mainPanel",
+      "entrypoint": "ui/index.js",
+      "export": "registerHistory"
+    }
+  ],
+  "sidecar": {
+    "path": "bin/clx-api-client-sidecar.exe",
+    "protocolVersion": 1
+  },
+  "requestedCapabilities": [
+    "networkRequest"
+  ],
+  "dependencies": [],
+  "entitlementId": "clx.api-client",
+  "backgroundActivation": "never",
+  "files": [
+    {
+      "path": "bin/clx-api-client-sidecar.exe",
+      "size": 2896384,
+      "sha256": "701b6f29dcdec5be30d106f93b34349b6f58d642a654fa30a76f57a0510be87c"
+    },
+    {
+      "path": "ui/index.js",
+      "size": 792387,
+      "sha256": "ea8ed76bf9b605bc2687d32c133c46545bb1e5ea00a9e30ccdb552643cca7e17"
+    },
+    {
+      "path": "NOTICE.txt",
+      "size": 69,
+      "sha256": "5ae6f58540795ce28534885704172f7e112a8faf00bf76d2a10d225bfbe684ee"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "MIT",
+      "path": "NOTICE.txt"
+    }
+  ],
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "clx-release-v1",
+    "value": "vD2gVLyTQnjHlJhYrx7Lw9Rp2Zco1x7wvAWIxwfpJNhU8NynRnjGm3SwO46auXI+kWf+4UjMSJA/m4U2RB5XDA=="
+  }
+}

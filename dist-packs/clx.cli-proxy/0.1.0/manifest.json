@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.cli-proxy",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    {
+      "id": "cli-proxy.main",
+      "kind": "mainPanel",
+      "entrypoint": "ui/index.js",
+      "export": "registerMain"
+    },
+    {
+      "id": "cli-proxy.settings",
+      "kind": "settingsSection",
+      "entrypoint": "ui/index.js",
+      "export": "registerSettings"
+    }
+  ],
+  "sidecar": {
+    "path": "bin/clx-cli-proxy-sidecar.exe",
+    "protocolVersion": 1
+  },
+  "requestedCapabilities": [
+    "networkRequest",
+    "localServer"
+  ],
+  "dependencies": [],
+  "entitlementId": "clx.cli-proxy",
+  "backgroundActivation": "onDemand",
+  "files": [
+    {
+      "path": "bin/clx-cli-proxy-sidecar.exe",
+      "size": 14044672,
+      "sha256": "4e90ac3a05b20f23b73652464cb258ade5a2715697c8d339fa8524159ea07b9f"
+    },
+    {
+      "path": "ui/index.js",
+      "size": 800437,
+      "sha256": "62e553f04b3b7bc155d5b056d841f27b4f956b126290e62b591b3cd0d8d59afc"
+    },
+    {
+      "path": "NOTICE.txt",
+      "size": 598,
+      "sha256": "5fc1dce770d4cdcb08b12b8c02ab1ea44f63f31408503f91651947af30d63225"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "MIT",
+      "path": "NOTICE.txt"
+    }
+  ],
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "clx-development-v1",
+    "value": "Qw3UJNcO7E0lcApE0zcdfdog0JMxE63loAFvw5PT0bhQs4OMkxXp326dcnsdBBdR/UedQWr7lktfxfkXaptDBA=="
+  }
+}

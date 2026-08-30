@@ -16,7 +16,7 @@ interface NesKeyConfigModalProps {
 
 type BindableKey = keyof NesKeyMapping;
 
-const KEY_LABELS: Record<BindableKey, { label: string; desc: string }> = {
+const KEY_LABELS: Partial<Record<BindableKey, { label: string; desc: string }>> = {
   up: { label: "D-Pad Up", desc: "Move character up" },
   down: { label: "D-Pad Down", desc: "Move character down" },
   left: { label: "D-Pad Left", desc: "Move character left" },
@@ -27,6 +27,15 @@ const KEY_LABELS: Record<BindableKey, { label: string; desc: string }> = {
   turboB: { label: "Turbo B (Rapid Fire)", desc: "Auto-repeat Button B ~30Hz" },
   select: { label: "Select", desc: "Choose menu option" },
   start: { label: "Start", desc: "Pause / Start game" },
+};
+
+// SNES-only extras are optional in NesKeyMapping, so they live outside the
+// required Record and are appended to the bindable list when present.
+const SNES_KEY_LABELS: Partial<Record<BindableKey, { label: string; desc: string }>> = {
+  x: { label: "Button X (SNES)", desc: "SNES face button X" },
+  y: { label: "Button Y (SNES)", desc: "SNES face button Y" },
+  l: { label: "L Shoulder (SNES)", desc: "SNES left shoulder" },
+  r: { label: "R Shoulder (SNES)", desc: "SNES right shoulder" },
 };
 
 export function NesKeyConfigModal({
@@ -123,8 +132,9 @@ export function NesKeyConfigModal({
           </p>
 
           <div className="space-y-2">
-            {(Object.keys(KEY_LABELS) as BindableKey[]).map((btnKey) => {
-              const info = KEY_LABELS[btnKey];
+            {([...(Object.keys(KEY_LABELS) as BindableKey[]), ...(Object.keys(SNES_KEY_LABELS) as BindableKey[])]).map((btnKey) => {
+              const info = KEY_LABELS[btnKey] ?? SNES_KEY_LABELS[btnKey];
+              if (!info) return null;
               const isListening = listeningKey === btnKey;
               const keys = mapping[btnKey] || [];
               const isTurbo = btnKey === "turboA" || btnKey === "turboB";

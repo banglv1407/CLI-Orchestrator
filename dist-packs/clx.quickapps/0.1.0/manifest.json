@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "clx.quickapps",
+  "version": "0.1.0",
+  "publisher": "CLX",
+  "target": "windows-x86_64",
+  "coreVersion": "^0.1",
+  "hostApiVersion": 1,
+  "uiContributions": [
+    {
+      "id": "quickapps.main",
+      "kind": "mainPanel",
+      "entrypoint": "ui/index.js",
+      "export": "register"
+    }
+  ],
+  "sidecar": {
+    "path": "bin/clx-quickapps-sidecar.exe",
+    "protocolVersion": 1
+  },
+  "requestedCapabilities": [
+    "processLaunch"
+  ],
+  "dependencies": [],
+  "entitlementId": "clx.quickapps",
+  "backgroundActivation": "never",
+  "files": [
+    {
+      "path": "bin/clx-quickapps-sidecar.exe",
+      "size": 737280,
+      "sha256": "7b971e6c08b153980bfec05589d4adf8f47c9e76c8c886d97128beca6bc8ac4c"
+    },
+    {
+      "path": "ui/index.js",
+      "size": 786465,
+      "sha256": "16eb561af483ff64ab760e1e700c67a5b3f9d83e181f1af10bb9b96306de50c8"
+    },
+    {
+      "path": "NOTICE.txt",
+      "size": 72,
+      "sha256": "f2b1f6c0d0e7ec4bc41a11092b0f209dbddccead86ef75d6fdb528da9252f993"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "MIT",
+      "path": "NOTICE.txt"
+    }
+  ],
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "clx-release-v1",
+    "value": "0bUPjXy5eJJwTeRh5G02Zi0DszXFaU/WRcj3a6fIE4HftSvSvRM1NER2z5HcuY/zB2VYJXpUYV/tqJCPHiQ+AA=="
+  }
+}

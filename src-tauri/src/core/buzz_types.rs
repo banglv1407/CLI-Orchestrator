@@ -1,10 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+use super::buzz_proxy::BuzzProxyConfig;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BuzzRelayConfig {
     pub relay_url: String,
     pub allow_insecure: bool,
+    #[serde(default)]
     pub identity_pubkey: Option<String>,
+    /// Optional outbound hop: SSH dynamic SOCKS5 or HTTP CONNECT.
+    #[serde(default)]
+    pub proxy: Option<BuzzProxyConfig>,
 }
 
 impl Default for BuzzRelayConfig {
@@ -13,6 +20,7 @@ impl Default for BuzzRelayConfig {
             relay_url: "https://buzz.happyplatform.io.vn".to_string(),
             allow_insecure: false,
             identity_pubkey: None,
+            proxy: None,
         }
     }
 }

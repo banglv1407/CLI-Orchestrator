@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { FitAddon } from '@xterm/addon-fit';
@@ -31,7 +31,7 @@ import { SshFileTransferDialog } from './SshFileTransferDialog';
 import { save } from '@tauri-apps/plugin-dialog';
 import { QuickAppsPanel } from './QuickAppsPanel';
 import { BuzzWorkspacePanel } from './BuzzWorkspacePanel';
-import { NesWorkspacePanel } from './NesWorkspacePanel';
+import { EntertainmentWorkspace } from './EntertainmentWorkspace';
 import { ApiClientPanel } from './ApiClientPanel';
 import { ProxyPanel } from './ProxyPanel';
 import { SystemLogPanel } from './SystemLogPanel';
@@ -62,18 +62,18 @@ const getRelativePath = (fullPath: string, root: string) => {
   return rel.replace(/\\/g, '/');
 };
 
-function MarqueeTitle({ text, className = "text-slate-300" }: { text: string; className?: string }) {
+function MarqueeTitle({ text, className = "text-slate-300", fontSizeClass = "text-[8px]" }: { text: string; className?: string; fontSizeClass?: string }) {
   const isLong = text.length > 25;
   if (!isLong) {
     return (
-      <span className={`truncate max-w-[90%] font-mono font-semibold ${className}`} title={text}>
+      <span className={`truncate max-w-[90%] font-mono font-semibold ${fontSizeClass} ${className}`} title={text}>
         {text}
       </span>
     );
   }
   return (
     <div className="cyber-marquee-container flex-1 max-w-[90%]" title={text}>
-      <div className={`cyber-marquee-track font-mono font-semibold ${className}`}>
+      <div className={`cyber-marquee-track font-mono font-semibold ${fontSizeClass} ${className}`}>
         <span>{text}</span>
         <span style={{ paddingLeft: '24px' }}>{text}</span>
         <span style={{ paddingLeft: '24px' }}></span>
@@ -2475,7 +2475,7 @@ export function TerminalPanel({
                     activeMainView === 'game' ? 'block' : 'hidden pointer-events-none'
                   }`}
                 >
-                  <NesWorkspacePanel isVisible={activeMainView === 'game'} />
+                  <EntertainmentWorkspace isVisible={activeMainView === 'game'} />
                 </div>
                 {activeMainView === 'apiclient' && <ApiClientPanel />}
                 {activeMainView === 'settings' && <SettingsPanel theme={theme!} setTheme={setTheme!} />}
@@ -2803,12 +2803,15 @@ export function TerminalPanel({
                   </div>
                 ) : (
                   <div className="flex-1 flex gap-3 overflow-x-auto overflow-y-hidden justify-start items-center scrollbar-thin pb-1">
-                    {sshSessions.map((session) => {
+                    {sshSessions.map((session, idx) => {
                       const isActive = visibleSessionId === session.id;
                       const isDragging = activeDragId === session.id;
                       return (
+                        <Fragment key={`ssh-thumb-${session.id}`}>
+                        {idx > 0 && (
+                          <div className="w-px self-stretch bg-gradient-to-b from-transparent via-cyber-electric/35 to-transparent shrink-0" aria-hidden="true" />
+                        )}
                         <div
-                          key={`ssh-thumb-${session.id}`}
                           onClick={() => onSelectSession(session.id)}
                           onContextMenu={(e) => handleContextMenu(e, session.id)}
                           onMouseDown={(e) => {
@@ -2835,6 +2838,18 @@ export function TerminalPanel({
                                 : 'border-cyber-line/50 hover:border-cyber-electric/80 bg-[#0a0f1f] hover:shadow-neon-blue-sm'
                           }`}
                         >
+                          {/* Full-path title bar — above the mini terminal */}
+                          <div
+                            className="shrink-0 flex items-center gap-1 bg-black/55 border-b border-cyber-electric/25 px-1.5 select-none"
+                            style={{ height: '14px' }}
+                          >
+                            <span className="text-[7px] shrink-0">📁</span>
+                            <MarqueeTitle
+                              text={session.workingDir || session.cliName}
+                              className="text-cyber-electric"
+                              fontSizeClass="text-[7px]"
+                            />
+                          </div>
                           {/* Terminal area — flex-1, no overlay */}
                           <div className="flex-1 relative min-h-0">
                             {/* Live scaled view */}
@@ -2893,6 +2908,7 @@ export function TerminalPanel({
                             </div>
                           )}
                         </div>
+                        </Fragment>
                       );
                     })}
                   </div>
@@ -2976,12 +2992,15 @@ export function TerminalPanel({
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col gap-2 overflow-y-auto overflow-x-hidden scrollbar-thin justify-start items-center w-full">
-                  {cliSessions.map((session) => {
+                  {cliSessions.map((session, idx) => {
                     const isActive = visibleSessionId === session.id;
                     const isDragging = activeDragId === session.id;
                     return (
+                      <Fragment key={`thumb-${session.id}`}>
+                      {idx > 0 && (
+                        <div className="h-px w-full bg-gradient-to-r from-transparent via-cyber-neon/30 to-transparent shrink-0" aria-hidden="true" />
+                      )}
                       <div
-                        key={`thumb-${session.id}`}
                         onClick={() => onSelectSession(session.id)}
                         onContextMenu={(e) => handleContextMenu(e, session.id)}
                         onMouseDown={(e) => {
@@ -3008,6 +3027,18 @@ export function TerminalPanel({
                               : 'border-cyber-line/50 hover:border-cyber-electric/80 bg-[#0a0f1f] hover:shadow-neon-blue-sm'
                         }`}
                       >
+                        {/* Full-path title bar — above the mini terminal */}
+                        <div
+                          className="shrink-0 flex items-center gap-1 bg-black/55 border-b border-cyber-neon/25 px-1.5 select-none"
+                          style={{ height: '14px' }}
+                        >
+                          <span className="text-[7px] shrink-0">📁</span>
+                          <MarqueeTitle
+                            text={session.workingDir || session.cliName}
+                            className="text-slate-200"
+                            fontSizeClass="text-[7px]"
+                          />
+                        </div>
                         {/* Terminal area — flex-1, no overlay */}
                         <div className="flex-1 relative min-h-0">
                           {/* Live scaled view */}
@@ -3066,6 +3097,7 @@ export function TerminalPanel({
                           </div>
                         )}
                       </div>
+                      </Fragment>
                     );
                   })}
                 </div>

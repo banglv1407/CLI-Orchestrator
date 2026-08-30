@@ -653,6 +653,10 @@ impl CompanionManager {
                     enable_rtk: false,
                     enable_ponytail: false,
                     reasoning_effort: None,
+                    auth_mode: Default::default(),
+                    oauth2: None,
+                    managed_profile_id: None,
+                    managed_profile_version: None,
                 });
                 config.save().map_err(|e| format!("save: {}", e))?;
                 Ok(format!("Backend '{}' saved", name))

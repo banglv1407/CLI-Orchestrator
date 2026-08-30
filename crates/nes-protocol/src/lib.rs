@@ -14,8 +14,8 @@ pub mod nip98;
 pub mod signaling;
 
 pub use controller::{
-    validate_bitmask, BIT_A, BIT_B, BIT_DOWN, BIT_LEFT, BIT_RIGHT, BIT_SELECT, BIT_START, BIT_UP,
-    CONTROLLER_MASK_OPPOSING, CONTROLLER_MASK_VALID,
+    validate_bitmask, BIT_A, BIT_B, BIT_DOWN, BIT_L, BIT_LEFT, BIT_R, BIT_RIGHT, BIT_SELECT,
+    BIT_START, BIT_UP, BIT_X, BIT_Y, CONTROLLER_MASK_OPPOSING, CONTROLLER_MASK_VALID,
 };
 pub use dto::*;
 pub use error::NesProtocolError;

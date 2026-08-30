@@ -12,6 +12,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+use crate::core::oauth2::OAuthManager;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tower_http::cors::CorsLayer;
@@ -24,6 +25,7 @@ pub struct ProxyBackend {
     pub id: Option<String>,
     pub name: String,
     pub url: String,
+    #[serde(default)]
     pub api_key: String,
     pub model: String,
     pub weight: u32,
@@ -36,6 +38,14 @@ pub struct ProxyBackend {
     pub enable_ponytail: bool,
     #[serde(default)]
     pub reasoning_effort: Option<String>,
+    #[serde(default)]
+    pub auth_mode: ProxyAuthMode,
+    #[serde(default)]
+    pub oauth2: Option<OAuth2Config>,
+    #[serde(default)]
+    pub managed_profile_id: Option<String>,
+    #[serde(default)]
+    pub managed_profile_version: Option<String>,
 }
 
 pub const PONYTAIL_SYSTEM_PROMPT: &str = r#"
@@ -132,6 +142,7 @@ pub struct ProxyState {
     pub logs: Mutex<Vec<ProxyLogEntry>>,
     pub app_handle: std::sync::Mutex<Option<tauri::AppHandle>>,
     persist_config: bool,
+    pub oauth: Arc<OAuthManager>,
     pub stream_options_incompatible_backends: std::sync::Mutex<std::collections::HashSet<String>>,
 }
 
@@ -143,6 +154,7 @@ impl ProxyState {
             logs: Mutex::new(Vec::with_capacity(100)),
             app_handle: std::sync::Mutex::new(None),
             persist_config: true,
+            oauth: Arc::new(OAuthManager::default()),
             stream_options_incompatible_backends: std::sync::Mutex::new(
                 std::collections::HashSet::new(),
             ),
@@ -157,6 +169,7 @@ impl ProxyState {
             logs: Mutex::new(Vec::with_capacity(100)),
             app_handle: std::sync::Mutex::new(None),
             persist_config: false,
+            oauth: Arc::new(OAuthManager::default()),
             stream_options_incompatible_backends: std::sync::Mutex::new(
                 std::collections::HashSet::new(),
             ),
@@ -372,34 +385,23 @@ fn compute_normalized_for_off(raw: &str) -> String {
 
 // ── SSE helpers ────────────────────────────────────────────────
 
-pub(crate) fn build_upstream_headers(backend: &ProxyBackend) -> HeaderMap {
+pub(crate) async fn build_upstream_headers(backend: &ProxyBackend, oauth: &OAuthManager) -> Result<HeaderMap, String> {
     let mut headers = HeaderMap::new();
-    headers.insert(
-        HeaderName::from_static("authorization"),
-        format!("Bearer {}", backend.api_key)
-            .parse()
-            .unwrap_or_else(|_| HeaderValue::from_static("")),
-    );
-    headers.insert(
-        HeaderName::from_static("content-type"),
-        "application/json"
-            .parse()
-            .unwrap_or_else(|_| HeaderValue::from_static("application/json")),
-    );
+    headers.insert(HeaderName::from_static("content-type"), HeaderValue::from_static("application/json"));
     for (name, value) in &backend.headers {
         if let (Ok(name), Ok(value)) = (HeaderName::from_bytes(name.as_bytes()), value.parse()) {
+            if backend.uses_oauth2() && name == HeaderName::from_static("authorization") { continue; }
             headers.insert(name, value);
         }
     }
     if let Some(user_agent) = &backend.custom_user_agent {
-        headers.insert(
-            HeaderName::from_static("user-agent"),
-            user_agent
-                .parse()
-                .unwrap_or_else(|_| HeaderValue::from_static("CliProxyAI/1.0")),
-        );
+        headers.insert(HeaderName::from_static("user-agent"), user_agent.parse().unwrap_or_else(|_| HeaderValue::from_static("CliProxyAI/1.0")));
     }
-    headers
+    let secret = if backend.uses_oauth2() { oauth.access_token(backend).await? } else { backend.api_key.clone() };
+    if secret.trim().is_empty() { return Err(format!("Backend '{}' has no usable credential", backend.name)); }
+    let authorization = format!("Bearer {secret}").parse().map_err(|_| "credential contains an invalid HTTP header value".to_string())?;
+    headers.insert(HeaderName::from_static("authorization"), authorization);
+    Ok(headers)
 }
 
 pub(crate) fn build_upstream_body(
@@ -694,7 +696,7 @@ async fn handle_chat_completion(
         for retry in 0..max_retries {
             let target_url = chat_completions_url(&backend.url);
 
-            let headers = build_upstream_headers(&backend);
+            let headers = match build_upstream_headers(&backend, state.oauth.as_ref()).await { Ok(headers) => headers, Err(error) => { eprintln!("Proxy authentication for {} failed: {}", backend.name, error); continue; } };
 
             let mut body = build_upstream_body(&request, &backend);
 
@@ -1345,5 +1347,36 @@ mod tests {
 
         let backend: ProxyBackend = serde_json::from_value(json_data).unwrap();
         assert!(backend.enable_ponytail);
+    }
+}
+fn default_oauth_redirect_uri() -> String {
+    crate::core::oauth2::OAUTH_REDIRECT_URI.to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuth2Config {
+    pub authorization_url: String,
+    pub token_url: String,
+    pub client_id: String,
+    #[serde(default)]
+    pub scopes: Vec<String>,
+    #[serde(default)]
+    pub audience: Option<String>,
+    #[serde(default = "default_oauth_redirect_uri")]
+    pub redirect_uri: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ProxyAuthMode {
+    #[default]
+    ApiKey,
+    OAuth2,
+}
+
+impl ProxyBackend {
+    pub fn uses_oauth2(&self) -> bool {
+        matches!(self.auth_mode, ProxyAuthMode::OAuth2)
     }
 }

@@ -5,8 +5,9 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("nes_session=trace,tower_http=debug,axum=debug")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                EnvFilter::new("nes_session=trace,tower_http=debug,axum=debug")
+            }),
         )
         .init();
 

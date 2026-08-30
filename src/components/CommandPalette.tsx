@@ -184,8 +184,8 @@ export function CommandPalette({
     if (activeMainView !== 'game') {
       items.push({
         id: 'action-view-game', type: 'action' as const,
-        label: 'View: NES Multiplayer',
-        description: 'Switch to NES multiplayer workspace',
+        label: 'View: Entertainment',
+        description: 'Switch to Entertainment & Games workspace',
         action: () => onSwitchView('game'),
       });
     }

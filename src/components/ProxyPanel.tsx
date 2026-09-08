@@ -39,6 +39,8 @@ function RefreshIcon() {
 }
 
 type SubTab = 'config' | 'logs';
+import { ProxyHopEditor } from './ProxyHopEditor';
+import type { ProxyHop } from '../types';
 
 export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
   const [status, setStatus] = useState<ProxyStatus | null>(null);
@@ -51,6 +53,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
   const [nName, setNName] = useState(''); const [nUrl, setNUrl] = useState('');
   const [nKey, setNKey] = useState(''); const [nModel, setNModel] = useState('');
   const [nUa, setNUa] = useState('');
+  const [nHop, setNHop] = useState<ProxyHop | undefined>();
   const [nEnableRtk, setNEnableRtk] = useState(false);
   const [nEnablePonytail, setNEnablePonytail] = useState(false);
   const [nReasoningEffort, setNReasoningEffort] = useState<string>('');
@@ -109,8 +112,8 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
     }
   }, []);
 
-  const resetForm = () => { setNName('');setNUrl('');setNKey('');setNModel('');setNUa('');setNReasoningEffort('');setNEnableRtk(false);setNEnablePonytail(false);setShowAdd(false);setEditingIdx(null); };
-  const loadBackend = (b: ProxyBackend, idx: number) => { setNName(b.name);setNUrl(b.url);setNKey(b.apiKey);setNModel(b.model);setNUa(b.customUserAgent||'');setNReasoningEffort(b.reasoningEffort||'');setNEnableRtk(b.enableRtk||false);setNEnablePonytail(b.enablePonytail||false);setShowAdd(false);setEditingIdx(idx); };
+  const resetForm = () => { setNHop(undefined);setNName('');setNUrl('');setNKey('');setNModel('');setNUa('');setNReasoningEffort('');setNEnableRtk(false);setNEnablePonytail(false);setShowAdd(false);setEditingIdx(null); };
+  const loadBackend = (b: ProxyBackend, idx: number) => { setNHop(b.hop);setNName(b.name);setNUrl(b.url);setNKey(b.apiKey);setNModel(b.model);setNUa(b.customUserAgent||'');setNReasoningEffort(b.reasoningEffort||'');setNEnableRtk(b.enableRtk||false);setNEnablePonytail(b.enablePonytail||false);setShowAdd(false);setEditingIdx(idx); };
 
   const refresh = useCallback(async () => {
     const errs: string[] = [];
@@ -145,6 +148,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
         const backends = [...config.backends];
         backends[editingIdx] = {
           ...backends[editingIdx],
+          hop: nHop,
           name:nName, url:nUrl, apiKey:nKey, model:nModel,
           customUserAgent: nUa || undefined,
           enableRtk: nEnableRtk,
@@ -154,6 +158,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
         await proxySaveConfig({...config, backends});
       } else {
         await proxyAddBackend({
+          hop: nHop,
           name:nName,url:nUrl,apiKey:nKey,model:nModel,weight:1,maxRetries:2,headers:{},
           customUserAgent:nUa||undefined,enableRtk:nEnableRtk,enablePonytail:nEnablePonytail,
           reasoningEffort:(nReasoningEffort as any)||undefined,
@@ -162,7 +167,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
       resetForm(); await refresh();
     }
     catch(e: any) { setError(String(e)); }
-  }, [nName,nUrl,nKey,nModel,nUa,nEnableRtk,nEnablePonytail,nReasoningEffort,editingIdx,config,refresh]);
+  }, [nName,nUrl,nKey,nModel,nUa,nHop,nEnableRtk,nEnablePonytail,nReasoningEffort,editingIdx,config,refresh]);
 
   const duplicateBackend = useCallback(async (b: ProxyBackend) => {
     if (!config) return;
@@ -351,6 +356,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                         </span>
                       </label>
                     </div>
+                    <ProxyHopEditor value={nHop} onChange={setNHop} />
                     <div className="flex gap-2 justify-end">
                       <button onClick={resetForm} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">Cancel</button>
                       <button onClick={addBackend} disabled={!nName||!nUrl||!nKey||!nModel} className="px-3 py-1.5 text-xs bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 rounded hover:bg-cyber-neon/30 uppercase tracking-wider disabled:opacity-40">{editingIdx !== null ? 'Update' : 'Save Backend'}</button>
@@ -402,6 +408,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                           )}
                         </div>
                         <div className="text-xs text-slate-500 truncate">{b.model} @ {b.url}</div>
+                        <div className="text-xs text-cyber-neon">Hop: {b.hop ? b.hop.kind.toUpperCase() : 'Direct'}</div>
                         {b.customUserAgent && <div className="text-[10px] text-cyber-neon/60 truncate">UA: {b.customUserAgent}</div>}
                         
                         {/* Durable Usage Statistics */}

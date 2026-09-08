@@ -157,6 +157,12 @@ export function CommandPalette({
     });
 
     // Views
+    items.push({
+      id: 'action-view-companion', type: 'action' as const,
+      label: 'View: AI Companion',
+      description: 'Open AI Companion chat',
+      action: () => window.dispatchEvent(new CustomEvent('open-sidebar-tab', { detail: 'ai-chat' })),
+    });
     if (activeMainView !== 'terminal') {
       items.push({
         id: 'action-view-terminal', type: 'action' as const,
@@ -215,6 +221,7 @@ export function CommandPalette({
     }
     // Settings sections deep links
     const settingsSections: { id: string; label: string; desc: string }[] = [
+      { id: 'proxy', label: 'Settings: CliProxyAI', desc: 'Configure upstream AI backends' },
       { id: 'appearance', label: 'Settings: Appearance', desc: 'Configure application theme and styling' },
       { id: 'mythical-pet', label: 'Settings: Mythical Pet', desc: 'Enable/disable and select mythical pets' },
       { id: 'ai-companion', label: 'Settings: AI Companion', desc: 'Configure OpenAI-compatible endpoint settings' },

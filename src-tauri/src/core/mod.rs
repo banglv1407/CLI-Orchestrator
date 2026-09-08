@@ -15,6 +15,7 @@ pub mod nes_types;
 pub mod oauth2;
 pub mod project_store;
 pub mod proxy_server;
+pub mod proxy_hop;
 pub mod proxy_usage_db;
 pub mod quickapp_registry;
 pub mod rtk_sanitizer;

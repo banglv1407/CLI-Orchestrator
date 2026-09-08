@@ -77,6 +77,30 @@ Open **Settings → Animated Pets** to:
 Per-pet overrides are saved locally under `clx-mythical-pet-tuning`. The
 showcase pack defaults to `32px / 1.3×`.
 
+### AI Proxy outbound hops
+
+Open **Settings > CliProxyAI**, then **Add Backend** or **Edit** and select an
+**Outbound hop**: Direct, HTTP, HTTPS, SOCKS4, SOCKS5, or SSH. Each backend keeps
+its own route for normal and streaming requests. SOCKS4 is unauthenticated;
+SOCKS5 supports username/password and remote DNS. HTTPS encrypts the connection
+to the proxy; HTTP proxies also support HTTPS destinations using CONNECT.
+
+SSH accepts password or private key/passphrase and requires the server's SHA256
+fingerprint from your administrator. Hop credentials are saved in the local
+proxy configuration alongside API keys. A failed hop will not silently connect
+directly to that backend; ordinary fallback to other configured backends remains.
+
+Press **Ctrl+P > View: AI Companion** to open chat, or
+**Ctrl+P > Settings: CliProxyAI** to configure backends.
+
+### Recent terminals
+
+Open **Terminal Orchestrator > Recent** to see the last 50 CLI and working-folder
+pairs, newest first. Click a row to start a new terminal with the current CLI
+configuration in that folder. Successful reuse moves the pair to the top.
+History persists across restarts and begins recording with this version.
+Deleted CLIs remain visible as unavailable.
+
 ### Copying a pet pack to another computer
 
 Zip the installed pack folder:

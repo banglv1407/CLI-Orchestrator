@@ -121,7 +121,8 @@ impl OAuthManager {
         if token.expires_at.map(|v| v > now() + 60).unwrap_or(true) { return Ok(token.access_token); }
         let refresh = token.refresh_token.ok_or("OAuth access token expired; reconnect the backend")?;
         let config = backend.oauth2.as_ref().ok_or("OAuth2 settings are missing")?;
-        let response = reqwest::Client::new().post(&config.token_url)
+        let transport = crate::core::proxy_hop::transport(backend.hop.as_ref(), &config.token_url).await?;
+        let response = transport.post(&config.token_url)
             .form(&[("grant_type", "refresh_token"), ("refresh_token", refresh.as_str()), ("client_id", config.client_id.as_str())])
             .send().await.map_err(|e| format!("OAuth refresh failed: {e}"))?;
         if !response.status().is_success() { return Err(format!("OAuth refresh was rejected ({})", response.status())); }
@@ -140,7 +141,8 @@ impl OAuthManager {
         if pending.state != received_state { pending.cancel.cancel(); return Err("OAuth state did not match".into()); }
         let id = pending.backend.id.clone().ok_or("OAuth backend is missing an id")?;
         let config = pending.backend.oauth2.as_ref().ok_or("OAuth2 settings are missing")?;
-        let response = reqwest::Client::new().post(&config.token_url).form(&[
+        let transport = crate::core::proxy_hop::transport(pending.backend.hop.as_ref(), &config.token_url).await?;
+        let response = transport.post(&config.token_url).form(&[
             ("grant_type", "authorization_code"), ("code", code.as_str()), ("redirect_uri", OAUTH_REDIRECT_URI),
             ("client_id", config.client_id.as_str()), ("code_verifier", pending.verifier.as_str()),
         ]).send().await.map_err(|e| format!("OAuth exchange failed: {e}"))?;

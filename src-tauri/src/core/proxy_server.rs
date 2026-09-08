@@ -8,7 +8,6 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::{stream, StreamExt};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -22,6 +21,8 @@ use tower_http::cors::CorsLayer;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProxyBackend {
+    #[serde(default)]
+    pub hop: Option<super::proxy_hop::ProxyHop>,
     pub id: Option<String>,
     pub name: String,
     pub url: String,
@@ -504,6 +505,7 @@ fn append_stream_log_preview(preview: &mut Vec<u8>, chunk: &[u8]) {
 
 fn streaming_response(
     upstream: reqwest::Response,
+    transport: super::proxy_hop::Transport,
     state: Arc<ProxyState>,
     backend: ProxyBackend,
     request_json: String,
@@ -516,12 +518,21 @@ fn streaming_response(
     let (sender, receiver) = tokio::sync::mpsc::channel::<Result<Bytes, std::io::Error>>(16);
 
     tokio::spawn(async move {
+        let _transport = transport;
         let mut upstream_stream = upstream.bytes_stream();
         let mut preview = Vec::new();
         let mut usage_buffer = Vec::new();
         let mut stream_error: Option<String> = None;
 
-        while let Some(item) = upstream_stream.next().await {
+        loop {
+            let item = tokio::select! {
+                _ = sender.closed() => {
+                    stream_error = Some("Downstream client disconnected".to_string());
+                    break;
+                }
+                item = upstream_stream.next() => item,
+            };
+            let Some(item) = item else { break };
             match item {
                 Ok(chunk) => {
                     append_stream_log_preview(&mut preview, &chunk);
@@ -681,13 +692,6 @@ async fn handle_chat_completion(
         }
     }
 
-    let client = Client::builder()
-        .no_proxy()
-        .connect_timeout(std::time::Duration::from_secs(30))
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .unwrap_or_else(|_| Client::new());
-
     let has_stream_options = request.extra.contains_key("stream_options");
 
     for backend in backends {
@@ -695,6 +699,20 @@ async fn handle_chat_completion(
 
         for retry in 0..max_retries {
             let target_url = chat_completions_url(&backend.url);
+            let client = match super::proxy_hop::transport(backend.hop.as_ref(), &target_url).await {
+                Ok(client) => client,
+                Err(error) => {
+                    state.add_log(ProxyLogEntry {
+                        id: log_id, timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                        backend: backend.name.clone(), model: backend.model.clone(),
+                        request_json: String::new(), response_json: String::new(),
+                        status: 0, duration_ms: 0, success: false, error_msg: Some(error),
+                        prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
+                        normalized_response_json: String::new(), response_truncated: false,
+                    }).await;
+                    continue;
+                }
+            };
 
             let headers = match build_upstream_headers(&backend, state.oauth.as_ref()).await { Ok(headers) => headers, Err(error) => { eprintln!("Proxy authentication for {} failed: {}", backend.name, error); continue; } };
 
@@ -761,6 +779,7 @@ async fn handle_chat_completion(
                         );
                         return streaming_response(
                             resp,
+                            client,
                             state.clone(),
                             backend.clone(),
                             request_json,
@@ -975,6 +994,9 @@ impl ProxyConfig {
     }
 
     pub fn save(&self) -> Result<(), String> {
+        for backend in &self.backends {
+            if let Some(hop) = &backend.hop { hop.validate()?; }
+        }
         let path = Self::config_path()?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
@@ -1088,6 +1110,9 @@ mod tests {
             port: 0,
             enabled: true,
             backends: vec![ProxyBackend {
+                hop: None,
+                auth_mode: Default::default(), oauth2: None,
+                managed_profile_id: None, managed_profile_version: None,
                 id: Some("mock-id".to_string()),
                 name: "mock".to_string(),
                 url: format!("http://{}", upstream_address),
@@ -1188,6 +1213,9 @@ mod tests {
             port: 0,
             enabled: true,
             backends: vec![ProxyBackend {
+                hop: None,
+                auth_mode: Default::default(), oauth2: None,
+                managed_profile_id: None, managed_profile_version: None,
                 id: Some("mock-id".to_string()),
                 name: "mock".to_string(),
                 url: format!("http://{}", upstream_address),

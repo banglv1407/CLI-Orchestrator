@@ -661,6 +661,10 @@ async fn call_backend_direct(
     cancel: &CancellationToken,
 ) -> Result<String, String> {
     let target_url = chat_completions_url(&backend.url);
+    let transport = tokio::select! {
+        _ = cancel.cancelled() => return Err("cancelled".into()),
+        result = crate::core::proxy_hop::transport(backend.hop.as_ref(), &target_url) => result?,
+    };
 
     let headers = build_upstream_headers(backend, state.proxy_server.state.oauth.as_ref()).await?;
     let messages = messages
@@ -686,9 +690,7 @@ async fn call_backend_direct(
         let start = std::time::Instant::now();
         let response = match tokio::select! {
             _ = cancel.cancelled() => return Err("cancelled".to_string()),
-            result = state
-                .companion
-                .http_client
+            result = transport
                 .post(&target_url)
                 .headers(headers.clone())
                 .json(&body)
@@ -1548,6 +1550,9 @@ mod tests {
     #[test]
     fn proxy_backend_routing_preserves_saved_order_even_when_proxy_is_stopped() {
         let backend = |name: &str| ProxyBackend {
+            hop: None,
+            auth_mode: Default::default(), oauth2: None,
+            managed_profile_id: None, managed_profile_version: None,
             id: Some(format!("{name}-id")),
             name: name.to_string(),
             url: format!("https://{name}.example.test/v1"),

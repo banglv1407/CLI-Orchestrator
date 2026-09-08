@@ -55,6 +55,7 @@ pub async fn proxy_add_backend(
     state: State<'_, AppState>,
     mut backend: ProxyBackend,
 ) -> Result<ProxyConfig, String> {
+    if let Some(hop) = &backend.hop { hop.validate()?; }
     let mut config = state.proxy_server.state.config.write().await;
 
     // Assign UUID if missing or empty

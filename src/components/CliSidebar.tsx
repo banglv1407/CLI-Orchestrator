@@ -6,6 +6,8 @@ import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled 
 import { getContextMenuPosition } from '../lib/contextMenu';
 import { ProxyPanel } from './ProxyPanel';
 import { AIChatPanel } from './AIChatPanel';
+import { RecentTerminals } from './RecentTerminals';
+import type { RecentTerminal } from '../lib/terminal-recents';
 import { loadSpecialConfigFiles, saveSpecialConfigFile, deleteSpecialConfigFile } from '../lib/configFiles';
 import { SpecialConfigModal } from './SpecialConfigModal';
 
@@ -180,6 +182,7 @@ function SwitchIcon() {
 // --- Component Interfaces ---
 
 interface CliSidebarProps {
+  onOpenRecent: (item: RecentTerminal) => Promise<void>;
   clis: CliDefinition[];
   sessions: SessionInfo[];
   activeCli: string;
@@ -349,6 +352,7 @@ export function CliSidebar({
   activeSessionId,
   onSelectCli,
   onOpenCliInteraction,
+  onOpenRecent,
   onSelectSession,
   onAddCli,
   onEditCli,
@@ -378,7 +382,7 @@ export function CliSidebar({
   onLogsTabChange,
 }: CliSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
-  const [cliSubTab, setCliSubTab] = useState<'clis' | 'operator' | 'configs' | 'explorer'>('clis');
+  const [cliSubTab, setCliSubTab] = useState<'clis' | 'recent' | 'operator' | 'configs' | 'explorer'>('clis');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('ai-cli-sidebar-collapsed') === 'true';
   });
@@ -703,6 +707,13 @@ export function CliSidebar({
     const handler = (e: Event) => {
       const customEvt = e as CustomEvent<SidebarTab>;
       if (customEvt.detail) {
+        if (customEvt.detail === 'ai-chat') {
+          setActiveTab('ai-chat');
+          setIsSidebarCollapsed(false);
+          localStorage.setItem('ai-cli-sidebar-collapsed', 'false');
+          window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'terminal' }));
+          return;
+        }
         handleSetActiveTab(customEvt.detail);
       }
     };
@@ -2059,6 +2070,10 @@ export function CliSidebar({
 
               {/* Sub-Navigation Pills */}
               <div className="flex items-center gap-1 px-3 pb-2.5">
+                <button type="button" onClick={() => setCliSubTab('recent')}
+                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold transition ${cliSubTab === 'recent' ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40' : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'}`}>
+                  Recent
+                </button>
                 <button
                   type="button"
                   onClick={() => setCliSubTab('clis')}
@@ -2107,6 +2122,7 @@ export function CliSidebar({
             </div>
 
             {/* Sub-view 1: CLIs & Sessions */}
+            {cliSubTab === 'recent' && <RecentTerminals clis={clis} onOpen={onOpenRecent} />}
             {cliSubTab === 'clis' && (
               <div className="flex flex-1 flex-col overflow-hidden">
                 {/* Action bar */}
@@ -2830,6 +2846,7 @@ export function CliSidebar({
 
         {/* Active Tab: API Client (History & saved queries) */}
         {activeTab === 'apiclient' && <ApiHistoryList />}
+        {activeTab === 'ai-chat' && <AIChatPanel />}
       </aside>
       )}
 

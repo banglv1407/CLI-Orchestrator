@@ -153,6 +153,7 @@ export interface RemoteSystemStats {
 }
 
 export interface ProxyBackend {
+  hop?: ProxyHop;
   id?: string;
   name: string;
   url: string;
@@ -182,6 +183,17 @@ export interface ProxyConfig {
   port: number;
   backends: ProxyBackend[];
   enabled: boolean;
+}
+
+export interface ProxyHop {
+  kind: 'http' | 'https' | 'socks4' | 'socks5' | 'ssh';
+  host: string;
+  port: number;
+  username: string;
+  secret: string;
+  authMode: 'password' | 'key';
+  keyPath: string;
+  hostKey: string;
 }
 
 export interface ProxyStatus {

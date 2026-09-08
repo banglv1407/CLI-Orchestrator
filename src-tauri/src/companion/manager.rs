@@ -641,6 +641,7 @@ impl CompanionManager {
                 let id = uuid::Uuid::new_v4().to_string();
                 config.backends.retain(|b| b.name != name);
                 config.backends.push(crate::core::proxy_server::ProxyBackend {
+                    hop: None,
                     id: Some(id.clone()),
                     name: name.into(),
                     url: url.into(),

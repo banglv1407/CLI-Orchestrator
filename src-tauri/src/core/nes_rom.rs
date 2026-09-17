@@ -32,10 +32,10 @@ pub fn open_rom(path: &str) -> Result<NesRomOpenResult, String> {
 
     let sha256 = compute_sha256(&bytes);
     let name = path
-    // The lobby publishes this display-only name so a guest can select the
-    // same local file. Keep the extension: it is part of the full filename
-    // users see in Explorer, while `file_name` ensures the local path is never
-    // exposed.
+        // The lobby publishes this display-only name so a guest can select the
+        // same local file. Keep the extension: it is part of the full filename
+        // users see in Explorer, while `file_name` ensures the local path is never
+        // exposed.
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| "rom".to_string());
@@ -83,10 +83,9 @@ fn validate_magic(bytes: &[u8]) -> Result<(), String> {
 
 /// Detect the console from ROM content, not extension.
 /// - iNES:  "NES\x1A" at offset 0        (NES)
-/// - SNES:  no unified magic; accept sizes that are a multiple of 0x8000 with
-///          a plausible reset vector at the end, or a known coprocessor header
-///          byte pattern. Headered dumps (512-byte copier header) are handled
-///          by trying both offsets.
+/// - SNES: bank-aligned data with a plausible internal cartridge header.
+///         A 512-byte copier prefix is skipped only for detection; the original
+///         bytes and their SHA-256 remain unchanged for the core and netplay.
 pub fn detect_console(bytes: &[u8]) -> Option<&'static str> {
     // iNES / NES 2.0
     if bytes.len() >= 4 && &bytes[0..4] == b"NES\x1a" {
@@ -104,23 +103,33 @@ pub fn detect_console(bytes: &[u8]) -> Option<&'static str> {
 }
 
 fn looks_like_snes(data: &[u8]) -> bool {
-    // Size must be a non-zero multiple of 32 KiB (bank granularity) or within
-    // one bank of it after stripping an interleave; this rejects random files.
     if data.is_empty() || data.len() % 0x8000 != 0 {
         return false;
     }
-    // Plausibility: reset vectors must sit in ROM range and be even-ish.
-    // LoROM vectors live at $7FFC, HiROM at $FFFC relative to mapped space;
-    // both fall near the end for these dump layouts.
-    if data.len() < 0x30 {
-        return false;
-    }
-    let tail = &data[data.len() - 8..];
-    // Vector words point into ROM ($0000-$FFFF each, little-endian); reject
-    // all-zero or all-FF tails which indicate garbage/erased dumps.
-    let non_zero = tail.iter().any(|&b| b != 0x00);
-    let non_ff = tail.iter().any(|&b| b != 0xFF);
-    non_zero && non_ff
+
+    // Internal headers sit in the first mapped bank, not at EOF. Expanded and
+    // translated dumps often end in 00/FF padding. Try LoROM, HiROM and their
+    // extended layouts, as in Snes9x's memmap.cpp header scoring.
+    [0x7fc0, 0xffc0, 0x407fc0, 0x40ffc0]
+        .into_iter()
+        .filter_map(|offset| data.get(offset..offset + 0x40))
+        .any(|header| {
+            // Slow/Fast LoROM, HiROM, SuperFX/S-DD1, SA-1, ExHiROM, SPC7110.
+            let known_mapping = matches!(
+                header[0x15],
+                0x20..=0x23 | 0x25 | 0x30..=0x33 | 0x35 | 0x3a
+            );
+            let reset_vector = u16::from_le_bytes([header[0x3c], header[0x3d]]);
+            let reset_in_rom = (0x8000..0xffff).contains(&reset_vector);
+            // Fields encode powers of two in KiB. Do not compare the declared
+            // size with the file length: ROM hacks can expand without fixing it.
+            let plausible_sizes = (5..=14).contains(&header[0x17]) && header[0x18] <= 10;
+
+            // Neither ASCII titles nor matching checksums are required: both
+            // can change in translations. Mapping, sizes and reset location
+            // together reject blank/random headers without excluding patches.
+            known_mapping && reset_in_rom && plausible_sizes
+        })
 }
 
 pub fn compute_sha256(bytes: &[u8]) -> String {
@@ -148,24 +157,101 @@ mod tests {
         assert_eq!(detect_console(&valid_header()), Some("nes"));
     }
 
+    fn snes_rom(size: usize, header_offset: usize, map_mode: u8, fill: u8) -> Vec<u8> {
+        let mut bytes = vec![fill; size];
+        let header = &mut bytes[header_offset..header_offset + 0x40];
+        header.fill(0);
+        header[..21].copy_from_slice(b"SYNTHETIC TEST ROM   ");
+        header[0x15] = map_mode;
+        header[0x16] = 0x02; // ROM + RAM + battery
+        header[0x17] = 0x0c; // 4 MiB (may be stale after a translation expands it)
+        header[0x18] = 0x03; // 8 KiB RAM
+        header[0x1c..0x20].copy_from_slice(&[0xbc, 0x01, 0x43, 0xfe]);
+        header[0x3c..0x3e].copy_from_slice(&0x8d56u16.to_le_bytes());
+        bytes
+    }
+
     #[test]
-    fn detects_snes_by_content() {
-        // 64 KiB unheadered dump with a plausible vector tail.
-        let mut v = vec![0u8; 0x10000];
-        let title = b"SUPER MARIOWORLD";
-        v[0x7fc0..0x7fc0 + title.len()].copy_from_slice(title);
-        v[0xfffc] = 0x05;
-        v[0xfffd] = 0x80; // reset vector $8005
-        assert_eq!(detect_console(&v), Some("snes"));
-        // Headered (512-byte copier header) variant.
-        let mut h = vec![0xDE; 512];
-        h.extend_from_slice(&v);
-        assert_eq!(detect_console(&h), Some("snes"));
-        // Garbage tails are rejected.
-        let mut bad = vec![0xFF; 0x10000];
-        assert_eq!(detect_console(&bad), None);
-        bad.truncate(12345); // not bank-aligned
-        assert_eq!(detect_console(&bad), None);
+    fn detects_snes_mapped_headers_with_padded_tails() {
+        for (size, offset, mode) in [
+            (0x400000, 0x7fc0, 0x20),
+            (0x400000, 0xffc0, 0x31),
+            (0x600000, 0x407fc0, 0x32),
+            (0x600000, 0x40ffc0, 0x35),
+        ] {
+            for fill in [0x00, 0xff] {
+                let bytes = snes_rom(size, offset, mode, fill);
+                assert_eq!(detect_console(&bytes), Some("snes"));
+                let mut headered = vec![0; 512];
+                headered.extend_from_slice(&bytes);
+                assert_eq!(detect_console(&headered), Some("snes"));
+            }
+        }
+    }
+
+    #[test]
+    fn detects_snes_coprocessor_headers() {
+        for (offset, mode) in [(0x7fc0, 0x23), (0x7fc0, 0x32), (0xffc0, 0x3a)] {
+            assert_eq!(
+                detect_console(&snes_rom(0x200000, offset, mode, 0)),
+                Some("snes")
+            );
+        }
+    }
+
+    #[test]
+    fn accepts_translated_headers_with_stale_checksums_and_sizes() {
+        let mut bytes = snes_rom(0x600000, 0x40ffc0, 0x35, 0);
+        // A translation can change the title encoding and ROM size without
+        // updating the checksum pair or original 4 MiB size declaration.
+        bytes[0x40ffc0..0x40ffd5].fill(0x82);
+        bytes[0x40ffdc..0x40ffe0].fill(0);
+        assert_eq!(detect_console(&bytes), Some("snes"));
+    }
+
+    #[test]
+    fn rejects_garbage_even_with_nonzero_tail() {
+        for fill in [0, 0xff, 0x42] {
+            let mut bytes = vec![fill; 0x10000];
+            assert_eq!(detect_console(&bytes), None);
+            bytes[0xfffc..0xfffe].copy_from_slice(&0x8005u16.to_le_bytes());
+            assert_eq!(detect_console(&bytes), None);
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_snes_headers_and_truncated_dumps() {
+        for (field, value) in [(0x15, 0xff), (0x17, 0xff), (0x18, 0xff), (0x3d, 0x7f)] {
+            let mut bytes = snes_rom(0x10000, 0x7fc0, 0x20, 0);
+            bytes[0x7fc0 + field] = value;
+            assert_eq!(detect_console(&bytes), None);
+        }
+        let mut bytes = snes_rom(0x10000, 0x7fc0, 0x20, 0);
+        bytes.pop();
+        assert_eq!(detect_console(&bytes), None);
+        assert_eq!(detect_console(&[]), None);
+        assert_eq!(detect_console(&vec![0; 512]), None);
+        assert_eq!(detect_console(&vec![0; 0x7fff]), None);
+    }
+
+    #[test]
+    fn nes_magic_takes_priority_over_snes_header() {
+        let mut bytes = snes_rom(0x10000, 0x7fc0, 0x20, 0);
+        bytes[..4].copy_from_slice(b"NES\x1a");
+        assert_eq!(detect_console(&bytes), Some("nes"));
+    }
+
+    #[test]
+    #[ignore = "Set CLX_TEST_ROM to a local SNES ROM; no ROM fixture is bundled"]
+    fn opens_local_snes_rom_without_changing_bytes() {
+        let path = std::env::var("CLX_TEST_ROM").expect("Set CLX_TEST_ROM");
+        let original = std::fs::read(&path).expect("Read local ROM");
+        let result = open_rom(&path).expect("Open local ROM");
+        assert_eq!(result.payload.console, "snes");
+        assert_eq!(result.payload.size_bytes, original.len() as u64);
+        assert_eq!(result.payload.sha256, compute_sha256(&original));
+        assert_eq!(STANDARD.decode(result.data_b64).unwrap(), original);
+        assert_eq!(std::fs::read(path).unwrap(), original);
     }
 
     #[test]

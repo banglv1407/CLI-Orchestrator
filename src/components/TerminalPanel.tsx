@@ -2845,7 +2845,7 @@ export function TerminalPanel({
                           >
                             <span className="text-[7px] shrink-0">📁</span>
                             <MarqueeTitle
-                              text={session.workingDir || session.cliName}
+                              text={session.workingDir ? `${session.cliName} — ${session.workingDir}` : session.cliName}
                               className="text-cyber-electric"
                               fontSizeClass="text-[7px]"
                             />
@@ -3034,7 +3034,7 @@ export function TerminalPanel({
                         >
                           <span className="text-[7px] shrink-0">📁</span>
                           <MarqueeTitle
-                            text={session.workingDir || session.cliName}
+                            text={session.workingDir ? `${session.cliName} — ${session.workingDir}` : session.cliName}
                             className="text-slate-200"
                             fontSizeClass="text-[7px]"
                           />

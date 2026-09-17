@@ -16,16 +16,16 @@ const SNES_FRAMERATE = 60;
 
 /** Shared-controller bit -> RetroArch joypad id (libretro). */
 export const BIT_TO_RETROARCH_BUTTON: Record<number, number> = {
-  0x001: 13, // Up
-  0x002: 14, // Down
-  0x004: 15, // Left
-  0x008: 16, // Right
+  0x001: 4,  // Up
+  0x002: 5,  // Down
+  0x004: 6,  // Left
+  0x008: 7,  // Right
   0x010: 8,  // A (east on pad = RETRO A)
   0x020: 0,  // B (south on pad = RETRO B)
   0x040: 2,  // Select
   0x080: 3,  // Start
-  0x100: 9,  // X (west)
-  0x200: 1,  // Y (north)
+  0x100: 9,  // X (north)
+  0x200: 1,  // Y (west)
   0x400: 10, // L shoulder
   0x800: 11, // R shoulder
 };
@@ -36,6 +36,8 @@ export interface SnesEmulatorEvents {
 }
 
 interface EjsEmulatorLike {
+  started?: boolean;
+  controls?: Record<number, Record<number, unknown>>;
   paused?: boolean;
   pause?: () => void;
   play?: () => void;
@@ -76,7 +78,7 @@ export class SnesEmulator {
   /**
    * Boot the snes9x core with this ROM. The EmulatorJS surface is mounted as
    * an overlay filling the canvas parent so gameplay appears exactly where
-   * the NES picture would. Resolves once the game manager is alive.
+   * the NES picture would. Resolves once the core has started.
    */
   async loadRomAsync(bytes: Uint8Array, dataRoot = "/snes/data/"): Promise<void> {
     // Mount into the game stage (canvas's grandparent) — the flex-centered
@@ -99,6 +101,15 @@ export class SnesEmulator {
     w.EJS_gameUrl = URL.createObjectURL(new Blob([bytes as BlobPart]));
     w.EJS_startOnLoaded = true;
     w.EJS_alignStartButton = "center";
+    // CLX already maps keyboard/gamepad input for solo and netplay. A second
+    // mapping here bypasses remaps and makes A/S press X/Y while moving.
+    w.EJS_defaultControls = { 0: {}, 1: {}, 2: {}, 3: {} };
+    w.EJS_onGameStart = () => {
+      // EmulatorJS restores its saved controls during startGame, after reading
+      // the defaults. Clear that restored mapping too, without touching CLX's.
+      const emu = this.ejs;
+      if (emu) emu.controls = { 0: {}, 1: {}, 2: {}, 3: {} };
+    };
     w.EJS_Buttons = {
       playPause: false, restart: false, mute: false, settings: false,
       fullscreen: false, saveState: false, loadState: false,
@@ -122,7 +133,7 @@ export class SnesEmulator {
       const deadline = Date.now() + 30000;
       const poll = window.setInterval(() => {
         const emu = this.ejs;
-        if (emu && emu.gameManager) {
+        if (emu?.started && emu.gameManager) {
           window.clearInterval(poll);
           resolve();
         } else if (Date.now() > deadline) {
@@ -134,6 +145,8 @@ export class SnesEmulator {
 
     this.started = true;
     this.paused = false;
+    this.appliedMasks = [-1, -1];
+    this.applyInputs();
     this.events.onStatus?.("SNES core ready");
   }
 
@@ -149,6 +162,7 @@ export class SnesEmulator {
   }
 
   private applyInputs(): void {
+    if (!this.started) return;
     const gm = this.ejs?.gameManager;
     if (!gm?.simulateInput) return;
     for (const p of [0, 1] as const) {

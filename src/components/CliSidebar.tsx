@@ -1504,7 +1504,6 @@ export function CliSidebar({
   const [cachedFiles, setCachedFiles] = useState<Record<string, FileEntry[]>>({});
 
   // Quick Config Files state
-  const [quickConfigsExpanded, setQuickConfigsExpanded] = useState(true);
   const [specialConfigs, setSpecialConfigs] = useState<SpecialConfigFile[]>(() => loadSpecialConfigFiles());
   const [specialModalOpen, setSpecialModalOpen] = useState(false);
   const [editingSpecialConfig, setEditingSpecialConfig] = useState<SpecialConfigFile | null>(null);
@@ -2601,92 +2600,6 @@ export function CliSidebar({
                         </div>
                       </div>
 
-                      {/* Panel 0: Quick Config Files */}
-                      <div className={`flex flex-col overflow-hidden border-b border-cyber-line/30 ${quickConfigsExpanded ? 'shrink-0 max-h-[220px]' : 'shrink-0'}`}>
-                        <div className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 select-none">
-                          <button
-                            type="button"
-                            onClick={() => setQuickConfigsExpanded(!quickConfigsExpanded)}
-                            className="flex items-center gap-2 flex-1 text-left"
-                          >
-                            <FolderArrowIcon isExpanded={quickConfigsExpanded} />
-                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-cyber-electric">⚡ Quick Config Files</span>
-                          </button>
-                          <div className="flex items-center gap-1.5">
-                            {quickConfigFiles.length > 0 && (
-                              <span className="rounded bg-cyber-electric/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-electric border border-cyber-electric/30 font-mono">
-                                {quickConfigFiles.length}
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingSpecialConfig(null);
-                                setSpecialModalOpen(true);
-                              }}
-                              className="rounded border border-cyber-neon/40 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyber-neon transition hover:bg-cyber-neon/15"
-                              title="Add custom Special Config File (Name, Path, Description)"
-                            >
-                              + Add
-                            </button>
-                          </div>
-                        </div>
-
-                        {quickConfigsExpanded && (
-                          <div className="flex-1 overflow-y-auto py-1 scrollbar-thin">
-                            {quickConfigFiles.length === 0 ? (
-                              <p className="px-4 py-2 text-[10px] italic text-slate-500 font-mono">No config files (.yaml, .json, .env, .toml) loaded yet.</p>
-                            ) : (
-                              quickConfigFiles.map((entry) => {
-                                const isActive = selectedFilePath === entry.path;
-                                const specialMatch = specialConfigs.find(sc => sc.name === entry.name || sc.path === entry.path || entry.path.endsWith(sc.path));
-                                return (
-                                  <div
-                                    key={`config-${entry.path}`}
-                                    className={`flex items-center justify-between px-3 py-1.5 transition text-xs font-mono border-b border-cyber-line/10 group ${
-                                      isActive ? 'bg-cyber-electric/15 text-cyber-electric border-l-2 border-cyber-electric pl-3' : 'text-slate-300 hover:text-white hover:bg-cyber-base/40'
-                                    }`}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() => void onFileClick(entry, rootPath)}
-                                      className="flex flex-1 items-center gap-2 min-w-0 text-left"
-                                      title={specialMatch ? `${specialMatch.name} (${specialMatch.path}): ${specialMatch.description}` : entry.path}
-                                    >
-                                      <span className="text-[10px] shrink-0">{specialMatch ? '⚙️' : '📄'}</span>
-                                      <div className="flex flex-col min-w-0 flex-1">
-                                        <span className="truncate font-semibold text-[11px] leading-tight">{entry.name}</span>
-                                        {specialMatch?.description && (
-                                          <span className="truncate text-[8px] text-slate-400 mt-0.5">{specialMatch.description}</span>
-                                        )}
-                                      </div>
-                                    </button>
-
-                                    <div className="flex items-center gap-1 shrink-0 ml-1">
-                                      {specialMatch && (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            deleteSpecialConfigFile(specialMatch.id);
-                                          }}
-                                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition p-0.5 text-[10px]"
-                                          title="Delete special config entry"
-                                        >
-                                          ✕
-                                        </button>
-                                      )}
-                                      <span className="text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-cyber-electric/10 text-cyber-electric border border-cyber-electric/20 font-mono">
-                                        {entry.name.split('.').pop() || 'CFG'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })
-                            )}
-                          </div>
-                        )}
-                      </div>
 
                       {/* Panel 1: Workspace Files */}
                       <div className={`flex flex-col overflow-hidden ${workspaceFilesExpanded ? 'flex-1 min-h-[100px]' : 'shrink-0'}`}>

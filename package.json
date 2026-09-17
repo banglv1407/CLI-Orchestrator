@@ -12,6 +12,7 @@
     "build:production": "node scripts/build-production.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
+    "test:snes-input": "node --test scripts/snes-input.test.mjs",
     "test:nes-patch": "node --test scripts/patch-jsnes-ppu.test.mjs",
     "test:rogue-assets": "node scripts/validate-rogue-assets.mjs"
   },

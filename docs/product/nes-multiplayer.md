@@ -25,6 +25,12 @@ never persisted. There is no WebRTC media path and no coturn dependency.
 ## ROM Boundary
 
 - Each machine reads its own ROM through the existing local Tauri command.
+- Local loading accepts `.nes`, `.sfc`, `.smc`, `.fig`, and `.swc` files up to
+  16 MiB. NES uses its iNES signature. SNES uses internal LoROM/HiROM/extended
+  cartridge headers, with optional 512-byte copier prefixes; trailing zero/FF
+  padding and stale translation checksums do not invalidate a plausible header.
+- Console detection never rewrites the file or strips bytes from the returned
+  payload. Size and SHA-256 continue to describe the exact selected file.
 - After the private room WebSocket is authenticated, peers exchange only the
   lowercase SHA-256 of their local ROM.
 - Gameplay fails closed when hashes differ.
@@ -43,6 +49,15 @@ never persisted. There is no WebRTC media path and no coturn dependency.
   SNES X/Y/L/R. In particular, `2048` is the valid SNES R bit, not a 255-byte
   payload violation. The JSON room envelope plus WebSocket/TLS framing makes
   real traffic typically single-digit to low-tens of KiB/s per client.
+
+## Local Controller Mapping
+
+- NES and SNES use CLX's per-role keyboard mapping, including WASD, arrows,
+  custom bindings, and SNES face/shoulder buttons.
+- The SNES adapter translates direction bits to the bundled core's D-pad IDs
+  4-7. Its separate EmulatorJS keyboard/gamepad bindings are cleared at startup,
+  including restored bindings, so they cannot add buttons or bypass CLX remaps.
+- Inputs received during SNES startup are applied after the core starts.
 
 ## Shared reactions
 

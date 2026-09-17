@@ -95,6 +95,10 @@ Press **Ctrl+P > View: AI Companion** to open chat, or
 
 ### Recent terminals
 
+Mini terminal headers display the session CLI name followed by its working
+folder. Explorer shows Workspace Files and Git Diff; Quick Config Files remains
+available in its dedicated manager, without a duplicate Explorer panel.
+
 Open **Terminal Orchestrator > Recent** to see the last 50 CLI and working-folder
 pairs, newest first. Click a row to start a new terminal with the current CLI
 configuration in that folder. Successful reuse moves the pair to the top.

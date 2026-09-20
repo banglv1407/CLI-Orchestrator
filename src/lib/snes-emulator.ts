@@ -16,19 +16,25 @@ const SNES_FRAMERATE = 60;
 
 /** Shared-controller bit -> RetroArch joypad id (libretro). */
 export const BIT_TO_RETROARCH_BUTTON: Record<number, number> = {
-  0x001: 4,  // Up
-  0x002: 5,  // Down
-  0x004: 6,  // Left
-  0x008: 7,  // Right
-  0x010: 8,  // A (east on pad = RETRO A)
-  0x020: 0,  // B (south on pad = RETRO B)
-  0x040: 2,  // Select
-  0x080: 3,  // Start
-  0x100: 9,  // X (north)
-  0x200: 1,  // Y (west)
+  0x001: 4, // Up
+  0x002: 5, // Down
+  0x004: 6, // Left
+  0x008: 7, // Right
+  0x010: 8, // A (east on pad = RETRO A)
+  0x020: 0, // B (south on pad = RETRO B)
+  0x040: 2, // Select
+  0x080: 3, // Start
+  0x100: 9, // X (north)
+  0x200: 1, // Y (west)
   0x400: 10, // L shoulder
   0x800: 11, // R shoulder
 };
+
+/** Upper bound for a plausible SNES state payload (real: ~823 KB). */
+const SNES_STATE_MAX_BYTES = 8 * 1024 * 1024;
+/** Floor for the DECODED size — snes9x states are always ~700 KB+, so
+ *  anything smaller than 64 KB is garbage, not a legitimate state. */
+const SNES_STATE_MIN_BYTES = 64 * 1024;
 
 export interface SnesEmulatorEvents {
   onFrame?: () => void;
@@ -46,6 +52,7 @@ interface EjsEmulatorLike {
     restart?: () => void;
     simulateInput?: (player: number, index: number, value: number) => void;
     getState?: () => Uint8Array | Promise<Uint8Array>;
+    loadState?: (data: Uint8Array) => void;
   } | null;
 }
 
@@ -55,6 +62,7 @@ export class SnesEmulator {
   private events: SnesEmulatorEvents;
 
   private container: HTMLDivElement | null = null;
+  private romUrl: string | null = null;
   private started = false;
   private paused = false;
   private manualMode = false;
@@ -72,7 +80,10 @@ export class SnesEmulator {
   }
 
   private get ejs(): EjsEmulatorLike | null {
-    return ((window as unknown as Record<string, unknown>).EJS_emulator as EjsEmulatorLike) ?? null;
+    return (
+      ((window as unknown as Record<string, unknown>)
+        .EJS_emulator as EjsEmulatorLike) ?? null
+    );
   }
 
   /**
@@ -80,7 +91,10 @@ export class SnesEmulator {
    * an overlay filling the canvas parent so gameplay appears exactly where
    * the NES picture would. Resolves once the core has started.
    */
-  async loadRomAsync(bytes: Uint8Array, dataRoot = "/snes/data/"): Promise<void> {
+  async loadRomAsync(
+    bytes: Uint8Array,
+    dataRoot = "/snes/data/",
+  ): Promise<void> {
     // Mount into the game stage (canvas's grandparent) — the flex-centered
     // container — so EmulatorJS fills and centers like the NES canvas does.
     const stage = this.canvas.parentElement?.parentElement;
@@ -98,7 +112,11 @@ export class SnesEmulator {
     w.EJS_player = "#clx-snes-ejs";
     w.EJS_core = "snes9x";
     w.EJS_pathtodata = dataRoot;
-    w.EJS_gameUrl = URL.createObjectURL(new Blob([bytes as BlobPart]));
+    // Revoke the previous ROM blob — EJS consumed it at first launch, a stale
+    // object URL would hold up to 16 MiB of ROM memory per reload.
+    if (this.romUrl) URL.revokeObjectURL(this.romUrl);
+    this.romUrl = URL.createObjectURL(new Blob([bytes as BlobPart]));
+    w.EJS_gameUrl = this.romUrl;
     w.EJS_startOnLoaded = true;
     w.EJS_alignStartButton = "center";
     // CLX already maps keyboard/gamepad input for solo and netplay. A second
@@ -111,23 +129,34 @@ export class SnesEmulator {
       if (emu) emu.controls = { 0: {}, 1: {}, 2: {}, 3: {} };
     };
     w.EJS_Buttons = {
-      playPause: false, restart: false, mute: false, settings: false,
-      fullscreen: false, saveState: false, loadState: false,
-      screenRecord: false, gamepad: false, cheat: false, volume: false,
-      saveSavFiles: false, loadSavFiles: false, exitEmulation: false,
+      playPause: false,
+      restart: false,
+      mute: false,
+      settings: false,
+      fullscreen: false,
+      saveState: false,
+      loadState: false,
+      screenRecord: false,
+      gamepad: false,
+      cheat: false,
+      volume: false,
+      saveSavFiles: false,
+      loadSavFiles: false,
+      exitEmulation: false,
     };
     w.EJS_ready = () => {
       window.setTimeout(() => {
-        container.querySelector(".ejs_start_button")?.dispatchEvent(
-          new MouseEvent("click", { bubbles: true }),
-        );
+        container
+          .querySelector(".ejs_start_button")
+          ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       }, 50);
     };
 
     await new Promise<void>((resolve, reject) => {
       const loader = document.createElement("script");
       loader.src = `${dataRoot}loader.js`;
-      loader.onerror = () => reject(new Error("SNES runtime failed to download"));
+      loader.onerror = () =>
+        reject(new Error("SNES runtime failed to download"));
       document.body.appendChild(loader);
 
       const deadline = Date.now() + 30000;
@@ -188,7 +217,9 @@ export class SnesEmulator {
     this.paused = true;
     try {
       this.ejs?.pause?.();
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
 
   async resume(): Promise<void> {
@@ -197,13 +228,17 @@ export class SnesEmulator {
     try {
       this.ejs?.play?.();
       await this.ejs?.audioContext?.resume?.();
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
 
   reset(): void {
     try {
       this.ejs?.gameManager?.restart?.();
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
 
   startManual(): void {
@@ -225,36 +260,103 @@ export class SnesEmulator {
     this.events.onFrame?.();
   }
 
+  /**
+   * Sync snapshot used by the netplay hash. EmulatorJS getState() is
+   * synchronous on 4.2.3; a Promise-returning core is skipped this tick.
+   */
   serialize(): string {
     try {
       const raw = this.ejs?.gameManager?.getState?.();
       if (!raw) return "";
       const state = raw instanceof Uint8Array ? raw : null;
       if (!state) return ""; // pending promise — skip this tick
-      let bin = "";
-      const CHUNK = 0x8000;
-      for (let i = 0; i < state.length; i += CHUNK) {
-        bin += String.fromCharCode(...state.subarray(i, i + CHUNK));
-      }
-      return JSON.stringify({ t: "clx-snes-state-v1", d: btoa(bin) });
+      return this.stateToBase64(state);
     } catch {
       return "";
     }
   }
 
-  deserialize(snapshot: string): void {
+  /**
+   * Async save used by the UI. Some cores return a Promise from getState() —
+   * await it before handing the snapshot to the backend, and never let a
+   * failure masquerade as a successful save.
+   */
+  async serializeAsync(): Promise<string> {
+    try {
+      const raw = this.ejs?.gameManager?.getState?.();
+      if (!raw) return "";
+      const state = raw instanceof Uint8Array ? raw : await raw;
+      if (!(state instanceof Uint8Array) || state.length === 0) return "";
+      return this.stateToBase64(state);
+    } catch {
+      return "";
+    }
+  }
+
+  private stateToBase64(state: Uint8Array): string {
+    let bin = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < state.length; i += CHUNK) {
+      bin += String.fromCharCode(...state.subarray(i, i + CHUNK));
+    }
+    return JSON.stringify({ t: "clx-snes-state-v1", d: btoa(bin) });
+  }
+
+  /**
+   * Restore a previously saved snapshot. Returns true on success. The
+   * envelope and payload size are validated BEFORE the bytes reach the WASM
+   * core — a truncated/garbage state fed to loadState can hang the core,
+   * which on the desktop WebView reads as a frozen machine.
+   */
+  deserialize(snapshot: string): boolean {
     try {
       const parsed = JSON.parse(snapshot) as { t?: string; d?: string };
-      if (parsed.t !== "clx-snes-state-v1" || !parsed.d) return;
-      const gm = this.ejs?.gameManager as unknown as {
-        loadState?: (data: Uint8Array) => void;
-      } | undefined;
+      if (parsed.t !== "clx-snes-state-v1" || !parsed.d) return false;
+      if (
+        (parsed.d.length * 3) / 4 < SNES_STATE_MIN_BYTES ||
+        parsed.d.length % 4 !== 0 ||
+        parsed.d.length > SNES_STATE_MAX_BYTES
+      ) {
+        this.events.onStatus?.(
+          "SNES save state rejected: unexpected payload size",
+        );
+        return false;
+      }
+      const ejs = this.ejs;
+      const gm = ejs?.gameManager as
+        | { loadState?: (data: Uint8Array) => void }
+        | undefined;
+      if (!gm?.loadState) return false;
       const bin = atob(parsed.d);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      gm?.loadState?.(bytes);
+
+      // Load into a paused core, then resume exactly as before. Matches the
+      // EmulatorJS convention and avoids mid-frame races with the WASM loop.
+      const wasPaused = ejs?.paused ?? true;
+      if (!wasPaused) {
+        try {
+          ejs?.pause?.();
+        } catch {
+          /* noop */
+        }
+      }
+      try {
+        gm.loadState(bytes);
+      } finally {
+        if (!wasPaused) {
+          try {
+            ejs?.play?.();
+            void ejs?.audioContext?.resume?.();
+          } catch {
+            /* noop */
+          }
+        }
+      }
+      return true;
     } catch {
       this.events.onStatus?.("SNES save state restore failed");
+      return false;
     }
   }
 
@@ -264,8 +366,14 @@ export class SnesEmulator {
     this.manualMode = false;
     try {
       this.ejs?.pause?.();
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     this.teardownOverlay();
+    if (this.romUrl) {
+      URL.revokeObjectURL(this.romUrl);
+      this.romUrl = null;
+    }
     delete (window as unknown as Record<string, unknown>).EJS_emulator;
     this.clearCanvas();
   }

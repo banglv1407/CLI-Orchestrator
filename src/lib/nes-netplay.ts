@@ -1,5 +1,4 @@
 import type { NesConnectionBundleV1 } from "./nes";
-import type { NesEmulator } from "./nes-emulator";
 import type { NesControllerInput } from "./nes-input";
 
 type SignalType =
@@ -50,7 +49,16 @@ export type NesNetplayStatus =
 
 export interface NesNetplayOptions {
   bundle: NesConnectionBundleV1;
-  emulator: NesEmulator;
+  /** The shared emulator surface — implemented by both NesEmulator and SnesEmulator. */
+  emulator: {
+    startManual: () => void;
+    stepFrame: (player1Mask: number, player2Mask: number) => void;
+    pause: () => void;
+    resume: () => void;
+    reset: () => void;
+    serialize: () => string;
+    stop: () => void;
+  };
   localInput: NesControllerInput;
   romSha256: string;
   onStatus?: (status: NesNetplayStatus, detail?: string) => void;

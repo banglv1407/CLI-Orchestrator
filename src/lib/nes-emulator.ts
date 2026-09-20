@@ -233,9 +233,25 @@ export class NesEmulator {
     return JSON.stringify(this.nes.toJSON());
   }
 
-  deserialize(snapshot: string): void {
-    if (!this.nes) return;
-    this.nes.fromJSON(JSON.parse(snapshot));
+  /**
+   * Restore a previously saved snapshot. Returns true on success. The payload
+   * is verified to be a JSNES toJSON() envelope BEFORE it reaches fromJSON —
+   * a truncated or foreign snapshot must never be fed to the emulator core.
+   */
+  deserialize(snapshot: string): boolean {
+    if (!this.nes) return false;
+    try {
+      const parsed = JSON.parse(snapshot) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== "object") return false;
+      for (const key of ["cpu", "mmap", "ppu", "papu"]) {
+        const part = parsed[key];
+        if (!part || typeof part !== "object" || Array.isArray(part)) return false;
+      }
+      this.nes.fromJSON(parsed as unknown as Parameters<typeof this.nes.fromJSON>[0]);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private startAudio(): void {

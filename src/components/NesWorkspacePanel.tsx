@@ -51,12 +51,13 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
   const [romOpen, setRomOpen] = useState(false);
 
   const [autoSavedNotice, setAutoSavedNotice] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string>("1");
   const [hasSaveSlot, setHasSaveSlot] = useState<boolean>(false);
 
   // Emulator runtime
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const emuRef = useRef<NesEmulator | null>(null);
+  const emuRef = useRef<NesEmulator | SnesEmulator | null>(null);
   const inputRef = useRef<NesControllerInput | null>(null);
   const [emuStatus, setEmuStatus] = useState<string>("Ready to load a ROM.");
   const [running, setRunning] = useState(false);
@@ -110,13 +111,22 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     const emu = emuRef.current;
     if (!emu || !romPayload?.sha256) return;
     try {
-      const json = emu.serialize();
-      if (!json) return;
+      // SNES getState() may be async on some cores — await the snapshot.
+      const json =
+        emu instanceof SnesEmulator ? await emu.serializeAsync() : emu.serialize();
+      if (!json) {
+        setSaveError("⚠ Save failed — the emulator is not ready. Try again in a moment.");
+        setAutoSavedNotice(null);
+        return;
+      }
       await nesSaveState(romPayload.sha256, slot, json);
       await checkSlotStatus(slot, romPayload.sha256);
+      setSaveError(null);
       setAutoSavedNotice(`Saved state to Slot ${slot.toUpperCase()}`);
       setTimeout(() => setAutoSavedNotice(null), 3000);
     } catch (e) {
+      setSaveError(`⚠ Save failed: ${String(e)}`);
+      setAutoSavedNotice(null);
       console.warn("Failed to save state:", e);
     }
   }, [selectedSlot, romPayload, checkSlotStatus]);
@@ -126,11 +136,25 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     if (!emu || !romPayload?.sha256) return;
     try {
       const json = await nesLoadState(romPayload.sha256, slot);
-      if (!json) return;
-      emu.deserialize(json);
+      if (!json) {
+        setSaveError("⚠ No save state found in this slot.");
+        setAutoSavedNotice(null);
+        return;
+      }
+      // deserialize() validates the envelope and reports failure instead of
+      // feeding a corrupt snapshot to the emulator core (which can hang it).
+      const loaded = emu.deserialize(json);
+      if (!loaded) {
+        setSaveError("⚠ Load failed — the save file is corrupted or unreadable.");
+        setAutoSavedNotice(null);
+        return;
+      }
+      setSaveError(null);
       setAutoSavedNotice(`Loaded state from Slot ${slot.toUpperCase()}`);
       setTimeout(() => setAutoSavedNotice(null), 3000);
     } catch (e) {
+      setSaveError(`⚠ Load failed: ${String(e)}`);
+      setAutoSavedNotice(null);
       console.warn("Failed to load state:", e);
     }
   }, [selectedSlot, romPayload]);
@@ -287,7 +311,7 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     let engine: Engine | null = null;
     const setEngine = (e: Engine) => {
       engine = e;
-      emuRef.current = e as NesEmulator;
+      emuRef.current = e;
     };
 
     if (!isSnes) {
@@ -375,17 +399,21 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     session.onReaction = (id, sender) => showReaction(id, sender);
     session.onAutoSave = (reason: string) => {
       if (!romPayload?.sha256) return;
-      try {
-        const json = emulator.serialize();
-        if (json) {
-          void nesSaveState(romPayload.sha256, "auto", json).then(() => {
+      void (async () => {
+        try {
+          const json =
+            emulator instanceof SnesEmulator
+              ? await emulator.serializeAsync()
+              : emulator.serialize();
+          if (json) {
+            await nesSaveState(romPayload.sha256, "auto", json);
             void checkSlotStatus(selectedSlot, romPayload.sha256);
             setAutoSavedNotice("Auto-saved stage upon player disconnect!");
-          });
+          }
+        } catch (err) {
+          console.warn("Auto-save failed on peer left:", err);
         }
-      } catch (err) {
-        console.warn("Auto-save failed on peer left:", err);
-      }
+      })();
     };
     netplayRef.current = session;
     void session.start().catch((error) => {
@@ -493,6 +521,11 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
           {autoSavedNotice && (
             <span className="rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[11px] font-semibold text-emerald-300 animate-pulse">
               ✨ {autoSavedNotice}
+            </span>
+          )}
+          {saveError && (
+            <span className="rounded bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[11px] font-semibold text-rose-300">
+              {saveError}
             </span>
           )}
           <button

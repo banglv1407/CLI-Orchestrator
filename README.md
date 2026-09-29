@@ -39,28 +39,6 @@ Every character includes idle, travel, blink, and two bounded special moves.
 The full runtime pack remains local-only and is not bundled into the
 application.
 
-<table>
-  <tr>
-    <td align="center">
-      <img src="docs/images/animated-pets/goku-ultra-instinct-contact.png" width="260" alt="Goku Ultra Instinct animation contact sheet">
-      <br><strong>Goku Ultra Instinct</strong>
-      <br><sub>Instant Transmission · Kamehameha</sub>
-    </td>
-    <td align="center">
-      <img src="docs/images/animated-pets/naruto-hokage-contact.png" width="260" alt="Naruto Seventh Hokage animation contact sheet">
-      <br><strong>Naruto Seventh Hokage</strong>
-      <br><sub>Shadow Clone Jutsu · Rasengan</sub>
-    </td>
-    <td align="center">
-      <img src="docs/images/animated-pets/web-ranger-contact.png" width="260" alt="Original Web Ranger animation contact sheet">
-      <br><strong>Web Ranger</strong>
-      <br><sub>Web Shot · Web Zip</sub>
-    </td>
-  </tr>
-</table>
-
-Web Ranger is an original arachnid-themed character. It is not represented as
-Spider-Man and does not use Spider-Man logos or movie suit artwork.
 
 ### Pet controls
 

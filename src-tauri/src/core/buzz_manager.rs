@@ -19,8 +19,9 @@ pub struct BuzzManager {
 
 impl BuzzManager {
     pub fn new() -> Self {
+        let config = BuzzRelayConfig::load().unwrap_or_default();
         Self {
-            config: Mutex::new(BuzzRelayConfig::default()),
+            config: Mutex::new(config),
             agents: Mutex::new(Vec::new()),
             live: BuzzLiveClient::new(),
         }
@@ -34,7 +35,16 @@ impl BuzzManager {
         self.config.lock().unwrap().clone()
     }
 
-    pub fn set_config(&self, cfg: BuzzRelayConfig) {
+    pub fn set_config(&self, mut cfg: BuzzRelayConfig) -> Result<(), String> {
+        let existing = self.get_config();
+        if let Some(new_proxy) = cfg.proxy.as_mut() {
+            if new_proxy.secret.is_none() {
+                if let Some(existing_proxy) = existing.proxy.as_ref() {
+                    new_proxy.secret = existing_proxy.secret.clone();
+                }
+            }
+        }
+        cfg.save()?;
         // SSH hop: (re)start the dynamic SOCKS5 listener when the config changes.
         if let Some(proxy) = cfg.proxy.as_ref() {
             if proxy.kind == BuzzProxyKind::Ssh && proxy.is_enabled() {
@@ -47,6 +57,7 @@ impl BuzzManager {
             }
         }
         *self.config.lock().unwrap() = cfg;
+        Ok(())
     }
 
     /// Read the private key from the Windows Credential Manager vault.

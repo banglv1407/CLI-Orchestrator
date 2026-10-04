@@ -41,12 +41,12 @@ pub struct BuzzProxyConfig {
     /// Password (auth_mode=password) or key passphrase (auth_mode=key).
     #[serde(default)]
     pub secret: Option<String>,
-    #[serde(default = "default_auth_mode")]
+    #[serde(default = "default_auth_mode", alias = "auth_mode")]
     pub auth_mode: String,
-    #[serde(default)]
+    #[serde(default, alias = "key_path")]
     pub key_path: Option<String>,
     /// Local port bound by the SSH dynamic SOCKS5 listener. 0 = default 31080.
-    #[serde(default)]
+    #[serde(default, alias = "local_port")]
     pub local_port: u16,
 }
 

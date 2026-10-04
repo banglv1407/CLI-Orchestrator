@@ -28,6 +28,13 @@ import {
 } from '../lib/tauri';
 import { RemoteMonitorWidget } from './RemoteMonitorWidget';
 import { SshFileTransferDialog } from './SshFileTransferDialog';
+import {
+  getTerminalFontSize,
+  getTerminalFontFamily,
+  zoomIn,
+  zoomOut,
+  resetZoom,
+} from '../lib/appearance';
 import { save } from '@tauri-apps/plugin-dialog';
 import { QuickAppsPanel } from './QuickAppsPanel';
 import { BuzzWorkspacePanel } from './BuzzWorkspacePanel';
@@ -38,6 +45,7 @@ import { SystemLogPanel } from './SystemLogPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
 import { DashboardPanel } from './DashboardPanel';
+import { AgentSessionPanel } from './AgentSessionPanel';
 import { useUiActive } from '../hooks/useUiActive';
 import { copyTerminalSelection, getTerminalSelectionText, type TerminalCopyMode } from '../lib/terminalClipboard';
 import { getContextMenuPosition } from '../lib/contextMenu';
@@ -1148,8 +1156,8 @@ export function TerminalPanel({
       cursorBlink: false,
       convertEol: false,
       scrollback: 500,
-      fontFamily: TERMINAL_FONT_FAMILY,
-      fontSize: 13,
+      fontFamily: getTerminalFontFamily(),
+      fontSize: getTerminalFontSize(),
       cols: handle.term.cols,
       rows: handle.term.rows,
       disableStdin: true,
@@ -1365,8 +1373,8 @@ export function TerminalPanel({
         cursorBlink: true,
         convertEol: false,
         scrollback: 2000,
-        fontFamily: TERMINAL_FONT_FAMILY,
-        fontSize: 13,
+        fontFamily: getTerminalFontFamily(),
+        fontSize: getTerminalFontSize(),
         disableStdin: false,
         // Disable auto-scroll on user input so we respect manual scroll position
         scrollOnUserInput: false,
@@ -1374,6 +1382,22 @@ export function TerminalPanel({
       });
 
       term.attachCustomKeyEventHandler((event) => {
+        // ── Ctrl+=, Ctrl+-, Ctrl+0 (zoom shortcuts) ──
+        if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+          if (event.key === '=' || event.key === '+') {
+            if (event.type === 'keydown') zoomIn();
+            return false;
+          }
+          if (event.key === '-' || event.key === '_') {
+            if (event.type === 'keydown') zoomOut();
+            return false;
+          }
+          if (event.key === '0') {
+            if (event.type === 'keydown') resetZoom();
+            return false;
+          }
+        }
+
         // ── Ctrl+Alt+? (command), Ctrl+Alt+1 (ripgrep), Ctrl+Alt+2 (mention) ──
         if (event.ctrlKey && event.altKey) {
           const key = event.key.toLowerCase();
@@ -2055,6 +2079,47 @@ export function TerminalPanel({
     };
   }, []);
 
+  useEffect(() => {
+    const handleFontChange = () => {
+      const fontSize = getTerminalFontSize();
+      const fontFamily = getTerminalFontFamily();
+      for (const id in terminalRefs.current) {
+        const handle = terminalRefs.current[id];
+        if (handle?.term) {
+          handle.term.options.fontSize = fontSize;
+          handle.term.options.fontFamily = fontFamily;
+          if (handle.miniTerm) {
+            handle.miniTerm.options.fontSize = fontSize;
+            handle.miniTerm.options.fontFamily = fontFamily;
+          }
+          try {
+            handle.fit.fit();
+            handle.term.refresh(0, handle.term.rows - 1);
+          } catch (_e) {}
+        }
+      }
+    };
+    const handleAppearanceChange = () => {
+      setTimeout(() => {
+        for (const id in terminalRefs.current) {
+          const handle = terminalRefs.current[id];
+          if (handle?.term) {
+            try {
+              handle.fit.fit();
+              handle.term.refresh(0, handle.term.rows - 1);
+            } catch (_e) {}
+          }
+        }
+      }, 50);
+    };
+    window.addEventListener('clx-terminal-font-changed', handleFontChange);
+    window.addEventListener('clx-appearance-changed', handleAppearanceChange);
+    return () => {
+      window.removeEventListener('clx-terminal-font-changed', handleFontChange);
+      window.removeEventListener('clx-appearance-changed', handleAppearanceChange);
+    };
+  }, []);
+
   const cliSessions = useMemo(
     () => sessions.filter(s => (s.panel ?? 'right') === 'right'),
     [sessions]
@@ -2483,6 +2548,11 @@ export function TerminalPanel({
                 {uiActive && activeMainView === 'dashboard' && (
                   <div className="absolute inset-0 z-[5]">
                     <DashboardPanel />
+                  </div>
+                )}
+                {activeMainView === 'agent-sessions' && (
+                  <div className="absolute inset-0 z-[5]">
+                    <AgentSessionPanel />
                   </div>
                 )}
 

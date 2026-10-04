@@ -14,7 +14,9 @@ pub const NES_RELAY_CONFIG_SCHEMA_VERSION: u32 = 1;
 /// and peer connection state are never persisted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NesRelayConfigV1 {
+    #[serde(alias = "schemaVersion")]
     pub schema_version: u32,
+    #[serde(alias = "serviceBaseUrl")]
     pub service_base_url: String,
     /// Optional outbound hop: SSH dynamic SOCKS5 or HTTP CONNECT.
     #[serde(default)]

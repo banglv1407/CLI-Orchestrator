@@ -43,7 +43,16 @@ pub async fn nes_test_server(config: NesRelayConfigV1) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn nes_save_config(config: NesRelayConfigV1) -> Result<(), String> {
+pub fn nes_save_config(mut config: NesRelayConfigV1) -> Result<(), String> {
+    if let Ok(existing) = NesRelayConfigV1::load() {
+        if let Some(new_proxy) = config.proxy.as_mut() {
+            if new_proxy.secret.is_none() {
+                if let Some(existing_proxy) = existing.proxy.as_ref() {
+                    new_proxy.secret = existing_proxy.secret.clone();
+                }
+            }
+        }
+    }
     // SSH hop: (re)start the dynamic SOCKS5 listener when the config enables it.
     if let Some(proxy) = config.proxy.as_ref() {
         if proxy.is_enabled() && proxy.kind == crate::core::buzz_proxy::BuzzProxyKind::Ssh {

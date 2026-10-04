@@ -15,8 +15,7 @@ pub fn buzz_get_config(state: State<'_, AppState>) -> Result<BuzzRelayConfig, St
 
 #[tauri::command]
 pub fn buzz_set_config(config: BuzzRelayConfig, state: State<'_, AppState>) -> Result<(), String> {
-    state.buzz.set_config(config);
-    Ok(())
+    state.buzz.set_config(config)
 }
 
 #[tauri::command]

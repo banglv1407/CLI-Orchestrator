@@ -52,6 +52,7 @@ export interface CreateSessionRequest {
   cliName: string;
   workingDir?: string;
   projectTag?: string;
+  customArgs?: string[];
 }
 
 export interface StopCliRequest {
@@ -505,4 +506,36 @@ export interface TerminalCommandSuggestRequest {
   userRequest: string;
   visibleLines: string[];
   environmentOverride?: TerminalEnvironmentOverride;
+}
+
+// ── Agent Session Browser ───────────────────────────────────────────────
+export interface AgentSessionEntry {
+  id: string;
+  agent: string;
+  model: string | null;
+  title: string | null;
+  cwd: string | null;
+  messageCount: number;
+  startedAt: number;
+  endedAt: number | null;
+  realPath: string | null;
+}
+
+export interface AgentSessionMessage {
+  role: string;
+  content: string | null;
+  timestamp: number;
+}
+
+export interface AgentExportContextRequest {
+  sessionId: string;
+  agent: string;
+  realPath?: string | null;
+  cwd?: string | null;
+  targetAgent?: string | null;
+}
+
+export interface AgentExportContextResponse {
+  filePath: string;
+  contextMarkdown: string;
 }

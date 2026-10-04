@@ -34,6 +34,7 @@ import {
   createDirectory,
   createFileContent,
 } from '../lib/tauri';
+import { zoomIn, zoomOut, resetZoom } from '../lib/appearance';
 import type {
   AssistantState,
   CliDefinition,
@@ -71,7 +72,7 @@ export function Dashboard() {
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
-  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'buzz' | 'game' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote' | 'dashboard'>('terminal');
+  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'buzz' | 'game' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote' | 'dashboard' | 'agent-sessions'>('terminal');
   const [showNotepad, setShowNotepad] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -430,6 +431,25 @@ export function Dashboard() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('ai-cli-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const handleZoomKeys = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.altKey) return;
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        zoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        zoomOut();
+      } else if (e.key === '0') {
+        e.preventDefault();
+        resetZoom();
+      }
+    };
+    window.addEventListener('keydown', handleZoomKeys);
+    return () => window.removeEventListener('keydown', handleZoomKeys);
+  }, []);
 
   useEffect(() => {
     let unlistenStatus: (() => void) | undefined;
@@ -1007,7 +1027,7 @@ export function Dashboard() {
   );
 
   return (
-    <main className="flex h-screen bg-cyber-base bg-grid text-slate-100">
+    <main className="flex h-full w-full bg-cyber-base bg-grid text-slate-100 overflow-hidden">
       <CliSidebar
         onOpenRecent={async item => {
           setActiveMainView('terminal');
@@ -1054,7 +1074,7 @@ export function Dashboard() {
         onLogsTabChange={(isActive) => setActiveMainView(isActive ? 'logs' : 'terminal')}
       />
 
-      <section className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
+      <section className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
         <TerminalPanel
           sessions={sessions}
           activeSessionId={activeSessionId}

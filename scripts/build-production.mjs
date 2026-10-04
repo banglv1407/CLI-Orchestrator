@@ -17,7 +17,7 @@ const tauriCliPath = resolve(
 const now = new Date();
 const month = String(now.getMonth() + 1).padStart(2, '0');
 const day = String(now.getDate()).padStart(2, '0');
-const productionName = `CLX (${month}${day})`;
+const productionName = process.env.CLX_BUILD_NAME || `CLX (${month}${day})`;
 
 const baseConfig = JSON.parse(readFileSync(tauriConfigPath, 'utf8'));
 const windows = baseConfig.app?.windows;

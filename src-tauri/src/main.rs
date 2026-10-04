@@ -54,7 +54,10 @@ use commands::{
         delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
     },
     rtk_commands::rtk_get_status,
-    system_commands::get_system_logs,
+    system_commands::{adjust_window_scale, get_system_logs, get_window_size},
+    agent_session_commands::{
+        agent_export_session_context, agent_list_sessions, agent_session_preview,
+    },
 };
 use companion::commands::{
     companion_cancel, companion_clear_history, companion_get_catalog, companion_get_config,
@@ -210,6 +213,8 @@ fn main() {
             proxy_reset_usage,
             rtk_get_status,
             get_system_logs,
+            adjust_window_scale,
+            get_window_size,
             get_notepad,
             save_notepad,
             pet_list_packs,
@@ -239,7 +244,10 @@ fn main() {
             dashboard_kill_processes,
             dashboard_get_target_connections,
             dashboard_get_all_connections,
-        ])
+            agent_list_sessions,
+            agent_session_preview,
+            agent_export_session_context,
+                    ])
         .setup(|app| {
             // Initialize companion with app handle for event emission
             if let Some(state) = app.try_state::<AppState>() {

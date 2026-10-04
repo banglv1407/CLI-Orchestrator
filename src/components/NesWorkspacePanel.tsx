@@ -23,9 +23,18 @@ import {
   NES_NATIVE_WIDTH,
 } from "../lib/nes-emulator";
 import { SnesEmulator } from "../lib/snes-emulator";
-import { NesControllerInput, NesKeyMapping } from "../lib/nes-input";
+import {
+  NesControllerInput,
+  NesKeyMapping,
+  NES_BIT_UP,
+  NES_BIT_DOWN,
+  NES_BIT_LEFT,
+  NES_BIT_RIGHT,
+} from "../lib/nes-input";
 import { NES_REACTIONS, NesNetplaySession, NesNetplayStatus, NesReactionId } from "../lib/nes-netplay";
 import { NesKeyConfigModal } from "./NesKeyConfigModal";
+import { NesLayaBot } from "../lib/nes-laya-bot";
+import { NesLayaBotControl } from "./NesLayaBotControl";
 import { pickFile } from "../lib/tauri";
 
 type Mode = "home" | "host-setup" | "waiting" | "host-game" | "guest-invite" | "guest-game";
@@ -66,6 +75,10 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
   const [showKeyConfig, setShowKeyConfig] = useState(false);
   const wasRunningBeforeHiddenRef = useRef<boolean>(false);
   const netplayRef = useRef<NesNetplaySession | null>(null);
+  const layaBotRef = useRef<NesLayaBot | null>(null);
+  if (!layaBotRef.current) {
+    layaBotRef.current = new NesLayaBot();
+  }
   const [pendingJoinRoomId, setPendingJoinRoomId] = useState<string | null>(null);
   const [pendingHostRomName, setPendingHostRomName] = useState<string | null>(null);
   const [rooms, setRooms] = useState<NesRoomDirectoryEntryV1[]>([]);
@@ -204,7 +217,11 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
   }, [mode, config]);
 
   async function handleSaveConfig() {
-    const next: NesRelayConfigV1 = { schema_version: 1, service_base_url: serviceUrl.trim() };
+    const next: NesRelayConfigV1 = {
+      schema_version: 1,
+      service_base_url: serviceUrl.trim(),
+      proxy: config.proxy,
+    };
     try {
       await nesSaveConfig(next);
       setConfig(next);
@@ -219,7 +236,11 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     setTestingServer(true);
     setServerError(null);
     try {
-      await nesTestServer({ schema_version: 1, service_base_url: serviceUrl.trim() });
+      await nesTestServer({
+        schema_version: 1,
+        service_base_url: serviceUrl.trim(),
+        proxy: config.proxy,
+      });
       setServerStatus("ok");
     } catch (e) {
       setServerStatus("error");
@@ -250,6 +271,7 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
       const nextConfig: NesRelayConfigV1 = {
         schema_version: 1,
         service_base_url: serviceUrl.trim(),
+        proxy: config.proxy,
       };
       if (!nextConfig.service_base_url) {
         throw new Error("Set the NES session service URL before hosting a public room.");
@@ -323,6 +345,9 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
         try {
           emu.loadRom(romData);
           setRomLoaded(true);
+          if (romPayload) {
+            layaBotRef.current?.setRom(romPayload.name, romData);
+          }
         } catch (e) {
           setEmuStatus(`Failed to load ROM: ${String(e)}`);
         }
@@ -354,7 +379,39 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
     const poll = activeBundle
       ? null
       : window.setInterval(() => {
-          engine?.setPlayerInput(1, input.readBitmask());
+          const humanMask = input.readBitmask();
+          const bot = layaBotRef.current;
+          if (bot && bot.isEnabled() && engine instanceof NesEmulator) {
+            bot.updateState(engine.getRam());
+            const target = bot.getTargetPlayer();
+            const p1BotMask = bot.getButtonMask(1);
+            const p2BotMask = bot.getButtonMask(2);
+
+            if (target === 1) {
+              if (humanMask !== 0) {
+                // Human is actively pressing buttons: Human has 100% immediate priority on P1
+                engine.setPlayerInput(1, humanMask);
+              } else {
+                // Hands-off: Bot controls Player 1
+                engine.setPlayerInput(1, p1BotMask);
+              }
+              engine.setPlayerInput(2, 0);
+            } else if (target === 2) {
+              // Bot plays Player 2 (Co-op partner): human is pure P1, bot is pure P2
+              engine.setPlayerInput(1, humanMask);
+              engine.setPlayerInput(2, p2BotMask);
+            } else {
+              // Target === 3 (Dual Auto: Bot controls both P1 and P2 simultaneously!)
+              if (humanMask !== 0) {
+                engine.setPlayerInput(1, humanMask);
+              } else {
+                engine.setPlayerInput(1, p1BotMask);
+              }
+              engine.setPlayerInput(2, p2BotMask);
+            }
+          } else {
+            engine?.setPlayerInput(1, humanMask);
+          }
         }, 1000 / 60);
 
     return () => {
@@ -365,6 +422,7 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
       emuRef.current = null;
       inputRef.current = null;
       setRomLoaded(false);
+      layaBotRef.current?.setEnabled(false);
     };
   }, [mode, romData, activeBundle, romPayload]);
 
@@ -580,6 +638,7 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
             running={running}
             paused={paused}
             romLoaded={romLoaded}
+            layaBot={layaBotRef.current}
             onToggleRun={toggleRun}
             onReset={handleReset}
             onQuitGame={handleQuitGame}
@@ -908,6 +967,7 @@ function HostGameView(props: {
   running: boolean;
   paused: boolean;
   romLoaded: boolean;
+  layaBot: NesLayaBot | null;
   onToggleRun: () => void;
   onReset: () => void;
   onQuitGame: () => void;
@@ -1015,6 +1075,10 @@ function HostGameView(props: {
           >
             ⌨️ Controls
           </button>
+
+          {!props.isSnes && (
+            <NesLayaBotControl bot={props.layaBot} romLoaded={props.romLoaded} />
+          )}
 
           <NesReactionPicker enabled={props.online && ["synced", "paused"].includes(props.netplayStatus)} onReact={props.onReact} />
 

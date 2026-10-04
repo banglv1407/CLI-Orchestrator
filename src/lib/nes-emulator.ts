@@ -198,6 +198,11 @@ export class NesEmulator {
     this.nes?.reset();
   }
 
+  getRam(): Uint8Array | null {
+    if (!this.nes) return null;
+    return (this.nes as any).cpu?.mem || null;
+  }
+
   setPlayerInput(player: 1 | 2, bitmask: number): void {
     if (!this.nes) return;
     for (const bit of ALL_NES_BITS) {

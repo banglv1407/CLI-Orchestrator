@@ -1,3 +1,4 @@
+pub mod agent_session_commands;
 pub mod api_proxy;
 pub mod builtin_llm_commands;
 pub mod buzz_commands;
@@ -10,3 +11,4 @@ pub mod proxy_commands;
 pub mod quickapps_commands;
 pub mod rtk_commands;
 pub mod system_commands;
+

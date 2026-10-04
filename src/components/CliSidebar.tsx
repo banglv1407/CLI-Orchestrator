@@ -116,6 +116,7 @@ function GameIcon() {
 }
 
 
+
 function FolderArrowIcon({ isExpanded }: { isExpanded: boolean }) {
   return (
     <svg 
@@ -218,9 +219,10 @@ interface CliSidebarProps {
   onLogsTabChange?: (isActive: boolean) => void;
 }
 
-type SidebarTab = 'cli-manager' | 'quickapps' | 'buzz' | 'game' | 'settings' | 'ai-chat' | 'apiclient' | 'dashboard';
+type SidebarTab = 'cli-manager' | 'quickapps' | 'buzz' | 'game' | 'settings' | 'ai-chat' | 'apiclient' | 'dashboard' | 'agent-sessions';
 
 const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['settings']);
+const DEFAULT_VISIBLE_SIDEBAR_TABS: SidebarTab[] = ['cli-manager', 'agent-sessions', 'settings'];
 
 interface FileContextTarget {
   path: string;
@@ -401,7 +403,7 @@ export function CliSidebar({
   }, []);
 
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
-    const tabsWithNoLeftArea = new Set(['quickapps', 'buzz', 'game', 'settings', 'dashboard']);
+    const tabsWithNoLeftArea = new Set(['quickapps', 'buzz', 'game', 'settings', 'dashboard', 'agent-sessions']);
     
     if (tabsWithNoLeftArea.has(tab)) {
       setIsSidebarCollapsed(true);
@@ -429,6 +431,9 @@ export function CliSidebar({
         if (onProxyTabChange) onProxyTabChange(false);
         if (onLogsTabChange) onLogsTabChange(false);
         window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'dashboard' }));
+      }
+      else if (tab === 'agent-sessions') {
+        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'agent-sessions' }));
       }
     } else {
       if (activeTab === tab && !isSidebarCollapsed) {
@@ -461,16 +466,36 @@ export function CliSidebar({
     }
   }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange, onApiClientTabChange, onProxyTabChange, onLogsTabChange]);
 
-  // --- Sidebar Tabs Reordering (Dynamic Icons) ---
+  // --- Sidebar Tabs Visibility & Reordering (Dynamic Icons) ---
+  const [visibleTabs, setVisibleTabs] = useState<SidebarTab[]>(() => {
+    const saved = localStorage.getItem('ai-cli-sidebar-visible-tabs');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed as SidebarTab[];
+        }
+      } catch { /* ignore */ }
+    }
+    return [...DEFAULT_VISIBLE_SIDEBAR_TABS];
+  });
+
   const [tabsOrder, setTabsOrder] = useState<SidebarTab[]>(() => {
     const saved = localStorage.getItem('ai-cli-sidebar-tabs-order');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          let list = [...parsed].filter((t) => t !== 'explorer' && t !== 'operator' && t !== 'web-ai' && t !== 'logs' && t !== 'remote' && t !== 'proxy');
+          let list = [...parsed].filter((t) => t !== 'explorer' && t !== 'operator' && t !== 'web-ai' && t !== 'logs' && t !== 'remote' && t !== 'proxy' && t !== 'harness');
+          if (!list.includes('cli-manager')) {
+            list.unshift('cli-manager');
+          }
+          if (!list.includes('agent-sessions')) {
+            const cliIdx = list.indexOf('cli-manager');
+            list.splice(cliIdx >= 0 ? cliIdx + 1 : list.length, 0, 'agent-sessions');
+          }
           if (!list.includes('dashboard')) {
-            list.unshift('dashboard');
+            list.push('dashboard');
           }
           if (!list.includes('buzz')) {
             const quickIdx = list.indexOf('quickapps');
@@ -480,16 +505,20 @@ export function CliSidebar({
             const buzzIdx = list.indexOf('buzz');
             list.splice(buzzIdx >= 0 ? buzzIdx + 1 : list.length, 0, 'game');
           }
-          return [
+          const finalOrder = [
             ...list.filter((t) => !PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
             ...list.filter((t) => PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
           ] as SidebarTab[];
+          try {
+            localStorage.setItem('ai-cli-sidebar-tabs-order', JSON.stringify(finalOrder));
+          } catch { /* ignore */ }
+          return finalOrder;
         }
       } catch {
         // ignore
       }
     }
-    return ['dashboard', 'cli-manager', 'quickapps', 'buzz', 'game', 'apiclient', 'settings'];
+    return ['cli-manager', 'agent-sessions', 'dashboard', 'quickapps', 'buzz', 'game', 'apiclient', 'settings'];
   });
 
   const handleTabDragStart = (e: React.DragEvent, tab: SidebarTab) => {
@@ -586,6 +615,33 @@ export function CliSidebar({
             title="Entertainment"
           >
             <GameIcon />
+          </div>
+        );
+      case 'agent-sessions':
+        return (
+          <div
+            key="agent-sessions"
+            role="button"
+            tabIndex={0}
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'agent-sessions')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'agent-sessions')}
+            onClick={() => handleSetActiveTab('agent-sessions')}
+            title="Agent Sessions"
+            className={`group relative flex h-10 w-10 items-center justify-center rounded-xl text-xs font-semibold cursor-pointer transition-all duration-200 ${
+              activeTab === 'agent-sessions'
+                ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25 ring-1 ring-amber-400/30'
+                : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
+            }`}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
           </div>
         );
       case 'quickapps':
@@ -743,6 +799,29 @@ export function CliSidebar({
     };
     window.addEventListener('sidebar-order-changed', handler);
     return () => window.removeEventListener('sidebar-order-changed', handler);
+  }, []);
+
+  // Listen for sidebar visibility changes from Settings panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvt = e as CustomEvent<string[]>;
+      if (customEvt.detail && Array.isArray(customEvt.detail)) {
+        const newVisible = customEvt.detail as SidebarTab[];
+        setVisibleTabs(newVisible);
+        if (!newVisible.includes(activeTab)) {
+          handleSetActiveTab('cli-manager');
+        }
+      }
+    };
+    window.addEventListener('sidebar-visibility-changed', handler);
+    return () => window.removeEventListener('sidebar-visibility-changed', handler);
+  }, [activeTab, handleSetActiveTab]);
+
+  // Fallback if current activeTab is not in visibleTabs
+  useEffect(() => {
+    if (!visibleTabs.includes(activeTab)) {
+      handleSetActiveTab('cli-manager');
+    }
   }, []);
 
   // --- Sidebar Resizer Code ---
@@ -2044,10 +2123,14 @@ export function CliSidebar({
       {/* 1. Left-most Activity Bar (VSCode Style) */}
       <nav className="flex h-full w-14 flex-col items-center border-r border-cyber-line/50 bg-cyber-base/70 py-4 shrink-0 select-none">
         <div className="flex flex-col gap-4 items-center flex-1 w-full overflow-y-auto scrollbar-none py-1">
-          {tabsOrder.filter((tab) => !PINNED_SIDEBAR_TABS.has(tab)).map(renderTabButton)}
+          {tabsOrder
+            .filter((tab) => !PINNED_SIDEBAR_TABS.has(tab) && visibleTabs.includes(tab))
+            .map(renderTabButton)}
         </div>
         <div className="mt-auto flex shrink-0 flex-col items-center gap-3 border-t border-cyber-line/40 pt-3">
-          {tabsOrder.filter((tab) => PINNED_SIDEBAR_TABS.has(tab)).map(renderTabButton)}
+          {tabsOrder
+            .filter((tab) => PINNED_SIDEBAR_TABS.has(tab) && visibleTabs.includes(tab))
+            .map(renderTabButton)}
         </div>
       </nav>
  

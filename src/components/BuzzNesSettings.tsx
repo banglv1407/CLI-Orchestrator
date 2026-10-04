@@ -52,6 +52,7 @@ export function BuzzNesSettings() {
   const [nesProxySecret, setNesProxySecret] = useState("");
   const [nesProxyAuthMode, setNesProxyAuthMode] = useState<"password" | "key">("password");
   const [nesProxyKeyPath, setNesProxyKeyPath] = useState("");
+  const [hasSavedNesSecret, setHasSavedNesSecret] = useState(false);
 
   // Background execution toggles
   const [nesKeepAlive, setNesKeepAlive] = useState<boolean>(() => {
@@ -77,15 +78,16 @@ export function BuzzNesSettings() {
   useEffect(() => {
     buzzGetConfig()
       .then((cfg) => {
-        if (cfg.relay_url) setRelayUrl(cfg.relay_url);
-        setAllowInsecure(cfg.allow_insecure);
+        const url = cfg.relayUrl || cfg.relay_url;
+        if (url) setRelayUrl(url);
+        setAllowInsecure(Boolean(cfg.allowInsecure ?? cfg.allow_insecure));
         if (cfg.proxy && cfg.proxy.kind !== "none") {
           setProxyKind(cfg.proxy.kind);
           setProxyHost(cfg.proxy.host || "");
           setProxyPort(cfg.proxy.port || (cfg.proxy.kind === "ssh" ? 22 : 8080));
           setProxyUser(cfg.proxy.user || "");
-          setProxyAuthMode(cfg.proxy.auth_mode === "key" ? "key" : "password");
-          setProxyKeyPath(cfg.proxy.key_path || "");
+          setProxyAuthMode((cfg.proxy.authMode || cfg.proxy.auth_mode) === "key" ? "key" : "password");
+          setProxyKeyPath(cfg.proxy.keyPath || cfg.proxy.key_path || "");
           // Backend never returns the secret; only report that one is stored.
           setHasSavedSecret(Boolean(cfg.proxy.secret));
         }
@@ -100,8 +102,9 @@ export function BuzzNesSettings() {
           setNesProxyHost(cfg.proxy.host || "");
           setNesProxyPort(cfg.proxy.port || (cfg.proxy.kind === "ssh" ? 22 : 8080));
           setNesProxyUser(cfg.proxy.user || "");
-          setNesProxyAuthMode(cfg.proxy.auth_mode === "key" ? "key" : "password");
-          setNesProxyKeyPath(cfg.proxy.key_path || "");
+          setNesProxyAuthMode((cfg.proxy.authMode || cfg.proxy.auth_mode) === "key" ? "key" : "password");
+          setNesProxyKeyPath(cfg.proxy.keyPath || cfg.proxy.key_path || "");
+          setHasSavedNesSecret(Boolean(cfg.proxy.secret));
         }
       })
       .catch((e) => console.warn("Failed to load NES config:", e));
@@ -121,22 +124,22 @@ export function BuzzNesSettings() {
           user: proxyUser.trim() || null,
           // Only send a fresh secret when typed; empty keeps the stored one.
           secret: proxySecret.trim() ? proxySecret : null,
-          auth_mode: proxyAuthMode,
-          key_path: proxyAuthMode === "key" && proxyKeyPath.trim() ? proxyKeyPath.trim() : null,
+          authMode: proxyAuthMode,
+          keyPath: proxyAuthMode === "key" && proxyKeyPath.trim() ? proxyKeyPath.trim() : null,
         };
         if (proxyKind === "ssh") {
           if (!proxy.user) throw new Error("SSH hop requires a username");
-          if (proxy.auth_mode === "password" && !proxy.secret && !hasSavedSecret) {
+          if (proxy.authMode === "password" && !proxy.secret && !hasSavedSecret) {
             throw new Error("SSH hop password is required");
           }
-          if (proxy.auth_mode === "key" && !proxy.key_path) {
+          if (proxy.authMode === "key" && !proxy.keyPath) {
             throw new Error("SSH hop key path is required");
           }
         }
       }
       await buzzSetConfig({
-        relay_url: relayUrl.trim(),
-        allow_insecure: allowInsecure,
+        relayUrl: relayUrl.trim(),
+        allowInsecure,
         proxy,
       });
       setProxySecret("");
@@ -201,15 +204,15 @@ export function BuzzNesSettings() {
           port: nesProxyPort,
           user: nesProxyUser.trim() || null,
           secret: nesProxySecret.trim() ? nesProxySecret : null,
-          auth_mode: nesProxyAuthMode,
-          key_path: nesProxyAuthMode === "key" && nesProxyKeyPath.trim() ? nesProxyKeyPath.trim() : null,
+          authMode: nesProxyAuthMode,
+          keyPath: nesProxyAuthMode === "key" && nesProxyKeyPath.trim() ? nesProxyKeyPath.trim() : null,
         };
         if (nesProxyKind === "ssh") {
           if (!proxy.user) throw new Error("SSH hop requires a username");
-          if (proxy.auth_mode === "password" && !proxy.secret) {
+          if (proxy.authMode === "password" && !proxy.secret && !hasSavedNesSecret) {
             throw new Error("SSH hop password is required");
           }
-          if (proxy.auth_mode === "key" && !proxy.key_path) {
+          if (proxy.authMode === "key" && !proxy.keyPath) {
             throw new Error("SSH hop key path is required");
           }
         }
@@ -220,6 +223,7 @@ export function BuzzNesSettings() {
         proxy,
       });
       setNesProxySecret("");
+      setHasSavedNesSecret(hasSavedNesSecret || Boolean(proxy));
       setNesMsg("Saved.");
     } catch (err) {
       setNesMsg(`Save failed: ${err}`);
@@ -252,6 +256,19 @@ export function BuzzNesSettings() {
               value={relayUrl}
               onChange={(e) => setRelayUrl(e.target.value)}
               className="rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-cyber-neon outline-none focus:border-cyber-neon w-72"
+            />
+          </label>
+
+          <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200 cursor-pointer">
+            <div>
+              <span className="font-semibold">Allow Insecure TLS</span>
+              <p className="text-[10px] text-slate-500 mt-0.5">Allow self-signed or invalid certificates</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={allowInsecure}
+              onChange={(e) => setAllowInsecure(e.target.checked)}
+              className="accent-cyan-400 w-4 h-4 cursor-pointer"
             />
           </label>
 
@@ -518,7 +535,7 @@ export function BuzzNesSettings() {
                     {nesProxyAuthMode === "password" ? (
                       <input
                         type="password"
-                        placeholder="SSH password"
+                        placeholder={hasSavedNesSecret ? "Password stored — type to replace" : "SSH password"}
                         value={nesProxySecret}
                         onChange={(e) => setNesProxySecret(e.target.value)}
                         className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
@@ -534,7 +551,7 @@ export function BuzzNesSettings() {
                         />
                         <input
                           type="password"
-                          placeholder="Key passphrase (optional)"
+                          placeholder={hasSavedNesSecret ? "Passphrase stored — type to replace" : "Key passphrase (optional)"}
                           value={nesProxySecret}
                           onChange={(e) => setNesProxySecret(e.target.value)}
                           className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"

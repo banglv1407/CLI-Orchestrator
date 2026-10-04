@@ -34,6 +34,8 @@ pub struct CreateTerminalSessionRequest {
     pub cli_name: String,
     pub working_dir: Option<String>,
     pub project_tag: Option<String>,
+    #[serde(default)]
+    pub custom_args: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -216,19 +218,41 @@ pub async fn create_terminal_session(
 ) -> Result<SessionInfo, String> {
     state.registry.reload().map_err(|error| error.to_string())?;
 
-    let cli = if request.cli_name == "shell" || request.cli_name == "Quick - shell" {
+    let mut cli = if request.cli_name == "shell" || request.cli_name == "Quick - shell" {
         let mut def = shell_cli_definition();
         def.name = request.cli_name.clone();
         def
     } else {
-        state
+        let found = state
             .registry
             .get(&request.cli_name)
-            .map_err(|error| error.to_string())?
-            .ok_or_else(|| format!("CLI not found: {}", request.cli_name))?
+            .map_err(|error| error.to_string())?;
+        if let Some(c) = found {
+            c
+        } else {
+            // Case-insensitive / command-based fallback
+            let all = state.registry.list().map_err(|error| error.to_string())?;
+            let req_lower = request.cli_name.to_lowercase();
+            all.into_iter()
+                .find(|c| {
+                    let name_l = c.name.to_lowercase();
+                    let cmd_l = c.command.to_lowercase();
+                    name_l == req_lower
+                        || cmd_l == req_lower
+                        || (req_lower == "hermes" && name_l == "hm")
+                        || (req_lower == "antigravity" && (name_l == "antigravity" || cmd_l == "agy"))
+                })
+                .ok_or_else(|| format!("CLI not found: {}", request.cli_name))?
+        }
     };
 
-    let working_dir = normalize_working_dir(request.working_dir)?;
+    if let Some(custom) = request.custom_args {
+        cli.args = custom;
+    }
+
+    let working_dir = normalize_working_dir(request.working_dir)
+        .unwrap_or(None)
+        .or_else(|| cli.default_working_dir.clone());
     let command = ExecutionEngine::resolve_command(&cli, "", working_dir.clone());
 
     crate::system_log!(

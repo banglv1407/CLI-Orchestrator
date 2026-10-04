@@ -8,14 +8,20 @@ export interface BuzzProxyConfig {
   port: number;
   user?: string | null;
   secret?: string | null;
+  authMode?: string;
   auth_mode?: string;
+  keyPath?: string | null;
   key_path?: string | null;
+  localPort?: number;
   local_port?: number;
 }
 
 export interface BuzzRelayConfig {
-  relay_url: string;
-  allow_insecure: boolean;
+  relayUrl: string;
+  relay_url?: string;
+  allowInsecure: boolean;
+  allow_insecure?: boolean;
+  identityPubkey?: string;
   identity_pubkey?: string;
   proxy?: BuzzProxyConfig | null;
 }

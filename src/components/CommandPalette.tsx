@@ -187,6 +187,14 @@ export function CommandPalette({
         action: () => onSwitchView('apiclient'),
       });
     }
+    if (activeMainView !== 'agent-sessions') {
+      items.push({
+        id: 'action-view-agent-sessions', type: 'action' as const,
+        label: 'View: Agent Sessions',
+        description: 'Browse agent conversation history',
+        action: () => onSwitchView('agent-sessions'),
+      });
+    }
     if (activeMainView !== 'game') {
       items.push({
         id: 'action-view-game', type: 'action' as const,

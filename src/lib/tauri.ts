@@ -32,6 +32,10 @@ import type {
   TerminalCommandEnvironment,
   TerminalCommandSuggestRequest,
   TerminalCommandSuggestion,
+  AgentSessionEntry,
+  AgentSessionMessage,
+  AgentExportContextRequest,
+  AgentExportContextResponse,
 } from '../types';
 export function listClis(): Promise<CliDefinition[]> {
   return invoke('list_clis');
@@ -656,4 +660,58 @@ export function companionSetActionsEnabled(enabled: boolean): Promise<void> {
 
 export function companionImportLegacy(legacy: any): Promise<{ configImported: boolean; historyImported: number; errors: string[] }> {
   return invoke('companion_import_legacy', { legacy });
+}
+
+// ── Agent Session Browser ─────────────────────────────────────────────
+export function agentListSessions(): Promise<AgentSessionEntry[]> {
+  return invoke('agent_list_sessions');
+}
+
+export function agentSessionPreview(
+  sessionId: string,
+  agent?: string,
+  realPath?: string | null,
+  limit?: number
+): Promise<AgentSessionMessage[]> {
+  return invoke('agent_session_preview', {
+    request: { sessionId, agent, realPath, limit: limit ?? 30 },
+  });
+}
+
+export function agentExportSessionContext(
+  request: AgentExportContextRequest
+): Promise<AgentExportContextResponse> {
+  return invoke('agent_export_session_context', { request });
+}
+
+// ── Window Scale & Resolution Adjustment ──────────────────────────────
+export interface AdjustWindowScaleResponse {
+  success: boolean;
+  maximized: boolean;
+  appliedWidth: number;
+  appliedHeight: number;
+  message: string;
+}
+
+export interface WindowSizeInfo {
+  width: number;
+  height: number;
+  isMaximized: boolean;
+  scaleFactor: number;
+}
+
+export function adjustWindowScale(
+  zoomPercent: number,
+  baseWidth?: number,
+  baseHeight?: number
+): Promise<AdjustWindowScaleResponse> {
+  return invoke('adjust_window_scale', {
+    zoomPercent,
+    baseWidth,
+    baseHeight,
+  });
+}
+
+export function getWindowSize(): Promise<WindowSizeInfo> {
+  return invoke('get_window_size');
 }

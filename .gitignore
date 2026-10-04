@@ -56,6 +56,8 @@ coverage/
 .temp/
 .temp/
 .antigravitycli/
+.hermes-tmp*
+**/.hermes-tmp*
 # Harness durable layer
 harness.db
 harness.db-wal

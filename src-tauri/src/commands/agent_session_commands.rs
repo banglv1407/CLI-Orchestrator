@@ -676,6 +676,234 @@ fn preview_antigravity_messages(session_id: &str) -> Vec<AgentSessionMessage> {
     messages
 }
 
+// ── 5. OpenCode Sessions ────────────────────────────────────────────────────────
+
+fn opencode_db_path() -> Option<PathBuf> {
+    let home = home_dir()?;
+    let p1 = home
+        .join(".local")
+        .join("share")
+        .join("opencode")
+        .join("opencode.db");
+    if p1.exists() {
+        return Some(p1);
+    }
+    let p2 = home
+        .join("AppData")
+        .join("Roaming")
+        .join("OpenCode")
+        .join("opencode.db");
+    if p2.exists() {
+        return Some(p2);
+    }
+    None
+}
+
+fn parse_opencode_model(raw_model: &str) -> Option<String> {
+    if raw_model.trim().is_empty() {
+        return None;
+    }
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(raw_model) {
+        if let Some(id) = val.get("id").and_then(|v| v.as_str()) {
+            return Some(id.to_string());
+        }
+        if let Some(model_id) = val.get("modelID").and_then(|v| v.as_str()) {
+            return Some(model_id.to_string());
+        }
+    }
+    Some(raw_model.to_string())
+}
+
+fn load_opencode_sessions() -> Vec<AgentSessionEntry> {
+    let mut entries = Vec::new();
+    let Some(db_path) = opencode_db_path() else {
+        return entries;
+    };
+
+    let Ok(conn) = rusqlite::Connection::open_with_flags(
+        &db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) else {
+        return entries;
+    };
+
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT s.id, s.title, s.directory, s.model, s.time_created, s.time_updated, \
+         (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) AS msg_count \
+         FROM session s \
+         ORDER BY s.time_updated DESC \
+         LIMIT 300",
+    ) else {
+        return entries;
+    };
+
+    let real_path_str = db_path.to_string_lossy().to_string();
+
+    if let Ok(rows) = stmt.query_map([], |row| {
+        let id: String = row.get(0)?;
+        let title_opt: Option<String> = row.get(1)?;
+        let dir_opt: Option<String> = row.get(2)?;
+        let model_raw: Option<String> = row.get(3)?;
+        let time_created: i64 = row.get(4).unwrap_or(0);
+        let time_updated: i64 = row.get(5).unwrap_or(0);
+        let msg_count: i64 = row.get(6).unwrap_or(0);
+
+        let title = title_opt
+            .filter(|t| !t.trim().is_empty())
+            .unwrap_or_else(|| id.clone());
+
+        let model = model_raw.as_deref().and_then(parse_opencode_model);
+
+        let updated_sec = if time_updated > 0 {
+            (time_updated as f64) / 1000.0
+        } else {
+            0.0
+        };
+        let created_sec = if time_created > 0 {
+            (time_created as f64) / 1000.0
+        } else {
+            updated_sec
+        };
+
+        let started_at = if updated_sec > 0.0 { updated_sec } else { created_sec };
+
+        Ok(AgentSessionEntry {
+            id,
+            agent: "opencode".to_string(),
+            model,
+            title: Some(title),
+            cwd: dir_opt,
+            message_count: msg_count,
+            started_at,
+            ended_at: Some(updated_sec),
+            real_path: Some(real_path_str.clone()),
+        })
+    }) {
+        for row in rows.flatten() {
+            entries.push(row);
+        }
+    }
+
+    entries
+}
+
+fn preview_opencode_messages(session_id: &str, limit: u32) -> Vec<AgentSessionMessage> {
+    let mut messages = Vec::new();
+    let Some(db_path) = opencode_db_path() else {
+        return messages;
+    };
+
+    let Ok(conn) = rusqlite::Connection::open_with_flags(
+        &db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) else {
+        return messages;
+    };
+
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT m.id, m.time_created, m.data, p.data \
+         FROM message m \
+         LEFT JOIN part p ON p.message_id = m.id \
+         WHERE m.session_id = ? \
+         ORDER BY m.time_created ASC, p.time_created ASC",
+    ) else {
+        return messages;
+    };
+
+    struct AccMessage {
+        role: String,
+        timestamp: f64,
+        texts: Vec<String>,
+        reasoning: Vec<String>,
+    }
+
+    let mut map: std::collections::HashMap<String, AccMessage> = std::collections::HashMap::new();
+    let mut order: Vec<String> = Vec::new();
+
+    if let Ok(rows) = stmt.query_map([session_id], |row| {
+        let mid: String = row.get(0)?;
+        let mtime: i64 = row.get(1).unwrap_or(0);
+        let mdata_str: Option<String> = row.get(2)?;
+        let pdata_str: Option<String> = row.get(3)?;
+        Ok((mid, mtime, mdata_str, pdata_str))
+    }) {
+        for (mid, mtime, mdata_str, pdata_str) in rows.flatten() {
+            if !map.contains_key(&mid) {
+                let mut role = "assistant".to_string();
+                if let Some(raw) = &mdata_str {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(raw) {
+                        if let Some(r) = val.get("role").and_then(|v| v.as_str()) {
+                            role = r.to_string();
+                        }
+                    }
+                }
+                let timestamp = if mtime > 0 {
+                    (mtime as f64) / 1000.0
+                } else {
+                    0.0
+                };
+                map.insert(
+                    mid.clone(),
+                    AccMessage {
+                        role,
+                        timestamp,
+                        texts: Vec::new(),
+                        reasoning: Vec::new(),
+                    },
+                );
+                order.push(mid.clone());
+            }
+
+            if let Some(raw) = pdata_str {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    let ptype = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    if ptype == "text" {
+                        if let Some(txt) = val.get("text").and_then(|v| v.as_str()) {
+                            if !txt.is_empty() {
+                                if let Some(acc) = map.get_mut(&mid) {
+                                    acc.texts.push(txt.to_string());
+                                }
+                            }
+                        }
+                    } else if ptype == "reasoning" {
+                        if let Some(txt) = val.get("text").and_then(|v| v.as_str()) {
+                            if !txt.is_empty() {
+                                if let Some(acc) = map.get_mut(&mid) {
+                                    acc.reasoning.push(txt.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for mid in order {
+        if let Some(acc) = map.remove(&mid) {
+            let content = if !acc.texts.is_empty() {
+                Some(acc.texts.join("\n"))
+            } else if !acc.reasoning.is_empty() {
+                Some(acc.reasoning.join("\n"))
+            } else {
+                None
+            };
+            messages.push(AgentSessionMessage {
+                role: acc.role,
+                content,
+                timestamp: acc.timestamp,
+            });
+        }
+    }
+
+    if messages.len() > limit as usize {
+        let skip = messages.len() - (limit as usize);
+        messages = messages.into_iter().skip(skip).collect();
+    }
+
+    messages
+}
+
 // ── Tauri Commands ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -695,6 +923,9 @@ pub fn agent_list_sessions(
 
     // 4. Antigravity
     all_sessions.extend(load_antigravity_sessions());
+
+    // 5. OpenCode
+    all_sessions.extend(load_opencode_sessions());
 
     // Sort newest first
     all_sessions.sort_by(|a, b| {
@@ -724,6 +955,7 @@ pub fn agent_session_preview(
         }
         "codex" => Ok(preview_codex_messages(&request.session_id, limit)),
         "antigravity" => Ok(preview_antigravity_messages(&request.session_id)),
+        "opencode" => Ok(preview_opencode_messages(&request.session_id, limit)),
         _ => Ok(preview_hermes_messages(&request.session_id, limit)),
     }
 }
@@ -743,6 +975,7 @@ pub fn agent_export_session_context(
         }
         "codex" => preview_codex_messages(&request.session_id, 100),
         "antigravity" => preview_antigravity_messages(&request.session_id),
+        "opencode" => preview_opencode_messages(&request.session_id, 100),
         _ => preview_hermes_messages(&request.session_id, 100),
     };
 
@@ -826,10 +1059,15 @@ mod tests {
         let c = load_claude_sessions();
         let x = load_codex_sessions();
         let a = load_antigravity_sessions();
-        println!("H: {}, C: {}, X: {}, A: {}", h.len(), c.len(), x.len(), a.len());
+        let o = load_opencode_sessions();
+        println!("H: {}, C: {}, X: {}, A: {}, O: {}", h.len(), c.len(), x.len(), a.len(), o.len());
         assert!(!h.is_empty(), "H empty");
         assert!(!c.is_empty(), "C empty");
         assert!(!x.is_empty(), "X empty");
         assert!(!a.is_empty(), "A empty");
+        assert!(!o.is_empty(), "O empty");
+        let first = &o[0];
+        let prev = preview_opencode_messages(&first.id, 10);
+        assert!(!prev.is_empty(), "OpenCode preview messages empty");
     }
 }

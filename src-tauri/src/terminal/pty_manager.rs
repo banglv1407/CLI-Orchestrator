@@ -99,8 +99,7 @@ fn build_command_builder(command: &ResolvedCommand) -> CommandBuilder {
 }
 
 fn apply_builder_context(builder: &mut CommandBuilder, command: &ResolvedCommand) {
-    #[cfg(target_os = "windows")]
-    seed_windows_safe_environment(builder);
+    seed_terminal_environment(builder);
 
     for (key, value) in &command.env {
         builder.env(key, value);
@@ -110,37 +109,12 @@ fn apply_builder_context(builder: &mut CommandBuilder, command: &ResolvedCommand
     }
 }
 
-#[cfg(target_os = "windows")]
-fn seed_windows_safe_environment(builder: &mut CommandBuilder) {
-    builder.env_clear();
-
-    const BASE_KEYS: &[&str] = &[
-        "SystemRoot",
-        "WINDIR",
-        "ComSpec",
-        "Path",
-        "PATHEXT",
-        "TEMP",
-        "TMP",
-        "USERPROFILE",
-        "HOMEDRIVE",
-        "HOMEPATH",
-        "APPDATA",
-        "LOCALAPPDATA",
-        "PROGRAMDATA",
-        "NUMBER_OF_PROCESSORS",
-        "PROCESSOR_ARCHITECTURE",
-        "OS",
-        "USERNAME",
-        "USERDOMAIN",
-        "PUBLIC",
-    ];
-
-    for key in BASE_KEYS {
-        if let Ok(value) = std::env::var(key) {
-            if !value.is_empty() {
-                builder.env(key, value);
-            }
+fn seed_terminal_environment(builder: &mut CommandBuilder) {
+    // Preserve ALL user environment variables from the current user session
+    // (PATH, tokens, API keys, NVM, Cargo, home directories, user configs, etc.)
+    for (key, value) in std::env::vars() {
+        if !key.is_empty() {
+            builder.env(key, value);
         }
     }
 

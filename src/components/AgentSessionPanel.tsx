@@ -9,7 +9,7 @@ import {
   listClis,
 } from '../lib/tauri';
 
-type AgentFilter = 'all' | 'hermes' | 'antigravity' | 'claude' | 'codex';
+type AgentFilter = 'all' | 'hermes' | 'opencode' | 'claude' | 'codex' | 'antigravity';
 type DateFilter = 'all' | 'today' | '7d' | '30d';
 
 interface TagFilter {
@@ -52,6 +52,13 @@ export function getAgentResumeCommand(session: AgentSessionEntry): ResumeCommand
       cliName: 'Antigravity',
       customArgs: ['--conversation', session.id],
       commandDisplay: `agy --conversation ${session.id}`,
+    };
+  }
+  if (agent === 'opencode') {
+    return {
+      cliName: 'OpenCode',
+      customArgs: ['-s', session.id],
+      commandDisplay: `opencode -s ${session.id}`,
     };
   }
   return {
@@ -345,10 +352,11 @@ export function AgentSessionPanel() {
 
   // Agent counts
   const agentCounts = useMemo(() => {
-    const counts = { all: sessions.length, hermes: 0, antigravity: 0, claude: 0, codex: 0 };
+    const counts = { all: sessions.length, hermes: 0, opencode: 0, antigravity: 0, claude: 0, codex: 0 };
     for (const s of sessions) {
       const a = s.agent.toLowerCase();
       if (a === 'hermes') counts.hermes++;
+      else if (a === 'opencode') counts.opencode++;
       else if (a === 'antigravity') counts.antigravity++;
       else if (a === 'claude') counts.claude++;
       else if (a === 'codex') counts.codex++;
@@ -387,6 +395,13 @@ export function AgentSessionPanel() {
       return (
         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm flex items-center gap-1">
           <span>🪐</span> Antigravity
+        </span>
+      );
+    }
+    if (a === 'opencode') {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30 shadow-sm flex items-center gap-1">
+          <span>💻</span> OpenCode
         </span>
       );
     }
@@ -476,6 +491,16 @@ export function AgentSessionPanel() {
             }`}
           >
             Hermes ({agentCounts.hermes})
+          </button>
+          <button
+            onClick={() => handleSelectAgent('opencode')}
+            className={`px-2.5 py-1 text-xs rounded-md font-medium transition-all cursor-pointer ${
+              agentFilter === 'opencode'
+                ? 'bg-blue-500 text-zinc-950 font-bold shadow-sm'
+                : 'text-zinc-400 hover:text-blue-400'
+            }`}
+          >
+            OpenCode ({agentCounts.opencode})
           </button>
           <button
             onClick={() => handleSelectAgent('antigravity')}

@@ -241,6 +241,24 @@ pub async fn create_terminal_session(
                         || cmd_l == req_lower
                         || (req_lower == "hermes" && name_l == "hm")
                         || (req_lower == "antigravity" && (name_l == "antigravity" || cmd_l == "agy"))
+                        || (req_lower == "opencode" && (name_l == "opencode" || cmd_l == "opencode"))
+                })
+                .or_else(|| {
+                    if req_lower == "opencode" {
+                        Some(crate::core::cli_registry::CliDefinition {
+                            name: "OpenCode".to_string(),
+                            command: "opencode".to_string(),
+                            args: Vec::new(),
+                            mode: crate::core::cli_registry::CliMode::Interactive,
+                            env: std::collections::HashMap::new(),
+                            default_working_dir: None,
+                            saved_directories: Vec::new(),
+                            enable_rtk: false,
+                            group: Some("Agents".to_string()),
+                        })
+                    } else {
+                        None
+                    }
                 })
                 .ok_or_else(|| format!("CLI not found: {}", request.cli_name))?
         }

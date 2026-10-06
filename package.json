@@ -1,7 +1,7 @@
 {
   "name": "clx",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "scripts": {
     "postinstall": "node scripts/patch-jsnes-ppu.mjs",
@@ -15,7 +15,10 @@
     "test:snes-input": "node --test scripts/snes-input.test.mjs",
     "test:nes-patch": "node --test scripts/patch-jsnes-ppu.test.mjs",
     "test:savestate": "node --test scripts/savestate-roundtrip.test.mjs",
-    "test:rogue-assets": "node scripts/validate-rogue-assets.mjs"
+    "test:rogue-assets": "node scripts/validate-rogue-assets.mjs",
+    "check:i18n": "node scripts/check-localization.mjs",
+    "test:i18n": "node --test scripts/i18n.test.mjs",
+    "test:i18n:ui": "node scripts/i18n-smoke.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.0",
@@ -33,6 +36,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "esbuild": "0.25.12",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",

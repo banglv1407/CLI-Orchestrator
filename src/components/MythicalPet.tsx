@@ -1,3 +1,4 @@
+import { t as tr, useLocale } from '../i18n';
 import {
   useCallback,
   useEffect,
@@ -12,6 +13,7 @@ import {
   getActivePetId,
   getPetById,
   getPetEnabled,
+  getPetDisplayName,
   getResolvedActivePet,
   refreshPetRegistry,
   resolvePetAssetUrl,
@@ -1181,8 +1183,8 @@ export function MythicalPet() {
         type="button"
         className="fixed left-0 top-0 pointer-events-auto cursor-pointer rounded-full bg-transparent border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-neon"
         onClick={handleClick}
-        aria-label={`Play an action with ${pet.name}`}
-        title={`${pet.name} · Click to play an action`}
+        aria-label={tr("Play an action with {v0}", { v0: getPetDisplayName(pet) })}
+        title={tr("{v0} · Click to play an action", { v0: getPetDisplayName(pet) })}
       />
     </div>
   );
@@ -1197,6 +1199,7 @@ export function PetPreviewStage({
   clipId: string;
   replayToken: number;
 }) {
+  const locale = useLocale();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef(0);
   const [loaded, setLoaded] = useState<LoadedClip | null>(null);
@@ -1361,7 +1364,7 @@ export function PetPreviewStage({
         height={220}
         className="block h-[220px] w-full"
         style={{ imageRendering: 'pixelated' }}
-        aria-label={`${pet.name} ${clipId} preview`}
+        aria-label={tr("{v0} {v1} preview", { v0: getPetDisplayName(pet), v1: tr(clipId) })}
       />
     </div>
   );

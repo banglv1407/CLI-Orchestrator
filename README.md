@@ -13,6 +13,7 @@ terminal behavior and long-running sessions.
 
 ## 🚀 Key Features
 
+- **Interface Languages**: English, Vietnamese, and Korean across the CLX interface. Choose **Settings → Appearance → Interface language**; changes apply immediately and persist after restart. User content, commands, and terminal output keep their original values.
 - **Multi-Session Interactive Terminal**: Run multiple interactive CLI sessions simultaneously using a robust XTerm.js-powered UI and a Rust-based PTY backend.
 - **Smart Ctrl+C / Ctrl+V Support**: Seamlessly copy selected terminal text or paste text from the system clipboard directly into PTY sessions.
 - **Built-in AI Companion**: 
@@ -71,7 +72,28 @@ directly to that backend; ordinary fallback to other configured backends remains
 Press **Ctrl+P > View: AI Companion** to open chat, or
 **Ctrl+P > Settings: CliProxyAI** to configure backends.
 
+### SSH server tunneling
+
+When the built-in SSH server is running (default port `2222`), an authenticated
+client can also use this machine as a jump point. Direct TCP forwarding is
+supported, so these work from another computer:
+
+```bash
+ssh -p 2222 -L 8080:192.168.1.10:80 user@clx-host   # local port forward
+ssh -p 2222 -D 1080 user@clx-host                   # SOCKS proxy
+ssh -J user@clx-host:2222 user@192.168.1.20         # jump host
+```
+
+Connections are opened from the CLX machine to any reachable host and port, with
+a 10 second connect timeout. Each tunnel is recorded in the SSH server log.
+Reverse forwarding (`-R`) is not supported.
+
+> The SSH server listens on all interfaces and the default login is
+> `admin` / `admin`. Change the password or use public keys before exposing it,
+> because anyone who can log in can reach every address your machine can reach.
+
 ### Recent terminals
+
 
 Mini terminal headers display the session CLI name followed by its working
 folder. Explorer shows Workspace Files and Git Diff; Quick Config Files remains

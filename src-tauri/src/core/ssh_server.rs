@@ -8,6 +8,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex as StdMutex};
 use tauri::AppHandle;
 
+/// Max seconds to wait when a client asks this machine to open a tunnel connection.
+const TUNNEL_CONNECT_TIMEOUT_SECS: u64 = 10;
+
 #[derive(Debug, Clone)]
 enum UserState {
     Menu,
@@ -302,6 +305,87 @@ impl Handler for SshHandler {
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
         reply.accept().await;
+        Ok(())
+    }
+
+    /// Handles `ssh -L`, `ssh -D` (SOCKS) and `ssh -J` (jump host) requests by
+    /// connecting to the requested target from this machine and relaying bytes
+    /// in both directions. Only reachable after the client authenticated.
+    async fn channel_open_direct_tcpip(
+        &mut self,
+        channel: russh::Channel<russh::server::Msg>,
+        host_to_connect: &str,
+        port_to_connect: u32,
+        originator_address: &str,
+        originator_port: u32,
+        reply: russh::server::ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        let target_host = host_to_connect.to_string();
+        let target = format!("{}:{}", target_host, port_to_connect);
+        self.add_log(&format!(
+            "Tunnel requested to {} (from {}:{})",
+            target, originator_address, originator_port
+        ));
+
+        let Ok(target_port) = u16::try_from(port_to_connect) else {
+            self.add_log(&format!("Tunnel rejected: invalid port in {}", target));
+            reply
+                .reject(russh::ChannelOpenFailure::ConnectFailed)
+                .await;
+            return Ok(());
+        };
+
+        let logs = self.logs.clone();
+        let client_ip = self.client_ip.clone();
+        tokio::spawn(async move {
+            let log = |msg: String| {
+                let ts = chrono::Local::now().format("%H:%M:%S").to_string();
+                if let Ok(mut l) = logs.lock() {
+                    l.push(format!("[{}] [{}] {}", ts, client_ip, msg));
+                    if l.len() > 100 {
+                        l.remove(0);
+                    }
+                }
+            };
+
+            let connect = tokio::time::timeout(
+                std::time::Duration::from_secs(TUNNEL_CONNECT_TIMEOUT_SECS),
+                tokio::net::TcpStream::connect((target_host.as_str(), target_port)),
+            )
+            .await;
+
+            let mut remote = match connect {
+                Ok(Ok(stream)) => stream,
+                Ok(Err(e)) => {
+                    log(format!("Tunnel to {} failed: {}", target, e));
+                    reply
+                        .reject(russh::ChannelOpenFailure::ConnectFailed)
+                        .await;
+                    return;
+                }
+                Err(_) => {
+                    log(format!("Tunnel to {} timed out", target));
+                    reply
+                        .reject(russh::ChannelOpenFailure::ConnectFailed)
+                        .await;
+                    return;
+                }
+            };
+
+            reply.accept().await;
+            log(format!("Tunnel to {} established", target));
+
+            let mut stream = channel.into_stream();
+            match tokio::io::copy_bidirectional(&mut stream, &mut remote).await {
+                Ok((up, down)) => log(format!(
+                    "Tunnel to {} closed (sent {} B, received {} B)",
+                    target, up, down
+                )),
+                Err(e) => log(format!("Tunnel to {} ended: {}", target, e)),
+            }
+        });
+
         Ok(())
     }
 

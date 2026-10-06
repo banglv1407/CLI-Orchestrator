@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr, formatChatTime } from '../i18n';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import type { CompanionRunEvent, CompanionConfigView } from '../types';
@@ -16,6 +17,7 @@ interface ChatMessage {
   content: string;
   timestamp: string;
   runId?: string;
+  interfaceFeedback?: boolean;
 }
 
 export function AIChatPanel() {
@@ -111,7 +113,7 @@ export function AIChatPanel() {
           return [...prev, {
             role: 'assistant',
             content: delta + '\u258c',
-            timestamp: new Date().toLocaleTimeString(),
+            timestamp: new Date().toISOString(),
             runId,
           }];
         });
@@ -131,7 +133,8 @@ export function AIChatPanel() {
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `\uD83D\uDD27 Running: ${evt.tool_name}...`,
-          timestamp: new Date().toLocaleTimeString(),
+          interfaceFeedback: true,
+          timestamp: new Date().toISOString(),
           runId,
         }]);
       } else if (type === 'tool_result') {
@@ -139,14 +142,15 @@ export function AIChatPanel() {
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `${icon} ${evt.tool_name}: ${(evt.result || '').slice(0, 200)}`,
-          timestamp: new Date().toLocaleTimeString(),
+          timestamp: new Date().toISOString(),
           runId,
         }]);
       } else if (type === 'error' || type === 'warning') {
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `\u26A0 ${evt.message}`,
-          timestamp: new Date().toLocaleTimeString(),
+          interfaceFeedback: true,
+          timestamp: new Date().toISOString(),
           runId,
         }]);
         if (type === 'error') {
@@ -196,7 +200,7 @@ export function AIChatPanel() {
     setMessages(prev => [...prev, {
       role: 'user',
       content,
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: new Date().toISOString(),
     }]);
 
     try {
@@ -207,7 +211,8 @@ export function AIChatPanel() {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: `Error: ${err}`,
-        timestamp: new Date().toLocaleTimeString(),
+        interfaceFeedback: true,
+        timestamp: new Date().toISOString(),
       }]);
       setIsRunning(false);
     }
@@ -271,13 +276,13 @@ export function AIChatPanel() {
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-3 bg-cyber-base/20">
         <div>
-          <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">AI Companion</h2>
+          <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">{tr("AI Companion")}</h2>
           <div className="flex gap-2 mt-0.5">
             {config && (
               <span className="text-[10px] text-slate-400">{config.model}</span>
             )}
             <span className={`text-[10px] font-semibold ${actionsEnabled ? 'text-cyber-neon' : 'text-slate-500'}`}>
-              {actionsEnabled ? 'Tools enabled' : 'Q&A only'}
+              {actionsEnabled ? tr("Tools enabled") : tr("Q&A only")}
             </span>
           </div>
         </div>
@@ -286,7 +291,7 @@ export function AIChatPanel() {
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('open-settings', { detail: 'ai-companion' }))}
             className="rounded border border-cyber-electric/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-electric hover:border-cyber-electric hover:bg-cyber-electric/10"
-          >Config</button>
+          >{tr("Config")}</button>
           <button
             type="button"
             onClick={handleToggleActions}
@@ -295,13 +300,13 @@ export function AIChatPanel() {
                 ? 'border-cyber-neon/40 text-cyber-neon hover:bg-cyber-neon/10'
                 : 'border-slate-500/40 text-slate-500 hover:bg-slate-500/10'
             }`}
-          >{actionsEnabled ? 'Disable' : 'Enable'} Tools</button>
+          >{actionsEnabled ? tr("Disable") : tr("Enable")}{tr(" Tools")}</button>
           {messages.length > 0 && (
             <button
               type="button"
               onClick={handleClear}
               className="rounded border border-cyber-warn/40 px-1.5 py-0.5 text-[9px] font-semibold text-cyber-warn hover:bg-cyber-warn/10"
-            >Clear</button>
+            >{tr("Clear")}</button>
           )}
         </div>
       </div>
@@ -309,17 +314,12 @@ export function AIChatPanel() {
       {/* Consent card */}
       {consentShown && (
         <div className="shrink-0 mx-3 mt-2 p-3 rounded-lg border border-cyber-neon/40 bg-cyber-neon/5">
-          <p className="text-[12px] text-slate-200 font-semibold mb-1">Enable App Actions?</p>
-          <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
-            App Actions let the AI navigate views, check status, and manage configurations on your behalf.
-            Read-only actions happen automatically. Creating, editing, or deleting anything requires your explicit approval each time.
-          </p>
-          <p className="text-[11px] text-cyber-warn/80 mb-3">
-            ⚠ Credentials typed in chat are sent to the configured model provider before local redaction.
-          </p>
+          <p className="text-[12px] text-slate-200 font-semibold mb-1">{tr("Enable App Actions?")}</p>
+          <p className="text-[11px] text-slate-400 leading-relaxed mb-2">{tr("App Actions let the AI navigate views, check status, and manage configurations on your behalf. Read-only actions happen automatically. Creating, editing, or deleting anything requires your explicit approval each time.")}</p>
+          <p className="text-[11px] text-cyber-warn/80 mb-3">{tr("⚠ Credentials typed in chat are sent to the configured model provider before local redaction.")}</p>
           <div className="flex gap-2">
-            <button onClick={handleAcceptConsent} className="rounded bg-cyber-neon/20 border border-cyber-neon px-2.5 py-1 text-[11px] font-semibold text-cyber-neon hover:bg-cyber-neon/30">Enable Actions</button>
-            <button onClick={() => setConsentShown(false)} className="rounded border border-slate-500/40 px-2.5 py-1 text-[11px] text-slate-400 hover:bg-slate-500/10">Cancel</button>
+            <button onClick={handleAcceptConsent} className="rounded bg-cyber-neon/20 border border-cyber-neon px-2.5 py-1 text-[11px] font-semibold text-cyber-neon hover:bg-cyber-neon/30">{tr("Enable Actions")}</button>
+            <button onClick={() => setConsentShown(false)} className="rounded border border-slate-500/40 px-2.5 py-1 text-[11px] text-slate-400 hover:bg-slate-500/10">{tr("Cancel")}</button>
           </div>
         </div>
       )}
@@ -328,8 +328,8 @@ export function AIChatPanel() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8">
-            <p className="text-[13px] italic">No messages yet.</p>
-            <p className="mt-1 text-[12px] text-slate-600">Ask about features, start sessions, or manage configs.</p>
+            <p className="text-[13px] italic">{tr("No messages yet.")}</p>
+            <p className="mt-1 text-[12px] text-slate-600">{tr("Ask about features, start sessions, or manage configs.")}</p>
           </div>
         ) : (
           messages.map((msg, idx) => (
@@ -344,16 +344,16 @@ export function AIChatPanel() {
               <span className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${
                 msg.role === 'user' ? 'text-cyber-neon' : 'text-cyber-electric'
               }`}>
-                {msg.role === 'user' ? 'You' : 'Companion'}
-                <span className="ml-2 font-normal opacity-50">{msg.timestamp}</span>
+                {msg.role === 'user' ? tr("You") : tr("Companion")}
+                <span className="ml-2 font-normal opacity-50">{formatChatTime(msg.timestamp)}</span>
               </span>
-              <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.content}</p>
+              <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.interfaceFeedback ? trFeedback(msg.content) : msg.content}</p>
             </div>
           ))
         )}
         {isRunning && !messages.some(m => m.role === 'assistant' && m.content.endsWith('▌')) && (
           <div className="flex items-center gap-2 self-start max-w-[80%] rounded-lg px-3 py-2 bg-cyber-electric/10 border border-cyber-electric/20">
-            <span className="text-[13px] text-cyber-electric italic">Thinking</span>
+            <span className="text-[13px] text-cyber-electric italic">{tr("Thinking")}</span>
             <span className="flex gap-0.5">
               <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '0ms' }} />
               <span className="h-1.5 w-1.5 rounded-full bg-cyber-electric animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -368,7 +368,7 @@ export function AIChatPanel() {
         <div className="flex gap-2 items-end">
           <textarea
             ref={inputRef}
-            placeholder="Type a message..."
+            placeholder={tr("Type a message...")}
             value={input}
             disabled={isRunning}
             rows={1}
@@ -382,16 +382,16 @@ export function AIChatPanel() {
               type="button"
               onClick={handleCancel}
               className="shrink-0 rounded border border-cyber-warn bg-cyber-warn/15 px-3 py-1.5 font-bold uppercase text-[11px] text-cyber-warn hover:bg-cyber-warn/25 transition"
-            >Cancel</button>
+            >{tr("Cancel")}</button>
           ) : (
             <button
               type="submit"
               disabled={!input.trim()}
               className="shrink-0 rounded border border-cyber-neon bg-cyber-neon/15 px-3 py-1.5 font-bold uppercase text-[11px] text-cyber-neon hover:bg-cyber-neon/25 transition disabled:opacity-30"
-            >Send</button>
+            >{tr("Send")}</button>
           )}
         </div>
-        <p className="mt-1 text-[10px] text-slate-600">Enter to send · Shift+Enter for new line</p>
+        <p className="mt-1 text-[10px] text-slate-600">{tr("Enter to send · Shift+Enter for new line")}</p>
       </form>
     </div>
   );

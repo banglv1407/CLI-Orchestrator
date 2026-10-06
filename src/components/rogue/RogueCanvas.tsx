@@ -1,3 +1,4 @@
+import { t as tr } from '../../i18n';
 import { MutableRefObject, useEffect, useRef } from 'react';
 import { RogueRound, RogueSnapshot, stepRound, snapshotRound } from './gameCore';
 import { QUANTUM_STATION_MAP } from './types';
@@ -63,7 +64,7 @@ const drawScene = (context: CanvasRenderingContext2D, width: number, height: num
     context.strokeRect(room.x + 1, room.y + 1, room.w - 2, room.h - 2);
     context.fillStyle = 'rgba(103, 232, 249, 0.72)';
     context.font = '700 12px ui-monospace, monospace';
-    context.fillText(room.name.toUpperCase(), room.x + 18, room.y + 28);
+    context.fillText(tr(room.name).toUpperCase(), room.x + 18, room.y + 28);
   }
 
   for (const wall of QUANTUM_STATION_MAP.walls) {
@@ -108,7 +109,7 @@ const drawScene = (context: CanvasRenderingContext2D, width: number, height: num
     context.fillStyle = player.isLocal ? '#e0f2fe' : '#cbd5e1';
     context.font = '700 10px ui-monospace, monospace';
     context.textAlign = 'center';
-    context.fillText(player.isLocal ? `YOU Ã‚Â· ${player.name}` : player.name, player.x, player.y - 66);
+    context.fillText(player.isLocal ? tr('YOU · {name}', { name: player.name }) : player.name, player.x, player.y - 66);
     context.restore();
   }
   context.restore();
@@ -176,5 +177,5 @@ export const RogueCanvas = ({ isVisible, roundRef, inputRef, onSnapshot }: Rogue
     return () => { cancelAnimationFrame(frameId); observer.disconnect(); };
   }, [inputRef, isVisible, onSnapshot, roundRef]);
 
-  return <canvas ref={canvasRef} className="block h-full w-full cursor-crosshair" aria-label="Rogue Node game canvas" />;
+  return <canvas ref={canvasRef} className="block h-full w-full cursor-crosshair" aria-label={tr("Rogue Node game canvas")} />;
 };

@@ -4,6 +4,7 @@ pub mod builtin_llm_commands;
 pub mod buzz_commands;
 pub mod cli_commands;
 pub mod dashboard_commands;
+pub mod language_commands;
 pub mod nes_commands;
 pub mod notepad_commands;
 pub mod pet_commands;
@@ -11,4 +12,3 @@ pub mod proxy_commands;
 pub mod quickapps_commands;
 pub mod rtk_commands;
 pub mod system_commands;
-

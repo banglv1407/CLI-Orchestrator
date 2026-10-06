@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr } from '../i18n';
 // Buzz & NES settings — the single home for Buzz relay URL, Buzz identity, and
 // NES session-service URL. The Buzz workspace header no longer carries config
 // controls; it links here instead.
@@ -238,18 +239,14 @@ export function BuzzNesSettings() {
       {/* Buzz relay */}
       <div className="space-y-3">
         <div>
-          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">
-            Buzz Relay
-          </h3>
-          <p className="text-[10px] text-slate-500 mt-1">
-            Connection used by the Buzz workspace chat.
-          </p>
+          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{tr("Buzz Relay")}</h3>
+          <p className="text-[10px] text-slate-500 mt-1">{tr("Connection used by the Buzz workspace chat.")}</p>
         </div>
         <form onSubmit={saveRelay} className="space-y-3">
           <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200">
             <div>
-              <span className="font-semibold">Relay URL</span>
-              <p className="text-[10px] text-slate-500 mt-0.5">https:// or wss:// endpoint</p>
+              <span className="font-semibold">{tr("Relay URL")}</span>
+              <p className="text-[10px] text-slate-500 mt-0.5">{tr("https:// or wss:// endpoint")}</p>
             </div>
             <input
               type="text"
@@ -261,8 +258,8 @@ export function BuzzNesSettings() {
 
           <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200 cursor-pointer">
             <div>
-              <span className="font-semibold">Allow Insecure TLS</span>
-              <p className="text-[10px] text-slate-500 mt-0.5">Allow self-signed or invalid certificates</p>
+              <span className="font-semibold">{tr("Allow Insecure TLS")}</span>
+              <p className="text-[10px] text-slate-500 mt-0.5">{tr("Allow self-signed or invalid certificates")}</p>
             </div>
             <input
               type="checkbox"
@@ -276,10 +273,8 @@ export function BuzzNesSettings() {
           <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="font-semibold text-xs text-slate-200">Connection Hop (Proxy)</span>
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  Route relay traffic through an SSH tunnel or HTTP proxy.
-                </p>
+                <span className="font-semibold text-xs text-slate-200">{tr("Connection Hop (Proxy)")}</span>
+                <p className="text-[10px] text-slate-500 mt-0.5">{tr("Route relay traffic through an SSH tunnel or HTTP proxy.")}</p>
               </div>
               <select
                 value={proxyKind}
@@ -291,9 +286,9 @@ export function BuzzNesSettings() {
                 }}
                 className="rounded border border-cyber-line bg-cyber-base px-2 py-1 text-xs text-slate-200 outline-none focus:border-cyber-neon"
               >
-                <option value="none">Direct (no hop)</option>
-                <option value="ssh">SSH Tunnel</option>
-                <option value="http">HTTP CONNECT Proxy</option>
+                <option value="none">{tr("Direct (no hop)")}</option>
+                <option value="ssh">{tr("SSH Tunnel")}</option>
+                <option value="http">{tr("HTTP CONNECT Proxy")}</option>
               </select>
             </div>
 
@@ -314,7 +309,7 @@ export function BuzzNesSettings() {
                     value={proxyPort}
                     onChange={(e) => setProxyPort(Number(e.target.value) || 0)}
                     className="w-20 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
-                    title="Port"
+                    title={tr("Port")}
                   />
                 </div>
 
@@ -323,7 +318,7 @@ export function BuzzNesSettings() {
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
-                        placeholder="SSH username"
+                        placeholder={tr("SSH username")}
                         value={proxyUser}
                         onChange={(e) => setProxyUser(e.target.value)}
                         className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
@@ -332,16 +327,16 @@ export function BuzzNesSettings() {
                         value={proxyAuthMode}
                         onChange={(e) => setProxyAuthMode(e.target.value === "key" ? "key" : "password")}
                         className="rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
-                        title="Auth mode"
+                        title={tr("Auth mode")}
                       >
-                        <option value="password">Password</option>
-                        <option value="key">Private Key</option>
+                        <option value="password">{tr("Password")}</option>
+                        <option value="key">{tr("Private Key")}</option>
                       </select>
                     </div>
                     {proxyAuthMode === "password" ? (
                       <input
                         type="password"
-                        placeholder={hasSavedSecret ? "Password stored — type to replace" : "SSH password"}
+                        placeholder={hasSavedSecret ? tr("Password stored — type to replace") : tr("SSH password")}
                         value={proxySecret}
                         onChange={(e) => setProxySecret(e.target.value)}
                         className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
@@ -349,7 +344,7 @@ export function BuzzNesSettings() {
                     ) : (
                       <input
                         type="text"
-                        placeholder="C:\\path\\to\\id_ed25519 (passphrase below, optional)"
+                        placeholder={tr("C:\\\\path\\\\to\\\\id_ed25519 (passphrase below, optional)")}
                         value={proxyKeyPath}
                         onChange={(e) => setProxyKeyPath(e.target.value)}
                         className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon font-mono"
@@ -358,23 +353,18 @@ export function BuzzNesSettings() {
                     {proxyAuthMode === "key" && (
                       <input
                         type="password"
-                        placeholder={hasSavedSecret ? "Passphrase stored — type to replace" : "Key passphrase (optional)"}
+                        placeholder={hasSavedSecret ? tr("Passphrase stored — type to replace") : tr("Key passphrase (optional)")}
                         value={proxySecret}
                         onChange={(e) => setProxySecret(e.target.value)}
                         className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
                       />
                     )}
-                    <p className="text-[10px] text-slate-500">
-                      CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH
-                      server and routes all relay traffic via it.
-                    </p>
+                    <p className="text-[10px] text-slate-500">{tr("CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH server and routes all relay traffic via it.")}</p>
                   </>
                 )}
 
                 {proxyKind === "http" && (
-                  <p className="text-[10px] text-slate-500">
-                    Relay requests are sent via HTTP CONNECT through this proxy host:port.
-                  </p>
+                  <p className="text-[10px] text-slate-500">{tr("Relay requests are sent via HTTP CONNECT through this proxy host:port.")}</p>
                 )}
               </div>
             )}
@@ -386,9 +376,9 @@ export function BuzzNesSettings() {
               disabled={savingRelay}
               className="rounded border border-cyber-neon/60 bg-cyber-neon/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyber-neon hover:bg-cyber-neon/20 disabled:opacity-50"
             >
-              {savingRelay ? "Saving…" : "Save Relay"}
+              {savingRelay ? tr("Saving…") : tr("Save Relay")}
             </button>
-            {relayMsg && <span className="text-[10px] text-slate-400">{relayMsg}</span>}
+            {relayMsg && <span className="text-[10px] text-slate-400">{trFeedback(relayMsg ?? '')}</span>}
           </div>
         </form>
       </div>
@@ -396,12 +386,8 @@ export function BuzzNesSettings() {
       {/* Buzz identity */}
       <div className="space-y-3">
         <div>
-          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">
-            Buzz Identity
-          </h3>
-          <p className="text-[10px] text-slate-500 mt-1">
-            Your Nostr private key (stored in Windows Credential Manager, never on disk).
-          </p>
+          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{tr("Buzz Identity")}</h3>
+          <p className="text-[10px] text-slate-500 mt-1">{tr("Your Nostr private key (stored in Windows Credential Manager, never on disk).")}</p>
         </div>
         <div className="flex items-center gap-2">
           <span
@@ -409,25 +395,21 @@ export function BuzzNesSettings() {
               hasIdentity ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
             }`}
           >
-            {hasIdentity ? "IDENTITY OK" : "NO IDENTITY"}
+            {hasIdentity ? tr("IDENTITY OK") : tr("NO IDENTITY")}
           </span>
           <button
             onClick={handleGenerate}
             className="rounded border border-cyber-neon/60 bg-cyber-neon/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyber-neon hover:bg-cyber-neon/20"
-          >
-            Generate
-          </button>
+          >{tr("Generate")}</button>
           <button
             onClick={handleClear}
             className="rounded border border-cyber-line/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-rose-300 hover:border-rose-500/40"
-          >
-            Clear
-          </button>
+          >{tr("Clear")}</button>
         </div>
         <div className="flex items-center gap-2">
           <input
             type="password"
-            placeholder="Import 64-hex private key"
+            placeholder={tr("Import 64-hex private key")}
             value={importKey}
             onChange={(e) => setImportKey(e.target.value)}
             className="rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-cyber-neon outline-none focus:border-cyber-neon w-72"
@@ -435,9 +417,7 @@ export function BuzzNesSettings() {
           <button
             onClick={handleImport}
             className="rounded border border-cyber-line/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 hover:text-cyber-neon hover:border-cyber-neon/40"
-          >
-            Import
-          </button>
+          >{tr("Import")}</button>
         </div>
         {identityMsg && <div className="text-[10px] text-slate-400">{identityMsg}</div>}
       </div>
@@ -445,18 +425,14 @@ export function BuzzNesSettings() {
       {/* NES service */}
       <div className="space-y-3">
         <div>
-          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">
-            NES Session Service
-          </h3>
-          <p className="text-[10px] text-slate-500 mt-1">
-            Base URL of the nes-session relay for multiplayer NES.
-          </p>
+          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{tr("NES Session Service")}</h3>
+          <p className="text-[10px] text-slate-500 mt-1">{tr("Base URL of the nes-session relay for multiplayer NES.")}</p>
         </div>
         <form onSubmit={saveNes} className="space-y-3">
           <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200">
             <div>
-              <span className="font-semibold">Service URL</span>
-              <p className="text-[10px] text-slate-500 mt-0.5">e.g. http://127.0.0.1:8080</p>
+              <span className="font-semibold">{tr("Service URL")}</span>
+              <p className="text-[10px] text-slate-500 mt-0.5">{tr("e.g. http://127.0.0.1:8080")}</p>
             </div>
             <input
               type="text"
@@ -470,10 +446,8 @@ export function BuzzNesSettings() {
           <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="font-semibold text-xs text-slate-200">Connection Hop (Proxy)</span>
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  Route session-service traffic through an SSH tunnel or HTTP proxy.
-                </p>
+                <span className="font-semibold text-xs text-slate-200">{tr("Connection Hop (Proxy)")}</span>
+                <p className="text-[10px] text-slate-500 mt-0.5">{tr("Route session-service traffic through an SSH tunnel or HTTP proxy.")}</p>
               </div>
               <select
                 value={nesProxyKind}
@@ -485,9 +459,9 @@ export function BuzzNesSettings() {
                 }}
                 className="rounded border border-cyber-line bg-cyber-base px-2 py-1 text-xs text-slate-200 outline-none focus:border-cyber-neon"
               >
-                <option value="none">Direct (no hop)</option>
-                <option value="ssh">SSH Tunnel</option>
-                <option value="http">HTTP CONNECT Proxy</option>
+                <option value="none">{tr("Direct (no hop)")}</option>
+                <option value="ssh">{tr("SSH Tunnel")}</option>
+                <option value="http">{tr("HTTP CONNECT Proxy")}</option>
               </select>
             </div>
 
@@ -508,7 +482,7 @@ export function BuzzNesSettings() {
                     value={nesProxyPort}
                     onChange={(e) => setNesProxyPort(Number(e.target.value) || 0)}
                     className="w-20 rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
-                    title="Port"
+                    title={tr("Port")}
                   />
                 </div>
 
@@ -517,7 +491,7 @@ export function BuzzNesSettings() {
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
-                        placeholder="SSH username"
+                        placeholder={tr("SSH username")}
                         value={nesProxyUser}
                         onChange={(e) => setNesProxyUser(e.target.value)}
                         className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
@@ -526,16 +500,16 @@ export function BuzzNesSettings() {
                         value={nesProxyAuthMode}
                         onChange={(e) => setNesProxyAuthMode(e.target.value === "key" ? "key" : "password")}
                         className="rounded border border-cyber-line bg-cyber-base px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
-                        title="Auth mode"
+                        title={tr("Auth mode")}
                       >
-                        <option value="password">Password</option>
-                        <option value="key">Private Key</option>
+                        <option value="password">{tr("Password")}</option>
+                        <option value="key">{tr("Private Key")}</option>
                       </select>
                     </div>
                     {nesProxyAuthMode === "password" ? (
                       <input
                         type="password"
-                        placeholder={hasSavedNesSecret ? "Password stored — type to replace" : "SSH password"}
+                        placeholder={hasSavedNesSecret ? tr("Password stored — type to replace") : tr("SSH password")}
                         value={nesProxySecret}
                         onChange={(e) => setNesProxySecret(e.target.value)}
                         className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
@@ -551,24 +525,19 @@ export function BuzzNesSettings() {
                         />
                         <input
                           type="password"
-                          placeholder={hasSavedNesSecret ? "Passphrase stored — type to replace" : "Key passphrase (optional)"}
+                          placeholder={hasSavedNesSecret ? tr("Passphrase stored — type to replace") : tr("Key passphrase (optional)")}
                           value={nesProxySecret}
                           onChange={(e) => setNesProxySecret(e.target.value)}
                           className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyber-neon"
                         />
                       </>
                     )}
-                    <p className="text-[10px] text-slate-500">
-                      CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH
-                      server and routes all session-service traffic via it.
-                    </p>
+                    <p className="text-[10px] text-slate-500">{tr("CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH server and routes all session-service traffic via it.")}</p>
                   </>
                 )}
 
                 {nesProxyKind === "http" && (
-                  <p className="text-[10px] text-slate-500">
-                    Session-service requests are sent via HTTP CONNECT through this proxy host:port.
-                  </p>
+                  <p className="text-[10px] text-slate-500">{tr("Session-service requests are sent via HTTP CONNECT through this proxy host:port.")}</p>
                 )}
               </div>
             )}
@@ -580,9 +549,9 @@ export function BuzzNesSettings() {
               disabled={savingNes}
               className="rounded border border-cyber-neon/60 bg-cyber-neon/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyber-neon hover:bg-cyber-neon/20 disabled:opacity-50"
             >
-              {savingNes ? "Saving…" : "Save Service"}
+              {savingNes ? tr("Saving…") : tr("Save Service")}
             </button>
-            {nesMsg && <span className="text-[10px] text-slate-400">{nesMsg}</span>}
+            {nesMsg && <span className="text-[10px] text-slate-400">{trFeedback(nesMsg ?? '')}</span>}
           </div>
         </form>
       </div>
@@ -590,48 +559,34 @@ export function BuzzNesSettings() {
       {/* NES Controller Controls */}
       <div className="space-y-3">
         <div>
-          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">
-            NES Controller Mapping
-          </h3>
-          <p className="text-[10px] text-slate-500 mt-1">
-            Configure keyboard keys and Turbo Rapid-Fire buttons for NES emulation.
-          </p>
+          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{tr("NES Controller Mapping")}</h3>
+          <p className="text-[10px] text-slate-500 mt-1">{tr("Configure keyboard keys and Turbo Rapid-Fire buttons for NES emulation.")}</p>
         </div>
         <div className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200">
           <div>
-            <span className="font-semibold">Button Mapping & Turbo Keys</span>
-            <p className="text-[10px] text-slate-500 mt-0.5">
-              Customize D-Pad, A, B, Turbo A, Turbo B, Select, Start
-            </p>
+            <span className="font-semibold">{tr("Button Mapping & Turbo Keys")}</span>
+            <p className="text-[10px] text-slate-500 mt-0.5">{tr("Customize D-Pad, A, B, Turbo A, Turbo B, Select, Start")}</p>
           </div>
           <button
             type="button"
             onClick={() => setShowKeyConfig(true)}
             className="rounded border border-cyber-neon/60 bg-cyber-neon/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyber-neon hover:bg-cyber-neon/20"
-          >
-            Configure Keys…
-          </button>
+          >{tr("Configure Keys…")}</button>
         </div>
       </div>
 
       {/* Background Execution & Notifications */}
       <div className="space-y-3">
         <div>
-          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">
-            Background Execution & Badges
-          </h3>
-          <p className="text-[10px] text-slate-500 mt-1">
-            Control resource preservation and unread message notifications.
-          </p>
+          <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{tr("Background Execution & Badges")}</h3>
+          <p className="text-[10px] text-slate-500 mt-1">{tr("Control resource preservation and unread message notifications.")}</p>
         </div>
 
         <div className="space-y-2">
           <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200 cursor-pointer hover:border-cyber-line">
             <div>
-              <span className="font-semibold">Keep NES game state when switching tabs</span>
-              <p className="text-[10px] text-slate-500 mt-0.5">
-                Preserves ROM execution in memory so the game never resets unless explicitly exited.
-              </p>
+              <span className="font-semibold">{tr("Keep NES game state when switching tabs")}</span>
+              <p className="text-[10px] text-slate-500 mt-0.5">{tr("Preserves ROM execution in memory so the game never resets unless explicitly exited.")}</p>
             </div>
             <input
               type="checkbox"
@@ -643,10 +598,8 @@ export function BuzzNesSettings() {
 
           <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200 cursor-pointer hover:border-cyber-line">
             <div>
-              <span className="font-semibold">Keep Buzz live connection & show unread badges</span>
-              <p className="text-[10px] text-slate-500 mt-0.5">
-                Displays a red badge count on the Buzz sidebar icon when new messages arrive.
-              </p>
+              <span className="font-semibold">{tr("Keep Buzz live connection & show unread badges")}</span>
+              <p className="text-[10px] text-slate-500 mt-0.5">{tr("Displays a red badge count on the Buzz sidebar icon when new messages arrive.")}</p>
             </div>
             <input
               type="checkbox"

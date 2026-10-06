@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import { useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { CliDefinition } from '../types';
@@ -24,7 +25,7 @@ export function CliStartModal({
             const picked = await open({
                 directory: true,
                 multiple: false,
-                title: `Select Working Directory for ${cli.name}`,
+                title: tr("Select Working Directory for {v0}", { v0: String(cli.name) }),
             });
 
             if (typeof picked === 'string') {
@@ -46,18 +47,15 @@ export function CliStartModal({
 
             <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-cyber-neon/30 bg-cyber-panel p-6 shadow-2xl shadow-cyber-neon/10 select-none">
                 <div className="mb-4">
-                    <h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">
-                        Start {cli.name}
+                    <h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">{tr("Start ")}{cli.name}
                     </h2>
-                    <p className="text-xs text-slate-400">Select a working directory to begin.</p>
+                    <p className="text-xs text-slate-400">{tr("Select a working directory to begin.")}</p>
                 </div>
 
                 <div className="space-y-3">
                     {recentFolders.length > 0 && (
                         <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold font-display">
-                                🕒 Recent Thư Mục Làm Việc
-                            </label>
+                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold font-display">{tr("🕒 Recent Thư Mục Làm Việc")}</label>
                             <div className="max-h-60 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
                                 {recentFolders.map((dirPath) => {
                                     const folderName = dirPath.split(/[/\\]/).pop() || dirPath;
@@ -87,9 +85,7 @@ export function CliStartModal({
                         >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                            Choose New Folder
-                        </button>
+                            </svg>{tr("Choose New Folder")}</button>
                     </div>
                 </div>
 
@@ -97,9 +93,7 @@ export function CliStartModal({
                     <button
                         onClick={onClose}
                         className="px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-400 transition hover:text-slate-100"
-                    >
-                        Cancel
-                    </button>
+                    >{tr("Cancel")}</button>
                 </div>
             </div>
         </div>

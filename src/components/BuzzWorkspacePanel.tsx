@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr, useLocale, getIntlLocale } from '../i18n';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -86,6 +87,7 @@ function isDmChannel(ch: BuzzChannel): boolean {
 }
 
 export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }) {
+  const locale = useLocale();
   const [channels, setChannels] = useState<BuzzChannel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<BuzzChannel | null>(null);
   const [messages, setMessages] = useState<BuzzMessage[]>([]);
@@ -868,13 +870,13 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
       {/* Top Header (identity + profile only; config lives in Settings) */}
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2 bg-slate-950">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-amber-400">🐝 Buzz Workspace</span>
+          <span className="font-semibold text-amber-400">{tr("🐝 Buzz Workspace")}</span>
           <span
             className={`rounded px-2 py-0.5 text-[10px] font-bold ${
               hasIdentity ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
             }`}
           >
-            {hasIdentity ? "IDENTITY OK" : "NO IDENTITY"}
+            {hasIdentity ? tr("IDENTITY OK") : tr("NO IDENTITY")}
           </span>
         </div>
         <button
@@ -883,14 +885,12 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
             loadMyProfile();
           }}
           className="rounded bg-slate-800 px-2 py-1 text-xs text-amber-300 hover:bg-slate-700 transition-colors"
-        >
-          Profile
-        </button>
+        >{tr("Profile")}</button>
       </div>
 
       {error && (
         <div className="bg-rose-900/50 border-b border-rose-700 px-4 py-1.5 text-xs text-rose-200 flex justify-between">
-          <span>Error: {error}</span>
+          <span>{tr("Error: ")}{trFeedback(error ?? '')}</span>
           <button onClick={() => setError(null)} className="text-rose-400 font-bold">✕</button>
         </div>
       )}
@@ -911,7 +911,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                   <span className="text-[9px] transition-transform text-slate-500 group-hover:text-slate-300">
                     {channelsExpanded ? "▼" : "▶"}
                   </span>
-                  <span>Channels</span>
+                  <span>{tr("Channels")}</span>
                 </span>
                 <span className="text-[10px] text-slate-600 font-mono font-normal">
                   {channels.length}
@@ -920,9 +920,9 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
 
               {channelsExpanded && (
                 <div className="space-y-0.5 pl-1">
-                  {loading && <Spinner label="Loading..." />}
+                  {loading && <Spinner label={tr("Loading...")} />}
                   {!loading && publicChannels.length === 0 && (
-                    <div className="text-[11px] text-slate-500 px-2 py-1">No channels</div>
+                    <div className="text-[11px] text-slate-500 px-2 py-1">{tr("No channels")}</div>
                   )}
                   {publicChannels.map((ch) => (
                     <button
@@ -960,7 +960,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                   <span className="text-[9px] transition-transform text-slate-500 group-hover:text-slate-300">
                     {dmsExpanded ? "▼" : "▶"}
                   </span>
-                  <span>Direct Messages</span>
+                  <span>{tr("Direct Messages")}</span>
                 </button>
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] text-slate-600 font-mono font-normal">
@@ -968,7 +968,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                   </span>
                   <button
                     onClick={() => setShowDmModal(true)}
-                    title="New direct message"
+                    title={tr("New direct message")}
                     className="text-amber-400 hover:text-amber-300 text-xs font-bold px-1 rounded hover:bg-slate-800"
                   >
                     +
@@ -979,9 +979,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
               {dmsExpanded && (
                 <div className="space-y-0.5 pl-1">
                   {allDms.length === 0 ? (
-                    <div className="text-[11px] text-slate-500 px-2 py-1">
-                      No direct messages. Click + to start.
-                    </div>
+                    <div className="text-[11px] text-slate-500 px-2 py-1">{tr("No direct messages. Click + to start.")}</div>
                   ) : (
                     allDms.map((dm) => {
                       const other =
@@ -991,7 +989,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                         profile?.display_name ||
                         profile?.name ||
                         dm.nameFallback ||
-                        (other ? other.slice(0, 8) : "Direct Message");
+                        (other ? other.slice(0, 8) : tr("Direct Message"));
 
                       return (
                         <button
@@ -1024,15 +1022,12 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                 <div className="min-w-0">
                   <span className="flex items-center gap-2">
                     {selectedChannel.description === "Direct message" ? "@" : "#"} {selectedChannel.name}
-                    <LiveIndicator state={liveState} error={liveError} />
+                    <LiveIndicator state={liveState} error={trFeedback(liveError ?? '')} />
                   </span>
-                  <div className="truncate font-mono text-[9px] font-normal text-slate-500" title={selectedChannel.channel_id}>
-                    Channel ID: {selectedChannel.channel_id}
+                  <div className="truncate font-mono text-[9px] font-normal text-slate-500" title={selectedChannel.channel_id}>{tr("Channel ID: ")}{selectedChannel.channel_id}
                   </div>
                 </div>
-                <button onClick={() => fetchMessages(selectedChannel.channel_id)} className="text-xs text-slate-400 hover:text-slate-200">
-                  Refresh
-                </button>
+                <button onClick={() => fetchMessages(selectedChannel.channel_id)} className="text-xs text-slate-400 hover:text-slate-200">{tr("Refresh")}</button>
               </div>
 
               <div
@@ -1043,9 +1038,9 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                 className="flex-1 overflow-y-auto p-4 space-y-3"
               >
                 {loadingMessages ? (
-                  <Spinner label="Loading messages..." />
+                  <Spinner label={tr("Loading messages...")} />
                 ) : topLevel.length === 0 ? (
-                  <div className="text-xs text-slate-500">No messages in this stream.</div>
+                  <div className="text-xs text-slate-500">{tr("No messages in this stream.")}</div>
                 ) : (
                   topLevel.map((msg) => (
                     <MessageCard
@@ -1066,7 +1061,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
               <Composer
                 inputRef={mainInputRef}
                 value={mainInput}
-                placeholder={`Message ${selectedChannel.description === "Direct message" ? "@" : "#"}${selectedChannel.name}...`}
+                placeholder={tr("Message {v0}{v1}...", { v0: String(selectedChannel.description === "Direct message" ? "@" : "#"), v1: String(selectedChannel.name) })}
                 onChange={(v) => onInputChange(v, "main")}
                 onKeyDown={onComposerKeyDown}
                 onSubmit={handleSendMain}
@@ -1077,9 +1072,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
               />
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-xs text-slate-500">
-              Select a channel to view conversation
-            </div>
+            <div className="flex-1 flex items-center justify-center text-xs text-slate-500">{tr("Select a channel to view conversation")}</div>
           )}
         </div>
 
@@ -1087,7 +1080,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
         {activeThread ? (
           <div className="w-80 border-l border-slate-800 bg-slate-950/50 flex flex-col">
             <div className="p-3 border-b border-slate-800 font-medium text-xs text-slate-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Thread</span>
+              <span>{tr("Thread")}</span>
               <button onClick={closeThread} className="text-slate-400 hover:text-slate-200">✕</button>
             </div>
             <div
@@ -1098,7 +1091,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
               className="flex-1 overflow-y-auto p-3 space-y-3"
             >
               {loadingThread ? (
-                <Spinner label="Loading thread..." />
+                <Spinner label={tr("Loading thread...")} />
               ) : (
                 <>
                   <MessageCard
@@ -1127,7 +1120,7 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
             <Composer
               inputRef={threadInputRef}
               value={threadInput}
-              placeholder="Reply in thread..."
+              placeholder={tr("Reply in thread...")}
               onChange={(v) => onInputChange(v, "thread")}
               onKeyDown={onComposerKeyDown}
               onSubmit={handleSendThread}
@@ -1139,19 +1132,17 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
           </div>
         ) : (
           <div className="w-64 border-l border-slate-800 bg-slate-950/50 flex flex-col p-3">
-            <div className="font-medium text-xs text-slate-400 uppercase tracking-wider mb-2">
-              Members
-            </div>
+            <div className="font-medium text-xs text-slate-400 uppercase tracking-wider mb-2">{tr("Members")}</div>
             <div className="flex-1 overflow-y-auto space-y-1.5">
               {loadingMembers ? (
-                <Spinner label="Loading members..." />
+                <Spinner label={tr("Loading members...")} />
               ) : (
                 members.map((m) => (
                   <button
                     key={m.pubkey}
                     onClick={() => void openDmWithUser(m.pubkey)}
                     disabled={m.pubkey === myPubkey}
-                    title={m.pubkey === myPubkey ? "This is you" : `Message ${memberLabel(m)}`}
+                    title={m.pubkey === myPubkey ? tr("This is you") : tr("Message {v0}", { v0: String(memberLabel(m)) })}
                     className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-slate-800 text-slate-300 flex items-center gap-2"
                   >
                     <Avatar name={memberLabel(m)} picture={m.picture} size="sm" />
@@ -1161,20 +1152,18 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
                 ))
               )}
               {!loadingMembers && members.length === 0 && (
-                <div className="text-xs text-slate-500">No members loaded.</div>
+                <div className="text-xs text-slate-500">{tr("No members loaded.")}</div>
               )}
             </div>
-            <div className="font-medium text-xs text-slate-400 uppercase tracking-wider mt-4 mb-2">
-              Managed Agents
-            </div>
+            <div className="font-medium text-xs text-slate-400 uppercase tracking-wider mt-4 mb-2">{tr("Managed Agents")}</div>
             <div className="flex-1 overflow-y-auto space-y-2">
               {agents.length === 0 ? (
-                <div className="text-xs text-slate-500">No agents configured.</div>
+                <div className="text-xs text-slate-500">{tr("No agents configured.")}</div>
               ) : (
                 agents.map((ag) => (
                   <div key={ag.agent_id} className="p-2 bg-slate-900 border border-slate-800 rounded text-xs">
                     <div className="font-semibold text-slate-200">{ag.name}</div>
-                    <div className="text-[10px] text-slate-400">Status: {ag.status}</div>
+                    <div className="text-[10px] text-slate-400">{tr("Status: ")}{tr(String(ag.status))}</div>
                   </div>
                 ))
               )}
@@ -1187,44 +1176,40 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
       {showProfile && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 w-96">
-            <h3 className="text-sm font-semibold text-slate-100 mb-3">Edit Profile</h3>
-            <label className="text-xs text-slate-400 block mb-1">Display name</label>
+            <h3 className="text-sm font-semibold text-slate-100 mb-3">{tr("Edit Profile")}</h3>
+            <label className="text-xs text-slate-400 block mb-1">{tr("Display name")}</label>
             <input
               type="text"
               value={profileName}
               onChange={(e) => setProfileName(e.target.value)}
-              placeholder="Your name"
+              placeholder={tr("Your name")}
               className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-100 focus:outline-none mb-3"
             />
-            <label className="text-xs text-slate-400 block mb-1">About</label>
+            <label className="text-xs text-slate-400 block mb-1">{tr("About")}</label>
             <input
               type="text"
               value={profileAbout}
               onChange={(e) => setProfileAbout(e.target.value)}
-              placeholder="Short bio (optional)"
+              placeholder={tr("Short bio (optional)")}
               className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-100 focus:outline-none mb-3"
             />
-            <label className="text-xs text-slate-400 block mb-1">Avatar URL</label>
+            <label className="text-xs text-slate-400 block mb-1">{tr("Avatar URL")}</label>
             <input
               type="text"
               value={profileAvatar}
               onChange={(e) => setProfileAvatar(e.target.value)}
-              placeholder="https://… (optional)"
+              placeholder={tr("https://… (optional)")}
               className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-100 focus:outline-none mb-4"
             />
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowProfile(false)}
                 className="px-3 py-1.5 text-xs rounded bg-slate-800 text-slate-300 hover:bg-slate-700"
-              >
-                Cancel
-              </button>
+              >{tr("Cancel")}</button>
               <button
                 onClick={handleSaveProfile}
                 className="px-3 py-1.5 text-xs rounded bg-amber-600 text-slate-100 hover:bg-amber-500 font-medium"
-              >
-                Save
-              </button>
+              >{tr("Save")}</button>
             </div>
           </div>
         </div>
@@ -1234,13 +1219,13 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
       {showDmModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 w-96">
-            <h3 className="text-sm font-semibold text-slate-100 mb-3">New Direct Message</h3>
-            <p className="text-xs text-slate-400 mb-2">Enter a user pubkey (64-hex) or pick from members.</p>
+            <h3 className="text-sm font-semibold text-slate-100 mb-3">{tr("New Direct Message")}</h3>
+            <p className="text-xs text-slate-400 mb-2">{tr("Enter a user pubkey (64-hex) or pick from members.")}</p>
             <input
               type="text"
               value={dmPubkey}
               onChange={(e) => setDmPubkey(e.target.value)}
-              placeholder="64-char hex pubkey"
+              placeholder={tr("64-char hex pubkey")}
               className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-100 focus:outline-none mb-3"
             />
             {members.length > 0 && (
@@ -1258,12 +1243,8 @@ export function BuzzWorkspacePanel({ isVisible = true }: { isVisible?: boolean }
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowDmModal(false)} className="px-3 py-1.5 text-xs rounded bg-slate-800 text-slate-300 hover:bg-slate-700">
-                Cancel
-              </button>
-              <button onClick={handleOpenDm} className="px-3 py-1.5 text-xs rounded bg-amber-600 text-slate-100 hover:bg-amber-500 font-medium">
-                Open DM
-              </button>
+              <button onClick={() => setShowDmModal(false)} className="px-3 py-1.5 text-xs rounded bg-slate-800 text-slate-300 hover:bg-slate-700">{tr("Cancel")}</button>
+              <button onClick={handleOpenDm} className="px-3 py-1.5 text-xs rounded bg-amber-600 text-slate-100 hover:bg-amber-500 font-medium">{tr("Open DM")}</button>
             </div>
           </div>
         </div>
@@ -1279,7 +1260,7 @@ function UnreadBadge({ count }: { count: number }) {
   return (
     <span
       className="ml-auto min-w-5 rounded-full bg-amber-500 px-1.5 py-0.5 text-center text-[9px] font-bold leading-none text-slate-950"
-      aria-label={`${count} unread message${count === 1 ? "" : "s"}`}
+      aria-label={tr('{count} unread messages', { count })}
     >
       {count > 99 ? "99+" : count}
     </span>
@@ -1290,7 +1271,7 @@ function Spinner({ label }: { label?: string }) {
   return (
     <div className="flex items-center gap-2 text-xs text-slate-400 py-2 px-1">
       <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-600 border-t-amber-400" />
-      {label && <span>{label}</span>}
+      {label && <span>{tr(label)}</span>}
     </div>
   );
 }
@@ -1315,7 +1296,7 @@ function LiveIndicator({ state, error }: { state: string; error?: string | null 
   return (
     <span className="inline-flex items-center gap-1 text-[10px] text-slate-400" title={error ?? undefined}>
       <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
-      {label}
+      {tr(label)}
     </span>
   );
 }
@@ -1389,7 +1370,7 @@ function MessageCard({
               <button
                 type="button"
                 onClick={() => onOpenDm(msg.pubkey)}
-                title={`Open direct message with ${displayName}`}
+                title={tr("Open direct message with {v0}", { v0: String(displayName) })}
                 className="block font-mono text-amber-400 hover:text-amber-200 hover:underline"
               >
                 {displayName}
@@ -1397,21 +1378,20 @@ function MessageCard({
             ) : (
               <span className="block font-mono text-amber-400">{displayName}</span>
             )}
-            <span className="block max-w-64 truncate font-mono text-[9px] text-slate-600" title={msg.pubkey}>
-              User ID: {msg.pubkey}
+            <span className="block max-w-64 truncate font-mono text-[9px] text-slate-600" title={msg.pubkey}>{tr("User ID: ")}{msg.pubkey}
             </span>
           </div>
-          <span>{new Date(msg.created_at * 1000).toLocaleTimeString()}</span>
+          <span>{new Date(msg.created_at * 1000).toLocaleTimeString(getIntlLocale())}</span>
         </div>
         <div className="text-xs text-slate-200 whitespace-pre-wrap break-words">{msg.content}</div>
         {!isRoot && (
           <div className="mt-1 flex items-center gap-3 text-[10px] text-slate-500">
             <button onClick={onOpenThread} className="hover:text-amber-400 transition-colors">
               {replyCount !== undefined && replyCount > 0
-                ? `💬 ${replyCount} repl${replyCount === 1 ? "y" : "ies"}`
+                ? tr(replyCount === 1 ? '💬 {count} reply' : '💬 {count} replies', { count: replyCount })
                 : hasReplyTag
-                  ? "↩ View thread"
-                  : "💬 Reply in thread"}
+                  ? tr("↩ View thread")
+                  : tr("💬 Reply in thread")}
             </button>
             {uniqueAuthors.length > 0 && (
               <span className="flex items-center -space-x-1.5">
@@ -1485,8 +1465,8 @@ function Composer({
                 setShowIconPicker(false);
               }}
               className="flex h-8 w-8 items-center justify-center rounded text-lg hover:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-400"
-              title={`Add ${icon}`}
-              aria-label={`Add ${icon}`}
+              title={tr("Add {v0}", { v0: String(icon) })}
+              aria-label={tr("Add {v0}", { v0: String(icon) })}
             >
               {icon}
             </button>
@@ -1502,8 +1482,8 @@ function Composer({
               ? "border-amber-500 bg-amber-500/15 text-amber-300"
               : "border-slate-700 bg-slate-800 text-slate-300 hover:border-amber-500 hover:text-amber-300"
           }`}
-          title="Choose an icon"
-          aria-label="Choose an icon"
+          title={tr("Choose an icon")}
+          aria-label={tr("Choose an icon")}
           aria-expanded={showIconPicker}
         >
           ☺
@@ -1517,9 +1497,7 @@ function Composer({
           onKeyDown={onKeyDown}
           className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
         />
-        <button type="submit" className="bg-amber-600 hover:bg-amber-500 text-slate-100 text-xs px-4 py-1.5 rounded font-medium transition-colors">
-          Send
-        </button>
+        <button type="submit" className="bg-amber-600 hover:bg-amber-500 text-slate-100 text-xs px-4 py-1.5 rounded font-medium transition-colors">{tr("Send")}</button>
       </form>
     </div>
   );

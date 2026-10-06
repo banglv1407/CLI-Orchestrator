@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr, useLocale } from '../i18n';
 import {
   useCallback,
   useEffect,
@@ -167,6 +168,7 @@ function removeTab(state: NotepadState, tabId: string): NotepadState {
 type Props = { onClose?: () => void };
 
 export function Notepad({ onClose }: Props) {
+  const locale = useLocale();
   const [state, setState] = useState<NotepadState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(true);
@@ -383,7 +385,7 @@ export function Notepad({ onClose }: Props) {
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <span className="text-sm text-slate-400">Loading notepad...</span>
+        <span className="text-sm text-slate-400">{tr("Loading notepad...")}</span>
       </div>
     );
   }
@@ -392,11 +394,9 @@ export function Notepad({ onClose }: Props) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <div className="rounded-lg border border-rose-500/40 bg-cyber-panel p-5 text-sm text-rose-300">
-          <p className="mb-3">Could not load Notepad.</p>
-          <p className="max-w-xl break-words font-mono text-xs text-slate-400">{error}</p>
-          <button type="button" onClick={onClose} className="mt-4 rounded border border-cyber-line px-3 py-1 text-xs">
-            Close
-          </button>
+          <p className="mb-3">{tr("Could not load Notepad.")}</p>
+          <p className="max-w-xl break-words font-mono text-xs text-slate-400">{trFeedback(error ?? '')}</p>
+          <button type="button" onClick={onClose} className="mt-4 rounded border border-cyber-line px-3 py-1 text-xs">{tr("Close")}</button>
         </div>
       </div>
     );
@@ -417,30 +417,28 @@ export function Notepad({ onClose }: Props) {
       <div className="flex h-[92vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-xl border border-cyber-line/50 bg-cyber-panel shadow-2xl">
         <div className="flex items-center justify-between border-b border-cyber-line/40 bg-cyber-base/70 px-5 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <h2 className="font-display text-sm uppercase tracking-widest text-cyber-neon">Notepad</h2>
+            <h2 className="font-display text-sm uppercase tracking-widest text-cyber-neon">{tr("Notepad")}</h2>
             <span className={`rounded-full px-2 py-0.5 text-xs ${
               saved ? 'bg-slate-500/10 text-slate-500' : 'bg-yellow-500/10 text-yellow-400'
             }`}>
-              {savingClose ? 'Saving…' : saved ? 'Saved' : 'Unsaved'}
+              {savingClose ? tr("Saving…") : saved ? tr("Saved") : tr("Unsaved")}
             </span>
-            {error && <span className="max-w-[260px] truncate text-xs text-red-400" title={error}>{error}</span>}
+            {error && <span className="max-w-[260px] truncate text-xs text-red-400" title={trFeedback(error ?? '')}>{trFeedback(error ?? '')}</span>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => updateActiveTab({ language: guessLanguage(activeTab.text) })}
-              title="Auto-detect language"
+              title={tr("Auto-detect language")}
               className="rounded border border-cyber-line px-2 py-1 text-xs text-slate-400 transition hover:border-cyan-400/30 hover:text-cyan-400"
-            >
-              Detect
-            </button>
+            >{tr("Detect")}</button>
             <select
               value={activeTab.language}
               onChange={(event) => updateActiveTab({ language: event.target.value })}
               className="rounded border border-cyber-line bg-cyber-base px-2 py-1 text-xs text-slate-300 outline-none focus:border-cyber-neon"
             >
               {LANGS.map((language) => (
-                <option key={language.id} value={language.id}>{language.label}</option>
+                <option key={language.id} value={language.id}>{tr(language.label)}</option>
               ))}
             </select>
             <button
@@ -449,9 +447,7 @@ export function Notepad({ onClose }: Props) {
                 text: prettyFormat(activeTab.text, activeTab.language),
               })}
               className="rounded border border-cyber-line px-2 py-1 text-xs text-slate-400 transition hover:border-green-400/30 hover:text-green-400"
-            >
-              Pretty
-            </button>
+            >{tr("Pretty")}</button>
             <button
               type="button"
               onClick={() => setShowPreview((current) => !current)}
@@ -461,7 +457,7 @@ export function Notepad({ onClose }: Props) {
                   : 'border-cyber-line text-slate-400 hover:text-slate-200'
               }`}
             >
-              {showPreview ? 'Edit' : 'Preview'}
+              {showPreview ? tr("Edit") : tr("Preview")}
             </button>
             <button
               type="button"
@@ -474,7 +470,7 @@ export function Notepad({ onClose }: Props) {
           </div>
         </div>
 
-        <div role="tablist" aria-label="Notepad tabs" className="flex shrink-0 items-end gap-1 overflow-x-auto border-b border-cyber-line/40 bg-[#070b16] px-3 pt-2 scrollbar-thin">
+        <div role="tablist" aria-label={tr("Notepad tabs")} className="flex shrink-0 items-end gap-1 overflow-x-auto border-b border-cyber-line/40 bg-[#070b16] px-3 pt-2 scrollbar-thin">
           {state.tabs.map((tab) => {
             const isActive = tab.id === state.activeTabId;
             return (
@@ -517,7 +513,7 @@ export function Notepad({ onClose }: Props) {
                       return next;
                     })}
                     onDoubleClick={() => beginRename(tab)}
-                    title={`${tab.title} — double-click to rename`}
+                    title={tr("{v0} — double-click to rename", { v0: String(tab.title) })}
                     className="min-w-[70px] max-w-[170px] truncate px-2 py-1.5 text-left text-xs"
                   >
                     {tab.title}
@@ -526,7 +522,7 @@ export function Notepad({ onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => requestTabClose(tab)}
-                  title={`Close ${tab.title}`}
+                  title={tr("Close {v0}", { v0: String(tab.title) })}
                   className="mr-1 rounded px-1 text-[10px] text-slate-500 hover:bg-rose-500/20 hover:text-rose-300"
                 >
                   ✕
@@ -537,7 +533,7 @@ export function Notepad({ onClose }: Props) {
           <button
             type="button"
             onClick={addTab}
-            title="New note tab"
+            title={tr("New note tab")}
             className="mb-1 shrink-0 rounded border border-cyber-line/50 px-2 py-1 text-xs text-slate-400 hover:border-cyber-neon/50 hover:text-cyber-neon"
           >
             +
@@ -563,7 +559,7 @@ export function Notepad({ onClose }: Props) {
                 className="absolute inset-0 h-full w-full resize-none overflow-auto border-none bg-transparent p-5 leading-relaxed outline-none scrollbar-thin"
                 style={{ color: 'transparent', caretColor: '#00ffcc' }}
                 spellCheck={false}
-                placeholder="Start typing..."
+                placeholder={tr("Start typing...")}
               />
               <div
                 key={`highlight-${activeTab.id}`}
@@ -578,36 +574,32 @@ export function Notepad({ onClose }: Props) {
 
         <div className="flex items-center justify-between border-t border-cyber-line/40 bg-cyber-base/50 px-4 py-1.5 text-[10px] text-slate-500">
           <span>
-            {activeTab.language.toUpperCase()} · {lineCount} lines · {activeTab.text.length} chars
-            <span className="ml-2 text-cyan-500">{state.tabs.length} tabs</span>
+            {activeTab.language.toUpperCase()} · {lineCount}{tr(" lines · ")}{activeTab.text.length}{tr(" chars")}<span className="ml-2 text-cyan-500">{state.tabs.length}{tr(" tabs")}</span>
           </span>
-          <span>Double-click tab to rename · Ctrl+Enter Preview · Tab Indent · Esc Close</span>
+          <span>{tr("Double-click tab to rename · Ctrl+Enter Preview · Tab Indent · Esc Close")}</span>
         </div>
       </div>
 
       {pendingCloseTab && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
           <div className="w-[420px] max-w-[90vw] rounded-xl border border-rose-500/40 bg-cyber-panel p-5 shadow-2xl">
-            <h3 className="font-display text-sm uppercase tracking-wider text-rose-300">Close note tab?</h3>
+            <h3 className="font-display text-sm uppercase tracking-wider text-rose-300">{tr("Close note tab?")}</h3>
             <p className="mt-3 text-xs leading-relaxed text-slate-300">
-              “{pendingCloseTab.title}” contains content. Closing it permanently removes that tab from Notepad.
-            </p>
+              “{pendingCloseTab.title}{tr("” contains content. Closing it permanently removes that tab from Notepad.")}</p>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmCloseId(null)}
                 disabled={savingClose}
                 className="rounded border border-cyber-line px-3 py-1.5 text-xs text-slate-300 disabled:opacity-50"
-              >
-                Cancel
-              </button>
+              >{tr("Cancel")}</button>
               <button
                 type="button"
                 onClick={() => void closeTab(pendingCloseTab.id, true)}
                 disabled={savingClose}
                 className="rounded border border-rose-500/60 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300 disabled:opacity-50"
               >
-                {savingClose ? 'Saving…' : 'Close tab'}
+                {savingClose ? tr("Saving…") : tr("Close tab")}
               </button>
             </div>
           </div>

@@ -1,7 +1,8 @@
+import { tFeedback as trFeedback, t as tr, useLocale } from '../i18n';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
-import { confirm } from '@tauri-apps/plugin-dialog';
+import { confirm, showMessage } from '../lib/dialogs';
 import { CliEditorModal } from '../components/CliEditorModal';
 import { CliStartModal } from '../components/CliStartModal';
 import { CliSidebar } from '../components/CliSidebar';
@@ -49,6 +50,7 @@ const DEFAULT_ASSISTANT_TEXT = 'Select a CLI and start an interactive session.';
 type AppTheme = 'cyberpunk' | 'kawaii' | 'light';
 
 export function Dashboard() {
+  const locale = useLocale();
   const [clis, setClis] = useState<CliDefinition[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [pendingSessions, setPendingSessions] = useState<SessionInfo[]>([]);
@@ -857,8 +859,8 @@ export function Dashboard() {
   const handleDeleteCli = useCallback(
     async (cli: CliDefinition) => {
       try {
-        const ok = await confirm(`Are you sure you want to delete the CLI "${cli.name}"?`, {
-          title: 'Delete CLI',
+        const ok = await confirm(tr("Are you sure you want to delete the CLI \"{v0}\"?", { v0: String(cli.name) }), {
+          title: tr("Delete CLI"),
           kind: 'warning',
         });
         if (!ok) return;
@@ -952,8 +954,8 @@ export function Dashboard() {
   const handleDeleteSshConnection = useCallback(
     async (connection: SshConnection) => {
       try {
-        const ok = await confirm(`Are you sure you want to delete the VM connection "${connection.name}"?`, {
-          title: 'Delete Connection',
+        const ok = await confirm(tr("Are you sure you want to delete the VM connection \"{v0}\"?", { v0: String(connection.name) }), {
+          title: tr("Delete Connection"),
           kind: 'warning',
         });
         if (!ok) return;
@@ -1051,7 +1053,7 @@ export function Dashboard() {
         theme={theme}
         setTheme={setTheme}
         assistantState={assistantState}
-        assistantText={assistantText}
+        assistantText={trFeedback(assistantText ?? '')}
         setAssistantState={setAssistantState}
         setAssistantText={setAssistantText}
         
@@ -1095,7 +1097,7 @@ export function Dashboard() {
           setFileContent={setFileContent}
           fileOriginalContent={fileOriginalContent}
           isSavingFile={isSavingFile}
-          fileLoadError={fileLoadError}
+          fileLoadError={trFeedback(fileLoadError ?? '')}
           isFileLoading={isFileLoading}
           viewMode={viewMode}
           setViewMode={setViewMode}
@@ -1173,11 +1175,11 @@ export function Dashboard() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-[420px] rounded-xl border border-cyber-neon/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none">
             <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-neon font-bold mb-4">
-              {newFileModal.type === 'directory' ? '📁 New Directory' : '📄 New File'}
+              {newFileModal.type === 'directory' ? tr("📁 New Directory") : tr("📄 New File")}
             </h2>
 
             <div className="mb-4">
-              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Location</label>
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">{tr("Location")}</label>
               <div className="rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[11px] text-slate-300 font-mono truncate">
                 {newFileModal.basePath}
               </div>
@@ -1185,7 +1187,7 @@ export function Dashboard() {
 
             <div className="mb-4">
               <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">
-                {newFileModal.type === 'directory' ? 'Directory Name' : 'File Name'}
+                {newFileModal.type === 'directory' ? tr("Directory Name") : tr("File Name")}
               </label>
               <input
                 type="text"
@@ -1195,7 +1197,7 @@ export function Dashboard() {
                   if (e.key === 'Enter') handleCreateFileOrDir();
                   if (e.key === 'Escape') setNewFileModal(null);
                 }}
-                placeholder={newFileModal.type === 'directory' ? 'e.g. my-folder' : 'e.g. config.json'}
+                placeholder={newFileModal.type === 'directory' ? tr("e.g. my-folder") : tr("e.g. config.json")}
                 className="w-full rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[12px] font-mono text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyber-electric transition"
                 autoFocus
               />
@@ -1203,13 +1205,12 @@ export function Dashboard() {
 
             {newFileModal.type === 'file' && (
               <div className="mb-4">
-                <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">
-                  Content <span className="text-slate-600">(optional)</span>
+                <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">{tr("Content ")}<span className="text-slate-600">{tr("(optional)")}</span>
                 </label>
                 <textarea
                   value={newFileContent}
                   onChange={(e) => setNewFileContent(e.target.value)}
-                  placeholder="File content..."
+                  placeholder={tr("File content...")}
                   rows={5}
                   className="w-full rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[12px] font-mono text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyber-electric transition resize-none"
                 />
@@ -1218,7 +1219,7 @@ export function Dashboard() {
 
             {newFileError && (
               <div className="mb-4 rounded border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-400 font-mono">
-                {newFileError}
+                {trFeedback(newFileError ?? '')}
               </div>
             )}
 
@@ -1227,17 +1228,13 @@ export function Dashboard() {
                 type="button"
                 onClick={() => setNewFileModal(null)}
                 className="rounded-lg border border-cyber-line px-4 py-2 text-[11px] font-semibold text-slate-400 hover:text-white hover:border-slate-500 transition"
-              >
-                Cancel
-              </button>
+              >{tr("Cancel")}</button>
               <button
                 type="button"
                 onClick={handleCreateFileOrDir}
                 disabled={!newFileName.trim()}
                 className="rounded-lg bg-cyber-neon/20 border border-cyber-neon/50 px-5 py-2 text-[11px] font-bold text-cyber-neon hover:bg-cyber-neon/30 transition disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                Create
-              </button>
+              >{tr("Create")}</button>
             </div>
           </div>
         </div>
@@ -1247,25 +1244,25 @@ export function Dashboard() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-[500px] rounded-xl border border-cyber-neon/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none">
             <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-neon font-bold mb-4">
-              {rewriteModal.type === 'suggest' ? '💻 AI Command Suggester' : '✨ AI Prompt Optimizer'}
+              {rewriteModal.type === 'suggest' ? tr("💻 AI Command Suggester") : tr("✨ AI Prompt Optimizer")}
             </h2>
 
             <div className="mb-4">
-              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Original Text</label>
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">{tr("Original Text")}</label>
               <div className="max-h-24 overflow-y-auto rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[11px] text-slate-400 font-mono whitespace-pre-wrap break-all">
                 {rewriteModal.originalText}
               </div>
             </div>
 
             <div className="mb-4">
-              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Optimized Result</label>
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">{tr("Optimized Result")}</label>
               {rewriteModal.loading ? (
                 <div className="flex flex-col items-center justify-center py-8 rounded border border-cyber-line bg-cyber-base/30 text-cyber-neon/80 text-xs font-mono">
                   <svg className="animate-spin h-5 w-5 mb-2 text-cyber-neon" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>Running built-in local inference...</span>
+                  <span>{tr("Running built-in local inference...")}</span>
                 </div>
               ) : rewriteModal.error ? (
                 <div className="rounded border border-red-500/30 bg-red-950/20 px-3 py-2 text-[11px] text-red-400 font-mono whitespace-pre-wrap break-all">
@@ -1288,12 +1285,10 @@ export function Dashboard() {
                     type="button"
                     onClick={() => {
                       void navigator.clipboard.writeText(rewriteModal.resultText);
-                      alert('Copied to clipboard!');
+                      void showMessage(tr("Copied to clipboard!"));
                     }}
                     className="rounded border border-cyber-line px-4 py-2 hover:bg-cyber-line/20 text-slate-300 transition uppercase"
-                  >
-                    📋 Copy
-                  </button>
+                  >{tr("📋 Copy")}</button>
                   {activeSessionId && (
                     <button
                       type="button"
@@ -1302,13 +1297,11 @@ export function Dashboard() {
                           await sendCliInput(activeSessionId, rewriteModal.resultText + '\n');
                           setRewriteModal(null);
                         } catch (e) {
-                          alert(`Failed to send to terminal: ${e}`);
+                          void showMessage(trFeedback("Failed to send to terminal: {v0}", { v0: String(e) }));
                         }
                       }}
                       className="rounded border border-cyber-neon/40 bg-cyber-neon/15 px-4 py-2 hover:bg-cyber-neon/25 text-cyber-neon transition uppercase font-bold"
-                    >
-                      ⚡ Run in Terminal
-                    </button>
+                    >{tr("⚡ Run in Terminal")}</button>
                   )}
                 </>
               )}
@@ -1316,9 +1309,7 @@ export function Dashboard() {
                 type="button"
                 onClick={() => setRewriteModal(null)}
                 className="rounded border border-cyber-line px-4 py-2 hover:bg-cyber-line/20 text-slate-300 transition uppercase"
-              >
-                Close
-              </button>
+              >{tr("Close")}</button>
             </div>
           </div>
         </div>

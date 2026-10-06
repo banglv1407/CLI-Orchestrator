@@ -1,4 +1,7 @@
+import { tFeedback as trFeedback, t as tr } from '../i18n';
 import React, { useState, useEffect } from 'react';
+import { LANGUAGES, setLanguage, t, useLocale, type Language } from '../i18n';
+import { confirm } from '../lib/dialogs';
 import { invoke } from '@tauri-apps/api/core';
 import type { AppTheme, BuiltinLlmConfig, BuiltinLlmStatus, LlmConfig } from '../types';
 import { petInstallPack, pickFolder } from '../lib/tauri';
@@ -8,6 +11,7 @@ import {
   getPetDiagnostics,
   getPetDefaultTuning,
   getPetEnabled,
+  getPetDisplayName,
   getRegisteredPets,
   refreshPetRegistry,
   resolvePetAssetUrl,
@@ -125,6 +129,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: string; desc: string
 ];
 
 export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
+  const locale = useLocale();
   const [activeSection, setActiveSection] = useState<SettingsSection>(() => {
     const saved = localStorage.getItem('ai-cli-settings-active-section');
     return (saved as SettingsSection) || 'appearance';
@@ -247,8 +252,8 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!message.includes('already installed')) throw error;
-        const replace = window.confirm(
-          'This pet pack is already installed. Replace it with the selected folder?',
+        const replace = await confirm(
+          tr("This pet pack is already installed. Replace it with the selected folder?"),
         );
         if (!replace) return;
         await petInstallPack(sourceDir, true);
@@ -445,8 +450,8 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
       {/* Settings title */}
       <div className="flex shrink-0 items-center justify-between border-b border-cyber-line/50 pb-4 mb-4">
         <div>
-          <h2 className="font-display text-base uppercase tracking-[0.2em] text-cyber-neon font-bold">Settings</h2>
-          <p className="text-[10px] text-slate-400 mt-0.5 font-mono">Category-based Configuration</p>
+          <h2 className="font-display text-base uppercase tracking-[0.2em] text-cyber-neon font-bold">{tr("Settings")}</h2>
+          <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{tr("Category-based Configuration")}</p>
         </div>
       </div>
 
@@ -469,8 +474,8 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
               >
                 <span className="text-base shrink-0">{sec.icon}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-xs font-display">{sec.label}</div>
-                  <div className={`text-[9px] truncate mt-0.5 ${isActive ? 'text-cyber-neon/80' : 'text-slate-500'}`}>{sec.desc}</div>
+                  <div className="font-semibold text-xs font-display">{tr(sec.label)}</div>
+                  <div className={`text-[9px] truncate mt-0.5 ${isActive ? 'text-cyber-neon/80' : 'text-slate-500'}`}>{tr(sec.desc)}</div>
                 </div>
               </button>
             );
@@ -479,7 +484,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
 
         {/* Top select (Narrow screens) */}
         <div className="block md:hidden shrink-0">
-          <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5 font-mono">Category</label>
+          <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5 font-mono">{tr("Category")}</label>
           <select
             value={activeSection}
             onChange={(e) => setActiveSection(e.target.value as SettingsSection)}
@@ -487,7 +492,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
           >
             {SECTIONS.map((sec) => (
               <option key={sec.id} value={sec.id}>
-                {sec.icon} {sec.label}
+                {sec.icon} {tr(sec.label)}
               </option>
             ))}
           </select>
@@ -498,13 +503,25 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
           {/* Appearance Section */}
           {activeSection === 'appearance' && (
             <div className="space-y-6">
+              <div className="space-y-3">
+                <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{t('Interface language')}</h3>
+                <label htmlFor="interface-language" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200">
+                  <div>
+                    <span className="font-semibold">{t('Language')}</span>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{t('Applies immediately and is remembered on this device.')}</p>
+                  </div>
+                  <select id="interface-language" value={locale} onChange={(event) => setLanguage(event.target.value as Language)} className="rounded border border-cyber-line bg-cyber-base px-3 py-1 font-semibold text-cyber-neon outline-none focus:border-cyber-neon cursor-pointer text-xs">
+                    {LANGUAGES.map((option) => <option key={option.code} value={option.code} lang={option.code}>{option.name}</option>)}
+                  </select>
+                </label>
+              </div>
               {/* Theme Settings */}
               <div className="space-y-3">
-                <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">Theme Settings</h3>
+                <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{tr("Theme Settings")}</h3>
                 <label className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200 transition hover:border-cyber-neon/80 cursor-pointer">
                   <div>
-                    <span className="font-semibold">App Theme</span>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Change overall visual styles</p>
+                    <span className="font-semibold">{tr("App Theme")}</span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{tr("Change overall visual styles")}</p>
                   </div>
                   <select
                     value={theme}
@@ -513,7 +530,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                   >
                     <option value="cyberpunk">Cyberpunk</option>
                     <option value="kawaii">Kawaii</option>
-                    <option value="light">Light</option>
+                    <option value="light">{tr("Light")}</option>
                   </select>
                 </label>
               </div>
@@ -521,24 +538,22 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
               {/* UI Scaling & Zoom */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-cyber-line/20 pb-2">
-                  <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 font-bold">Display & Scaling</h3>
+                  <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 font-bold">{tr("Display & Scaling")}</h3>
                   <span className="font-mono text-xs text-cyber-neon font-bold">{uiZoom}%</span>
                 </div>
 
                 <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-3 text-xs text-slate-200">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                      <span className="font-semibold">UI Scale / Zoom</span>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        Phóng to toàn bộ giao diện (chữ, thanh bên, biểu tượng, panel, popups).
-                      </p>
+                      <span className="font-semibold">{tr("UI Scale / Zoom")}</span>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{tr("Phóng to toàn bộ giao diện (chữ, thanh bên, biểu tượng, panel, popups).")}</p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={zoomOut}
-                        title="Thu nhỏ (Ctrl -)"
+                        title={tr("Thu nhỏ (Ctrl -)")}
                         className="rounded border border-cyber-line bg-cyber-panel px-2.5 py-1 text-xs font-bold text-slate-300 hover:text-cyber-neon hover:border-cyber-neon transition"
                       >
                         −
@@ -551,7 +566,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                       >
                         {UI_ZOOM_PRESETS.map((p) => (
                           <option key={p} value={p}>
-                            {p}% {p === 100 ? '(Mặc định)' : p === 115 ? '(Khuyên dùng)' : ''}
+                            {p}% {p === 100 ? tr("(Mặc định)") : p === 115 ? tr("(Khuyên dùng)") : ''}
                           </option>
                         ))}
                       </select>
@@ -559,7 +574,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                       <button
                         type="button"
                         onClick={zoomIn}
-                        title="Phóng to (Ctrl +)"
+                        title={tr("Phóng to (Ctrl +)")}
                         className="rounded border border-cyber-line bg-cyber-panel px-2.5 py-1 text-xs font-bold text-slate-300 hover:text-cyber-neon hover:border-cyber-neon transition"
                       >
                         +
@@ -569,7 +584,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                         <button
                           type="button"
                           onClick={resetZoom}
-                          title="Đặt lại 100% (Ctrl 0)"
+                          title={tr("Đặt lại 100% (Ctrl 0)")}
                           className="rounded border border-cyber-line/50 bg-cyber-base px-2 py-1 text-[10px] text-slate-400 hover:text-cyber-neon transition"
                         >
                           100%
@@ -578,18 +593,14 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                     </div>
                   </div>
 
-                  <p className="text-[10px] text-slate-500 font-mono">
-                    💡 Phím tắt nhanh: <kbd className="px-1 py-0.5 rounded bg-cyber-panel border border-cyber-line/60 text-slate-300">Ctrl +</kbd> để phóng to, <kbd className="px-1 py-0.5 rounded bg-cyber-panel border border-cyber-line/60 text-slate-300">Ctrl -</kbd> để thu nhỏ, <kbd className="px-1 py-0.5 rounded bg-cyber-panel border border-cyber-line/60 text-slate-300">Ctrl 0</kbd> để về 100%.
-                  </p>
+                  <p className="text-[10px] text-slate-500 font-mono">{tr("💡 Phím tắt nhanh: ")}<kbd className="px-1 py-0.5 rounded bg-cyber-panel border border-cyber-line/60 text-slate-300">Ctrl +</kbd>{tr(" để phóng to, ")}<kbd className="px-1 py-0.5 rounded bg-cyber-panel border border-cyber-line/60 text-slate-300">Ctrl -</kbd>{tr(" để thu nhỏ, ")}<kbd className="px-1 py-0.5 rounded bg-cyber-panel border border-cyber-line/60 text-slate-300">Ctrl 0</kbd>{tr(" để về 100%.")}</p>
                 </div>
 
                 {/* UI Font Family */}
                 <label className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200 transition hover:border-cyber-neon/80 cursor-pointer">
                   <div>
-                    <span className="font-semibold">UI Font Family (Phông chữ giao diện)</span>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Chọn font chuẩn (Segoe UI / Inter) giúp chữ dày dặn, to và dễ đọc hơn đáng kể.
-                    </p>
+                    <span className="font-semibold">{tr("UI Font Family (Phông chữ giao diện)")}</span>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{tr("Chọn font chuẩn (Segoe UI / Inter) giúp chữ dày dặn, to và dễ đọc hơn đáng kể.")}</p>
                   </div>
                   <select
                     value={uiFont}
@@ -598,7 +609,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                   >
                     {UI_FONT_OPTIONS.map((f) => (
                       <option key={f.id} value={f.fontFamily}>
-                        {f.name}
+                        {tr(f.name)}
                       </option>
                     ))}
                   </select>
@@ -608,14 +619,14 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
               {/* Terminal Font Settings */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-cyber-line/20 pb-2">
-                  <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 font-bold">Terminal Font Settings</h3>
+                  <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 font-bold">{tr("Terminal Font Settings")}</h3>
                   <span className="font-mono text-xs text-cyber-neon font-bold">{termFontSize}px</span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-2 text-xs text-slate-200">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">Terminal Font Size</span>
+                      <span className="font-semibold">{tr("Terminal Font Size")}</span>
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
@@ -631,7 +642,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                         >
                           {TERMINAL_FONT_SIZES.map((s) => (
                             <option key={s} value={s}>
-                              {s}px {s === 13 ? '(Mặc định)' : s === 15 ? '(Khuyên dùng)' : ''}
+                              {s}px {s === 13 ? tr("(Mặc định)") : s === 15 ? tr("(Khuyên dùng)") : ''}
                             </option>
                           ))}
                         </select>
@@ -644,14 +655,12 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                         </button>
                       </div>
                     </div>
-                    <p className="text-[10px] text-slate-500">
-                      Cỡ chữ cho tất cả terminal sessions (áp dụng ngay lập tức).
-                    </p>
+                    <p className="text-[10px] text-slate-500">{tr("Cỡ chữ cho tất cả terminal sessions (áp dụng ngay lập tức).")}</p>
                   </div>
 
                   <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-2 text-xs text-slate-200">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">Terminal Font</span>
+                      <span className="font-semibold">{tr("Terminal Font")}</span>
                       <select
                         value={termFontFamily}
                         onChange={(e) => setTerminalFontFamily(e.target.value)}
@@ -659,28 +668,24 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                       >
                         {TERMINAL_FONT_OPTIONS.map((f) => (
                           <option key={f.id} value={f.fontFamily}>
-                            {f.name}
+                            {tr(f.name)}
                           </option>
                         ))}
                       </select>
                     </div>
-                    <p className="text-[10px] text-slate-500">
-                      Phông chữ monospace hiển thị trong cửa sổ terminal.
-                    </p>
+                    <p className="text-[10px] text-slate-500">{tr("Phông chữ monospace hiển thị trong cửa sổ terminal.")}</p>
                   </div>
                 </div>
 
                 {/* Live Preview Card */}
                 <div className="rounded-lg border border-cyber-line/40 bg-cyber-base/60 p-3 space-y-2">
                   <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                    <span>Live Preview</span>
-                    <span className="text-cyber-neon font-semibold">Scale: {uiZoom}% | Term: {termFontSize}px</span>
+                    <span>{tr("Live Preview")}</span>
+                    <span className="text-cyber-neon font-semibold">{tr("Scale: ")}{uiZoom}{tr("% | Term: ")}{termFontSize}px</span>
                   </div>
                   <div className="space-y-1.5 p-3 rounded border border-cyber-line/30 bg-black/40">
                     <div className="text-xs text-slate-200 font-semibold flex items-center gap-2">
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-                      Giao diện CLX: Chữ rõ nét, kích thước hiển thị cân đối
-                    </div>
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>{tr("Giao diện CLX: Chữ rõ nét, kích thước hiển thị cân đối")}</div>
                     <div
                       style={{
                         fontFamily: termFontFamily,
@@ -690,8 +695,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                       className="p-2 rounded bg-black/60 border border-cyber-line/20 text-slate-300 font-mono overflow-x-auto"
                     >
                       <span className="text-emerald-400">user@clx</span>:<span className="text-cyan-400">~/app</span>$ bun run build && cargo check<br />
-                      <span className="text-slate-400">[info]</span> All modules compiled successfully (60 FPS, ready)
-                    </div>
+                      <span className="text-slate-400">[info]</span>{tr(" All modules compiled successfully (60 FPS, ready)")}</div>
                   </div>
                 </div>
               </div>
@@ -703,8 +707,8 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-cyber-line/20 pb-2">
                 <div>
-                  <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 font-bold">Animated Pets</h3>
-                  <p className="mt-1 text-[10px] text-slate-500">Built-in companions and private local pet packs</p>
+                  <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 font-bold">{tr("Animated Pets")}</h3>
+                  <p className="mt-1 text-[10px] text-slate-500">{tr("Built-in companions and private local pet packs")}</p>
                 </div>
                 <button
                   type="button"
@@ -712,12 +716,12 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                   disabled={petImporting}
                   className="rounded-lg border border-cyber-neon/60 bg-cyber-neon/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-cyber-neon transition hover:bg-cyber-neon/20 disabled:cursor-wait disabled:opacity-50"
                 >
-                  {petImporting ? 'Importing…' : 'Import Folder'}
+                  {petImporting ? tr("Importing…") : tr("Import Folder")}
                 </button>
               </div>
               {petImportError && (
                 <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-[11px] text-red-300">
-                  {petImportError}
+                  {trFeedback(petImportError ?? '')}
                 </div>
               )}
               {petDiagnostics.length > 0 && (
@@ -733,8 +737,8 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
               <div className="space-y-3">
                 <div className="flex items-center justify-between rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 text-xs text-slate-200">
                   <div>
-                    <span className="font-semibold">Enable Pet Overlay</span>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Show the selected animated pet across CLX</p>
+                    <span className="font-semibold">{tr("Enable Pet Overlay")}</span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{tr("Show the selected animated pet across CLX")}</p>
                   </div>
                   <button
                     type="button"
@@ -752,7 +756,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                 {petEnabled && selectedPet && (
                   <>
                   <div className="rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-4">
-                    <p className="text-xs text-slate-400 mb-3 font-semibold uppercase tracking-wider">Select Pet</p>
+                    <p className="text-xs text-slate-400 mb-3 font-semibold uppercase tracking-wider">{tr("Select Pet")}</p>
                     <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                       {pets.map((p) => (
                         <button
@@ -772,14 +776,14 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                           <div className="flex items-center gap-3">
                             <PetPickerThumbnail pet={p} />
                             <div className="min-w-0 flex-1">
-                              <div className="truncate font-semibold">{p.name}</div>
-                              <div className="mt-0.5 truncate text-[10px] text-slate-500">{p.nameVn || p.packName}</div>
+                              <div className="truncate font-semibold">{getPetDisplayName(p)}</div>
+                              <div className="mt-0.5 truncate text-[10px] text-slate-500">{p.source === 'local' ? p.packName : tr('Built-in companion')}</div>
                               <span className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider ${
                                 p.source === 'local'
                                   ? 'border-violet-400/40 bg-violet-400/10 text-violet-300'
                                   : 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
                               }`}>
-                                {p.source === 'local' ? 'Local Pack' : 'Built-in'}
+                                {p.source === 'local' ? tr("Local Pack") : tr("Built-in")}
                               </span>
                             </div>
                           </div>
@@ -790,21 +794,19 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                   <div className="space-y-4 rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">Pet Tuning</p>
-                        <p className="mt-1 text-[10px] text-slate-500">Saved separately for {selectedPet.name}; preview and live overlay update immediately.</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">{tr("Pet Tuning")}</p>
+                        <p className="mt-1 text-[10px] text-slate-500">{tr("Saved separately for ")}{getPetDisplayName(selectedPet)}{tr("; preview and live overlay update immediately.")}</p>
                       </div>
                       <button
                         type="button"
                         onClick={handleResetPetTuning}
                         disabled={!selectedPetHasTuning}
                         className="rounded border border-cyber-line/60 px-2.5 py-1 text-[10px] text-slate-300 transition hover:border-cyber-neon hover:text-cyber-neon disabled:cursor-not-allowed disabled:opacity-35"
-                      >
-                        Reset
-                      </button>
+                      >{tr("Reset")}</button>
                     </div>
                     <label className="block space-y-2">
                       <span className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        <span>Size</span>
+                        <span>{tr("Size")}</span>
                         <span className="font-mono text-cyber-neon">{selectedPet.displaySize}px</span>
                       </span>
                       <input
@@ -825,7 +827,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                     </label>
                     <label className="block space-y-2">
                       <span className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        <span>Speed</span>
+                        <span>{tr("Speed")}</span>
                         <span className="font-mono text-cyber-neon">{selectedPet.speedMultiplier.toFixed(1)}×</span>
                       </span>
                       <input
@@ -848,16 +850,14 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                   <div className="space-y-3 rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">Move Preview</p>
-                        <p className="mt-1 text-[10px] text-slate-500">Isolated 320×220 stage; the live overlay is not interrupted.</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">{tr("Move Preview")}</p>
+                        <p className="mt-1 text-[10px] text-slate-500">{tr("Isolated 320×220 stage; the live overlay is not interrupted.")}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setPreviewReplay((value) => value + 1)}
                         className="rounded border border-cyber-line/60 px-2 py-1 text-[10px] text-slate-300 transition hover:border-cyber-neon hover:text-cyber-neon"
-                      >
-                        Replay
-                      </button>
+                      >{tr("Replay")}</button>
                     </div>
                     <PetPreviewStage
                       pet={selectedPet}
@@ -887,7 +887,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                               : 'border-cyber-line/50 text-slate-400 hover:border-cyber-electric/70 hover:text-slate-200'
                           }`}
                         >
-                          {clipOption.label}
+                          {selectedPet.source === 'builtin' || ['idle', 'travel', 'blink'].includes(clipOption.id) ? tr(clipOption.label) : clipOption.label}
                         </button>
                       ))}
                     </div>
@@ -901,27 +901,25 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
           {/* Cloud AI Companion Section */}
           {activeSection === 'ai-companion' && (
             <div className="space-y-4">
-              <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">Cloud AI Companion</h3>
+              <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{tr("Cloud AI Companion")}</h3>
               <form onSubmit={handleSaveCompanionConfig} className="space-y-4 text-xs">
                 {companionStatusMsg && (
                   <div className="rounded border border-green-500/40 bg-green-950/20 p-3 text-green-300 font-semibold font-mono">
-                    ✓ {companionStatusMsg}
+                    ✓ {trFeedback(companionStatusMsg ?? '')}
                   </div>
                 )}
                 {companionErrorMsg && (
                   <div className="rounded border border-rose-500/40 bg-rose-950/20 p-3 text-rose-300 font-semibold font-mono">
-                    ⚠ {companionErrorMsg}
+                    ⚠ {trFeedback(companionErrorMsg ?? '')}
                   </div>
                 )}
 
                 <div>
-                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">
-                    API Base URL (OpenAI Compatible)
-                  </label>
+                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">{tr("API Base URL (OpenAI Compatible)")}</label>
                   <input
                     type="url"
                     required
-                    placeholder="e.g. https://api.openai.com/v1"
+                    placeholder={tr("e.g. https://api.openai.com/v1")}
                     value={llmConfig.baseUrl}
                     onChange={(e) => setLlmConfig({ ...llmConfig, baseUrl: e.target.value })}
                     className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-600 outline-none transition focus:border-cyber-neon"
@@ -930,25 +928,21 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">
-                      Model Name
-                    </label>
+                    <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">{tr("Model Name")}</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. gpt-4o-mini"
+                      placeholder={tr("e.g. gpt-4o-mini")}
                       value={llmConfig.model}
                       onChange={(e) => setLlmConfig({ ...llmConfig, model: e.target.value })}
                       className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-600 outline-none transition focus:border-cyber-neon"
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">
-                      API Key
-                    </label>
+                    <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">{tr("API Key")}</label>
                     <input
                       type="password"
-                      placeholder="Secret API Key"
+                      placeholder={tr("Secret API Key")}
                       value={llmConfig.apiKey}
                       onChange={(e) => setLlmConfig({ ...llmConfig, apiKey: e.target.value })}
                       className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-600 outline-none transition focus:border-cyber-neon"
@@ -957,12 +951,10 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                 </div>
 
                 <div>
-                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">
-                    Custom Headers (JSON Object)
-                  </label>
+                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">{tr("Custom Headers (JSON Object)")}</label>
                   <textarea
                     rows={3}
-                    placeholder='e.g. { "User-Agent": "Custom-Agent-Value" }'
+                    placeholder={tr("e.g. { \"User-Agent\": \"Custom-Agent-Value\" }")}
                     value={headersJson}
                     onChange={(e) => setHeadersJson(e.target.value)}
                     className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 font-mono text-[11px] text-slate-100 placeholder-slate-600 outline-none transition focus:border-cyber-neon resize-y"
@@ -970,12 +962,10 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                 </div>
 
                 <div>
-                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">
-                    System Prompt
-                  </label>
+                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 font-mono text-[10px]">{tr("System Prompt")}</label>
                   <textarea
                     rows={4}
-                    placeholder="System prompt to guide the AI assistant..."
+                    placeholder={tr("System prompt to guide the AI assistant...")}
                     value={llmConfig.systemPrompt}
                     onChange={(e) => setLlmConfig({ ...llmConfig, systemPrompt: e.target.value })}
                     className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-600 outline-none transition focus:border-cyber-neon resize-y"
@@ -993,17 +983,13 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                   <label
                     htmlFor="llm-stream"
                     className="font-semibold uppercase tracking-wider text-slate-300 cursor-pointer font-mono text-[10px]"
-                  >
-                    Enable Stream Mode (Server SSE)
-                  </label>
+                  >{tr("Enable Stream Mode (Server SSE)")}</label>
                 </div>
 
                 <button
                   type="submit"
                   className="rounded-lg bg-cyber-neon/20 border border-cyber-neon/50 px-5 py-2.5 font-bold uppercase tracking-wider text-cyber-neon hover:bg-cyber-neon/30 transition shadow-neon-sm"
-                >
-                  Save Configuration
-                </button>
+                >{tr("Save Configuration")}</button>
               </form>
             </div>
           )}
@@ -1011,12 +997,12 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
           {/* Local LLM Section */}
           {activeSection === 'local-llm' && (
             <div className="space-y-4">
-              <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">Built-in Local LLM</h3>
+              <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold">{tr("Built-in Local LLM")}</h3>
               <div className="space-y-4 rounded-lg border border-cyber-line/40 bg-cyber-base/20 p-4">
                 <label className="flex items-center justify-between text-xs text-slate-200 cursor-pointer">
                   <div>
-                    <span className="font-semibold">Enable local LLM fallback</span>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Use local model when cloud API fails</p>
+                    <span className="font-semibold">{tr("Enable local LLM fallback")}</span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{tr("Use local model when cloud API fails")}</p>
                   </div>
                   <button
                     type="button"
@@ -1031,19 +1017,17 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                   <div className="space-y-4 pt-4 border-t border-cyber-line/30 text-xs">
                     {/* Model Status */}
                     <div className="flex items-center justify-between font-mono">
-                      <span className="text-slate-400">Model Status:</span>
+                      <span className="text-slate-400">{tr("Model Status:")}</span>
                       <div className="flex items-center gap-2">
                         <span className={`font-bold uppercase ${builtinLlmStatus.loaded ? 'text-cyber-neon' : 'text-red-400'}`}>
-                          {builtinLlmStatus.loaded ? '🟢 Loaded' : '🔴 Unloaded'}
+                          {builtinLlmStatus.loaded ? tr("🟢 Loaded") : tr("🔴 Unloaded")}
                         </span>
                         {builtinLlmStatus.loaded ? (
                           <button
                             type="button"
                             onClick={handleUnloadBuiltinLlm}
                             className="rounded border border-red-500/40 bg-red-950/20 px-3 py-1 hover:bg-red-500/20 transition"
-                          >
-                            Unload
-                          </button>
+                          >{tr("Unload")}</button>
                         ) : (
                           <button
                             type="button"
@@ -1051,7 +1035,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                             onClick={handleLoadBuiltinLlm}
                             className="rounded border border-cyber-neon/40 bg-cyber-neon/15 px-3 py-1 text-cyber-neon hover:bg-cyber-neon/20 transition disabled:opacity-40"
                           >
-                            {isBuiltinLlmLoading ? 'Loading...' : 'Load Model'}
+                            {isBuiltinLlmLoading ? tr("Loading...") : tr("Load Model")}
                           </button>
                         )}
                       </div>
@@ -1059,24 +1043,24 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
 
                     {/* Inference Engine (Runtime) */}
                     <div className="space-y-1.5">
-                      <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Inference Engine</span>
+                      <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">{tr("Inference Engine")}</span>
                       <select
                         value={builtinLlmConfig.runtime || 'candle'}
                         onChange={(e) => handleUpdateBuiltinConfig({ runtime: e.target.value })}
                         className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-300 font-mono outline-none focus:border-cyber-neon cursor-pointer"
                       >
-                        <option value="candle">Candle (CPU - Lightweight, Standard Llama only)</option>
-                        <option value="llamacpp">Llama.cpp (Local server - GPU/AVX, GGUF models)</option>
+                        <option value="candle">{tr("Candle (CPU - Lightweight, Standard Llama only)")}</option>
+                        <option value="llamacpp">{tr("Llama.cpp (Local server - GPU/AVX, GGUF models)")}</option>
                       </select>
                     </div>
 
                     {/* GGUF Path */}
                     <div className="space-y-1.5">
-                      <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">GGUF Model Path</span>
+                      <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">{tr("GGUF Model Path")}</span>
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="Select .gguf model file..."
+                          placeholder={tr("Select .gguf model file...")}
                           value={builtinLlmConfig.modelPath || ''}
                           onChange={(e) => handleUpdateBuiltinConfig({ modelPath: e.target.value || null })}
                           className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-slate-300 font-mono outline-none focus:border-cyber-neon"
@@ -1085,20 +1069,18 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                           type="button"
                           onClick={handlePickBuiltinModel}
                           className="rounded border border-cyber-line px-3.5 py-1.5 text-slate-300 hover:bg-cyber-line/20 transition"
-                        >
-                          Browse
-                        </button>
+                        >{tr("Browse")}</button>
                       </div>
                     </div>
 
                     {builtinLlmConfig.runtime === 'llamacpp' && (
                       <>
                         <div className="space-y-1.5">
-                          <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Llama Server Executable Path (Optional)</span>
+                          <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">{tr("Llama Server Executable Path (Optional)")}</span>
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              placeholder="Defaults to 'llama-server' in your PATH..."
+                              placeholder={tr("Defaults to 'llama-server' in your PATH...")}
                               value={builtinLlmConfig.serverPath || ''}
                               onChange={(e) => handleUpdateBuiltinConfig({ serverPath: e.target.value || null })}
                               className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-slate-300 font-mono outline-none focus:border-cyber-neon"
@@ -1107,14 +1089,12 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                               type="button"
                               onClick={handlePickBuiltinServer}
                               className="rounded border border-cyber-line px-3.5 py-1.5 text-slate-300 hover:bg-cyber-line/20 transition"
-                            >
-                              Browse
-                            </button>
+                            >{tr("Browse")}</button>
                           </div>
                         </div>
 
                         <div className="space-y-1.5">
-                          <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Local Server Port</span>
+                          <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">{tr("Local Server Port")}</span>
                           <input
                             type="number"
                             placeholder="8080"
@@ -1128,11 +1108,11 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
 
                     {builtinLlmConfig.runtime !== 'llamacpp' && (
                       <div className="space-y-1.5">
-                        <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Tokenizer Path (Optional)</span>
+                        <span className="block text-slate-400 font-semibold uppercase tracking-wider text-[10px]">{tr("Tokenizer Path (Optional)")}</span>
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            placeholder="Defaults to tokenizer.json next to model..."
+                            placeholder={tr("Defaults to tokenizer.json next to model...")}
                             value={builtinLlmConfig.tokenizerPath || ''}
                             onChange={(e) => handleUpdateBuiltinConfig({ tokenizerPath: e.target.value || null })}
                             className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-slate-300 font-mono outline-none focus:border-cyber-neon"
@@ -1141,16 +1121,14 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                             type="button"
                             onClick={handlePickBuiltinTokenizer}
                             className="rounded border border-cyber-line px-3.5 py-1.5 text-slate-300 hover:bg-cyber-line/20 transition"
-                          >
-                            Browse
-                          </button>
+                          >{tr("Browse")}</button>
                         </div>
                       </div>
                     )}
 
                     <div className="grid grid-cols-2 gap-3 font-mono">
                       <label className="block space-y-1">
-                        <span className="text-slate-400 uppercase text-[9px]">Temp ({builtinLlmConfig.temperature})</span>
+                        <span className="text-slate-400 uppercase text-[9px]">{tr("Temp (")}{builtinLlmConfig.temperature})</span>
                         <input
                           type="range"
                           min="0.1"
@@ -1163,7 +1141,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-slate-400 uppercase text-[9px]">Max Tokens ({builtinLlmConfig.maxTokens})</span>
+                        <span className="text-slate-400 uppercase text-[9px]">{tr("Max Tokens (")}{builtinLlmConfig.maxTokens})</span>
                         <input
                           type="range"
                           min="64"
@@ -1188,12 +1166,10 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
             <div className="space-y-4">
               <div>
                 <h3 className="font-display text-sm uppercase tracking-wider text-slate-200 border-b border-cyber-line/20 pb-2 font-bold flex items-center justify-between">
-                  <span>Cấu hình Navigation & Hiển thị Feature</span>
-                  <span className="text-[10px] text-cyber-neon font-mono font-normal">Active Bar</span>
+                  <span>{tr("Cấu hình Navigation & Hiển thị Feature")}</span>
+                  <span className="text-[10px] text-cyber-neon font-mono font-normal">{tr("Active Bar")}</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                  Tùy chỉnh bật/tắt hiển thị các tính năng trên thanh Active Bar bên trái và sắp xếp thứ tự ưu tiên.
-                  Mặc định hệ thống chỉ hiển thị <strong className="text-amber-400 font-semibold">Terminal Orchestor</strong> và <strong className="text-amber-400 font-semibold">Agent Sessions</strong>.
+                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">{tr("Tùy chỉnh bật/tắt hiển thị các tính năng trên thanh Active Bar bên trái và sắp xếp thứ tự ưu tiên. Mặc định hệ thống chỉ hiển thị ")}<strong className="text-amber-400 font-semibold">{tr("Terminal Orchestor")}</strong>{tr(" và ")}<strong className="text-amber-400 font-semibold">{tr("Agent Sessions")}</strong>.
                 </p>
               </div>
               <SidebarOrderEditor />
@@ -1340,25 +1316,19 @@ function SidebarOrderEditor() {
   return (
     <div className="space-y-3 text-xs">
       <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-        <span className="font-medium">
-          Danh sách tính năng: <strong className="text-zinc-200">{visibleTabs.length}/{order.length}</strong> đang hiển thị
-        </span>
+        <span className="font-medium">{tr("Danh sách tính năng: ")}<strong className="text-zinc-200">{visibleTabs.length}/{order.length}</strong>{tr(" đang hiển thị")}</span>
         <div className="flex items-center gap-2 font-medium">
           <button
             type="button"
             onClick={showOnlyDefaults}
             className="text-amber-400 hover:text-amber-300 transition hover:underline cursor-pointer"
-          >
-            Chỉ hiện mặc định
-          </button>
+          >{tr("Chỉ hiện mặc định")}</button>
           <span className="text-zinc-600">•</span>
           <button
             type="button"
             onClick={showAll}
             className="text-cyber-neon hover:text-cyber-neon/80 transition hover:underline cursor-pointer"
-          >
-            Hiện tất cả
-          </button>
+          >{tr("Hiện tất cả")}</button>
         </div>
       </div>
 
@@ -1393,26 +1363,20 @@ function SidebarOrderEditor() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className={`font-semibold truncate ${isVisible ? 'text-zinc-100' : 'text-zinc-400'}`}>
-                    {info.label}
+                    {tr(info.label)}
                   </span>
                   {isPinned && (
-                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-zinc-800 text-zinc-400 border border-zinc-700">
-                      Cố định dưới
-                    </span>
+                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-zinc-800 text-zinc-400 border border-zinc-700">{tr("Cố định dưới")}</span>
                   )}
                   {tab === 'cli-manager' && (
-                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
-                      Mặc định
-                    </span>
+                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">{tr("Mặc định")}</span>
                   )}
                   {tab === 'agent-sessions' && (
-                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
-                      Mặc định
-                    </span>
+                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">{tr("Mặc định")}</span>
                   )}
                 </div>
                 {info.desc && (
-                  <p className="text-[10px] text-zinc-500 truncate mt-0.5">{info.desc}</p>
+                  <p className="text-[10px] text-zinc-500 truncate mt-0.5">{tr(info.desc)}</p>
                 )}
               </div>
 
@@ -1425,10 +1389,10 @@ function SidebarOrderEditor() {
                     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25 shadow-sm'
                     : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-zinc-200 hover:bg-zinc-700/60'
                 }`}
-                title={isVisible ? 'Nhấp để ẩn khỏi thanh Active Bar' : 'Nhấp để hiển thị trên thanh Active Bar'}
+                title={isVisible ? tr("Nhấp để ẩn khỏi thanh Active Bar") : tr("Nhấp để hiển thị trên thanh Active Bar")}
               >
                 <span>{isVisible ? '👁️' : '🙈'}</span>
-                <span>{isVisible ? 'Hiển thị' : 'Đã ẩn'}</span>
+                <span>{isVisible ? tr("Hiển thị") : tr("Đã ẩn")}</span>
               </button>
 
               {/* Reorder Buttons */}
@@ -1438,7 +1402,7 @@ function SidebarOrderEditor() {
                   onClick={() => moveUp(idx)}
                   disabled={!canMoveUp}
                   className="flex h-6 w-6 items-center justify-center rounded border border-cyber-line/50 hover:bg-cyber-neon/15 hover:text-cyber-neon disabled:opacity-20 disabled:cursor-not-allowed transition text-[10px] cursor-pointer"
-                  title="Di chuyển lên"
+                  title={tr("Di chuyển lên")}
                 >
                   ▲
                 </button>
@@ -1447,7 +1411,7 @@ function SidebarOrderEditor() {
                   onClick={() => moveDown(idx)}
                   disabled={!canMoveDown}
                   className="flex h-6 w-6 items-center justify-center rounded border border-cyber-line/50 hover:bg-cyber-neon/15 hover:text-cyber-neon disabled:opacity-20 disabled:cursor-not-allowed transition text-[10px] cursor-pointer"
-                  title="Di chuyển xuống"
+                  title={tr("Di chuyển xuống")}
                 >
                   ▼
                 </button>
@@ -1462,12 +1426,8 @@ function SidebarOrderEditor() {
           type="button"
           onClick={resetToDefault}
           className="rounded border border-cyber-line/50 px-3 py-1.5 text-[10px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition uppercase tracking-wider font-semibold cursor-pointer"
-        >
-          Reset to Default
-        </button>
-        <span className="text-[10px] text-zinc-500 font-mono">
-          Thanh Active Bar sẽ tự động cập nhật ngay khi thay đổi
-        </span>
+        >{tr("Reset to Default")}</button>
+        <span className="text-[10px] text-zinc-500 font-mono">{tr("Thanh Active Bar sẽ tự động cập nhật ngay khi thay đổi")}</span>
       </div>
     </div>
   );

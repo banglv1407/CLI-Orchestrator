@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import React, { useEffect, useState } from "react";
 import {
   DEFAULT_KEY_MAPPING,
@@ -112,8 +113,7 @@ export function NesKeyConfigModal({
         <div className="flex items-center justify-between border-b border-cyber-line/40 px-5 py-3.5">
           <div className="flex items-center gap-2">
             <span className="text-base">🎮</span>
-            <h3 className="font-display text-xs font-bold uppercase tracking-wider text-cyber-neon">
-              NES Controller Key Mapping ({role.toUpperCase()})
+            <h3 className="font-display text-xs font-bold uppercase tracking-wider text-cyber-neon">{tr("NES Controller Key Mapping (")}{tr(role.toUpperCase())})
             </h3>
           </div>
           <button
@@ -127,9 +127,7 @@ export function NesKeyConfigModal({
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          <p className="text-[11px] text-slate-400">
-            Click on a button row to bind a keyboard key. Press <kbd className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[10px] text-amber-400">ESC</kbd> to cancel binding. Standard Gamepads (Xbox / PlayStation / SNES USB) are also mapped automatically.
-          </p>
+          <p className="text-[11px] text-slate-400">{tr("Click on a button row to bind a keyboard key. Press ")}<kbd className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[10px] text-amber-400">ESC</kbd>{tr(" to cancel binding. Standard Gamepads (Xbox / PlayStation / SNES USB) are also mapped automatically.")}</p>
 
           <div className="space-y-2">
             {([...(Object.keys(KEY_LABELS) as BindableKey[]), ...(Object.keys(SNES_KEY_LABELS) as BindableKey[])]).map((btnKey) => {
@@ -157,15 +155,13 @@ export function NesKeyConfigModal({
                           isTurbo ? "text-amber-400 font-mono" : "text-slate-200 font-mono"
                         }`}
                       >
-                        {info.label}
+                        {tr(info.label)}
                       </span>
                       {isTurbo && (
-                        <span className="rounded bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-bold text-amber-300">
-                          TURBO
-                        </span>
+                        <span className="rounded bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-bold text-amber-300">{tr("TURBO")}</span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-500 truncate">{info.desc}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{tr(info.desc)}</p>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
@@ -175,7 +171,7 @@ export function NesKeyConfigModal({
                           key={k}
                           className="inline-flex items-center gap-1 rounded bg-slate-800 border border-slate-700 px-2 py-0.5 text-[10px] font-mono text-slate-200 group"
                         >
-                          <span>{k === " " ? "Space" : k}</span>
+                          <span>{k === " " ? tr("Space") : k}</span>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -183,14 +179,14 @@ export function NesKeyConfigModal({
                               removeKey(btnKey, k);
                             }}
                             className="text-slate-500 hover:text-rose-400 font-bold ml-0.5"
-                            title="Remove key"
+                            title={tr("Remove key")}
                           >
                             ×
                           </button>
                         </span>
                       ))}
                       {keys.length === 0 && (
-                        <span className="text-[10px] text-slate-600 italic">Unbound</span>
+                        <span className="text-[10px] text-slate-600 italic">{tr("Unbound")}</span>
                       )}
                     </div>
 
@@ -203,7 +199,7 @@ export function NesKeyConfigModal({
                           : "border border-cyber-line/60 bg-slate-800 text-slate-300 hover:text-white hover:border-cyber-neon/40"
                       }`}
                     >
-                      {isListening ? "Press key…" : "+ Bind"}
+                      {isListening ? tr("Press key…") : tr("+ Bind")}
                     </button>
                   </div>
                 </div>
@@ -218,24 +214,18 @@ export function NesKeyConfigModal({
             type="button"
             onClick={handleReset}
             className="rounded border border-cyber-line/40 px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:text-rose-300 hover:border-rose-500/40 transition"
-          >
-            Reset Default
-          </button>
+          >{tr("Reset Default")}</button>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
               className="rounded bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-300 hover:bg-slate-700 transition"
-            >
-              Cancel
-            </button>
+            >{tr("Cancel")}</button>
             <button
               type="button"
               onClick={handleSave}
               className="rounded bg-cyber-electric px-4 py-1.5 text-[11px] font-bold text-white hover:bg-cyber-electric/80 transition"
-            >
-              Save Key Mapping
-            </button>
+            >{tr("Save Key Mapping")}</button>
           </div>
         </div>
       </div>

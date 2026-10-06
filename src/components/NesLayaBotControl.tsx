@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import React, { useState, useEffect, useRef } from "react";
 import { NesLayaBot, LayaBotStatus } from "../lib/nes-laya-bot";
 
@@ -74,10 +75,10 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
             ? "border border-emerald-500/70 bg-emerald-500/20 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.3)] hover:bg-emerald-500/30"
             : "border border-cyber-line/40 bg-cyber-base/40 text-slate-400 hover:text-slate-200 hover:border-cyber-line/80"
         }`}
-        title={isEnabled ? "Tắt AI Bot tự chơi" : "Bật Laya AI Bot tự động chơi"}
+        title={isEnabled ? tr("Tắt AI Bot tự chơi") : tr("Bật Laya AI Bot tự động chơi")}
       >
         <span className="text-[12px]">🤖</span>
-        <span>AI Bot: {isEnabled ? "ON" : "OFF"}</span>
+        <span>{tr("AI Bot: ")}{isEnabled ? tr("ON") : tr("OFF")}</span>
         <span className="rounded bg-black/40 px-1 py-0.2 text-[9px] font-mono text-cyan-300">
           P{targetPlayer === 3 ? "1+2" : targetPlayer}
         </span>
@@ -86,7 +87,7 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
             className={`h-1.5 w-1.5 rounded-full ${
               isOnline ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
             }`}
-            title={isOnline ? "Laya Service Online" : "Laya Service Offline"}
+            title={isOnline ? tr("Laya Service Online") : tr("Laya Service Offline")}
           />
         )}
       </button>
@@ -95,9 +96,9 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
       {status?.profileTitle && (
         <span
           className="hidden md:inline-flex items-center rounded border border-cyber-line/40 bg-cyber-base/50 px-2 py-0.5 text-[10px] font-semibold text-cyber-neon"
-          title={`Game profile đang kích hoạt: ${status.profileTitle}`}
+          title={tr("Game profile đang kích hoạt: {v0}", { v0: tr(status.profileTitle) })}
         >
-          🎮 {status.profileTitle}
+          🎮 {tr(status.profileTitle)}
         </span>
       )}
 
@@ -119,7 +120,7 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
           setShowConfig((prev) => !prev);
         }}
         className="rounded border border-cyber-line/40 bg-cyber-base/40 p-1 text-[11px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition"
-        title="Cấu hình URL Laya Service & Game Profile"
+        title={tr("Cấu hình URL Laya Service & Game Profile")}
       >
         ⚙️
       </button>
@@ -131,9 +132,7 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
           className="absolute left-0 top-full mt-2 z-50 w-84 rounded-lg border border-cyber-line/60 bg-slate-900/95 p-3.5 shadow-xl backdrop-blur-md"
         >
           <div className="mb-2.5 flex items-center justify-between border-b border-cyber-line/30 pb-1.5">
-            <span className="text-[11px] font-bold text-cyber-neon tracking-wide uppercase">
-              Cấu hình Laya Bot
-            </span>
+            <span className="text-[11px] font-bold text-cyber-neon tracking-wide uppercase">{tr("Cấu hình Laya Bot")}</span>
             <div className="flex items-center gap-1 text-[10px]">
               <span
                 className={`h-2 w-2 rounded-full ${
@@ -141,7 +140,7 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
                 }`}
               />
               <span className={isOnline ? "text-emerald-400 font-semibold" : "text-rose-400"}>
-                {isOnline ? "Online" : "Offline"}
+                {isOnline ? tr("Online") : tr("Offline")}
               </span>
             </div>
           </div>
@@ -149,9 +148,7 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
           <div className="space-y-3">
             {/* Target Player (P1 Auto vs P2 Co-op vs Dual P1+P2) */}
             <div>
-              <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                Vai trò điều khiển (Target Slot)
-              </label>
+              <label className="block text-[10px] font-semibold text-slate-400 mb-1">{tr("Vai trò điều khiển (Target Slot)")}</label>
               <div className="grid grid-cols-3 gap-1">
                 <button
                   type="button"
@@ -161,10 +158,8 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
                       ? "border-cyber-neon bg-cyber-neon/15 text-cyber-neon shadow-[0_0_6px_rgba(6,182,212,0.3)]"
                       : "border-cyber-line/40 bg-black/40 text-slate-400 hover:text-slate-200"
                   }`}
-                  title="Bot tự chơi Player 1"
-                >
-                  🎮 P1 Auto
-                </button>
+                  title={tr("Bot tự chơi Player 1")}
+                >{tr("🎮 P1 Auto")}</button>
                 <button
                   type="button"
                   onClick={() => bot.setTargetPlayer(2)}
@@ -173,10 +168,8 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
                       ? "border-cyber-neon bg-cyber-neon/15 text-cyber-neon shadow-[0_0_6px_rgba(6,182,212,0.3)]"
                       : "border-cyber-line/40 bg-black/40 text-slate-400 hover:text-slate-200"
                   }`}
-                  title="Boss chơi P1, Bot tự lái P2 làm đồng đội"
-                >
-                  👥 P2 Co-op
-                </button>
+                  title={tr("Boss chơi P1, Bot tự lái P2 làm đồng đội")}
+                >{tr("👥 P2 Co-op")}</button>
                 <button
                   type="button"
                   onClick={() => bot.setTargetPlayer(3)}
@@ -185,25 +178,21 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
                       ? "border-cyber-neon bg-cyber-neon/15 text-cyber-neon shadow-[0_0_6px_rgba(6,182,212,0.3)]"
                       : "border-cyber-line/40 bg-black/40 text-slate-400 hover:text-slate-200"
                   }`}
-                  title="Bot tự lái CẢ HAI xe (Player 1 + Player 2)"
-                >
-                  ⚡ Cả P1+P2
-                </button>
+                  title={tr("Bot tự lái CẢ HAI xe (Player 1 + Player 2)")}
+                >{tr("⚡ Cả P1+P2")}</button>
               </div>
               <p className="mt-1 text-[9px] text-slate-500">
                 {targetPlayer === 1
-                  ? "Bot tự chơi P1. Nếu Boss bấm phím, hướng phím của Boss sẽ tự động ghi đè."
+                  ? tr("Bot tự chơi P1. Nếu Boss bấm phím, hướng phím của Boss sẽ tự động ghi đè.")
                   : targetPlayer === 2
-                  ? "Boss tự do điều khiển P1, Bot tự động lái P2 (hỗ trợ Contra, Jackal, Xe tăng...)."
-                  : "Bot tự động điều khiển CẢ HAI người chơi (P1 & P2) cùng phối hợp tác chiến!"}
+                  ? tr("Boss tự do điều khiển P1, Bot tự động lái P2 (hỗ trợ Contra, Jackal, Xe tăng...).")
+                  : tr("Bot tự động điều khiển CẢ HAI người chơi (P1 & P2) cùng phối hợp tác chiến!")}
               </p>
             </div>
 
             {/* Game Profile Selector */}
             <div>
-              <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                Game Profile (Tự động nhận diện ROM)
-              </label>
+              <label className="block text-[10px] font-semibold text-slate-400 mb-1">{tr("Game Profile (Tự động nhận diện ROM)")}</label>
               <select
                 value={status?.profileId ?? "generic"}
                 onChange={(e) => handleSelectProfile(e.target.value)}
@@ -211,7 +200,7 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
               >
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id} className="bg-slate-900 text-slate-200">
-                    {p.title}
+                    {tr(p.title)}
                   </option>
                 ))}
               </select>
@@ -219,9 +208,7 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
 
             {/* API URL */}
             <div>
-              <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                Laya Service URL
-              </label>
+              <label className="block text-[10px] font-semibold text-slate-400 mb-1">{tr("Laya Service URL")}</label>
               <input
                 type="text"
                 value={inputUrl}
@@ -240,7 +227,7 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
                 className="flex items-center justify-center gap-1.5 w-full rounded border border-cyber-neon/40 bg-cyber-neon/10 hover:bg-cyber-neon/20 px-2 py-1.5 text-[11px] font-bold text-cyber-neon transition"
               >
                 <span>📊</span>
-                <span>Mở Realtime Logs Dashboard (/logs)</span>
+                <span>{tr("Mở Realtime Logs Dashboard (/logs)")}</span>
               </a>
             </div>
 
@@ -251,15 +238,13 @@ export function NesLayaBotControl({ bot, romLoaded, disabled }: NesLayaBotContro
                 disabled={isPinging}
                 className="rounded bg-cyber-electric/90 hover:bg-cyber-electric px-3 py-1 text-[11px] font-bold text-white transition disabled:opacity-50"
               >
-                {isPinging ? "Đang test..." : "Lưu & Kiểm tra"}
+                {isPinging ? tr("Đang test...") : tr("Lưu & Kiểm tra")}
               </button>
               <button
                 type="button"
                 onClick={() => setShowConfig(false)}
                 className="text-[11px] text-slate-400 hover:text-slate-200"
-              >
-                Đóng
-              </button>
+              >{tr("Đóng")}</button>
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@
 // - Special Custom Config Files storage (Name, Path, Description)
 
 import type { SpecialConfigFile } from '../types';
+import { t } from '../i18n';
 
 export function isConfigFile(fileName: string): boolean {
   if (!fileName) return false;
@@ -126,14 +127,7 @@ export function formatConfigContent(
 
 const SPECIAL_CONFIGS_KEY = 'clx-special-config-files';
 
-export function loadSpecialConfigFiles(): SpecialConfigFile[] {
-  try {
-    const raw = localStorage.getItem(SPECIAL_CONFIGS_KEY);
-    if (raw) return JSON.parse(raw) as SpecialConfigFile[];
-  } catch {
-    // ignore
-  }
-  return [
+const DEFAULT_SPECIAL_CONFIGS: SpecialConfigFile[] = [
     {
       id: 'special-1',
       name: 'Docker Compose',
@@ -162,7 +156,26 @@ export function loadSpecialConfigFiles(): SpecialConfigFile[] {
       description: 'Cấu hình dependencies và npx scripts',
       group: 'Node.js',
     },
-  ];
+];
+
+export function loadSpecialConfigFiles(): SpecialConfigFile[] {
+  try {
+    const raw = localStorage.getItem(SPECIAL_CONFIGS_KEY);
+    if (raw) return JSON.parse(raw) as SpecialConfigFile[];
+  } catch {
+    // ignore
+  }
+  return DEFAULT_SPECIAL_CONFIGS.map((entry) => ({ ...entry }));
+}
+
+/** Translate bundled examples only; authored names/descriptions remain data. */
+export function getSpecialConfigDisplay(entry: SpecialConfigFile, field: 'name' | 'description' | 'group'): string {
+  const bundled = DEFAULT_SPECIAL_CONFIGS.find((item) => item.id === entry.id);
+  const unchanged = bundled && ['name', 'path', 'description', 'group'].every((key) => (
+    entry[key as keyof SpecialConfigFile] === bundled[key as keyof SpecialConfigFile]
+  ));
+  const value = entry[field] ?? '';
+  return unchanged ? t(value) : value;
 }
 
 export function saveSpecialConfigFile(entry: SpecialConfigFile): SpecialConfigFile[] {

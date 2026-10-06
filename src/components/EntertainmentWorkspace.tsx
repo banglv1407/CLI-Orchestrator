@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import React, { useState } from 'react';
 import { NesWorkspacePanel } from './NesWorkspacePanel';
 import { RogueWorkspacePanel } from './rogue/RogueWorkspacePanel';
@@ -18,9 +19,7 @@ export const EntertainmentWorkspace: React.FC<EntertainmentWorkspaceProps> = ({ 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">🕹️</span>
-            <span className="font-bold tracking-wide text-white uppercase text-xs font-mono">
-              Entertainment Hub
-            </span>
+            <span className="font-bold tracking-wide text-white uppercase text-xs font-mono">{tr("Entertainment Hub")}</span>
           </div>
 
           <div className="h-4 w-px bg-slate-800" />
@@ -36,10 +35,8 @@ export const EntertainmentWorkspace: React.FC<EntertainmentWorkspaceProps> = ({ 
               }`}
             >
               <span>🤖</span>
-              <span>Rogue Node (AI Outpost)</span>
-              <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[9px] font-mono text-emerald-300 border border-emerald-500/30">
-                HOT
-              </span>
+              <span>{tr("Rogue Node (AI Outpost)")}</span>
+              <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[9px] font-mono text-emerald-300 border border-emerald-500/30">{tr("HOT")}</span>
             </button>
 
             <button
@@ -51,7 +48,7 @@ export const EntertainmentWorkspace: React.FC<EntertainmentWorkspaceProps> = ({ 
               }`}
             >
               <span>🎮</span>
-              <span>NES Retro Multiplayer</span>
+              <span>{tr("NES Retro Multiplayer")}</span>
             </button>
           </nav>
         </div>
@@ -59,7 +56,7 @@ export const EntertainmentWorkspace: React.FC<EntertainmentWorkspaceProps> = ({ 
         <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
           <div className="flex items-center gap-1.5 rounded-full bg-slate-800/60 px-2.5 py-0.5 border border-slate-700/50">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Online Services Ready</span>
+            <span>{tr("Online Services Ready")}</span>
           </div>
         </div>
       </header>

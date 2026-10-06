@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import type {
   PetAnimationClip,
   PetMoveDefinition,
@@ -21,6 +22,10 @@ export interface MythicalPet {
   glowColor: string;
   animations: Record<string, PetAnimationClip>;
   moves: PetMoveDefinition[];
+}
+
+export function getPetDisplayName(pet: MythicalPet): string {
+  return pet.source === 'builtin' ? tr(pet.name) : pet.name;
 }
 
 export interface PetTuning {

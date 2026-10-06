@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import { useState } from 'react';
 import { downloadSshFile, uploadSshFile } from '../lib/tauri';
 import { save } from '@tauri-apps/plugin-dialog';
@@ -66,7 +67,7 @@ export function SshFileTransferDialog({
   return (
     <div className="ssh-transfer-overlay" onClick={onClose}>
       <div className="ssh-transfer-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{mode === 'upload' ? '📤 Upload to Server' : '⬇️ Download from Server'}</h3>
+        <h3>{mode === 'upload' ? tr("📤 Upload to Server") : tr("⬇️ Download from Server")}</h3>
         <div className="ssh-transfer-host">🌐 {connection.host}</div>
 
         {mode === 'upload' && files && (
@@ -81,7 +82,7 @@ export function SshFileTransferDialog({
                 </div>
               ))}
             </div>
-            <label className="ssh-transfer-label">Remote destination:</label>
+            <label className="ssh-transfer-label">{tr("Remote destination:")}</label>
             <input
               className="ssh-transfer-input"
               value={targetDir}
@@ -102,7 +103,7 @@ export function SshFileTransferDialog({
             <div className="ssh-transfer-progress-bar">
               <div className="ssh-transfer-progress-fill indeterminate" />
             </div>
-            <span>Transferring...</span>
+            <span>{tr("Transferring...")}</span>
           </div>
         )}
 
@@ -111,19 +112,17 @@ export function SshFileTransferDialog({
         )}
 
         {status === 'done' && (
-          <div className="ssh-transfer-success">✅ Transfer complete!</div>
+          <div className="ssh-transfer-success">{tr("✅ Transfer complete!")}</div>
         )}
 
         <div className="ssh-transfer-actions">
-          <button className="ssh-transfer-btn cancel" onClick={onClose}>
-            Cancel
-          </button>
+          <button className="ssh-transfer-btn cancel" onClick={onClose}>{tr("Cancel")}</button>
           <button
             className="ssh-transfer-btn primary"
             onClick={handleTransfer}
             disabled={status === 'transferring' || status === 'done'}
           >
-            {mode === 'upload' ? 'Upload' : 'Download'}
+            {mode === 'upload' ? tr("Upload") : tr("Download")}
           </button>
         </div>
       </div>

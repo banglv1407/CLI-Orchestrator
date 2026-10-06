@@ -1,3 +1,4 @@
+import { t as tr } from '../../i18n';
 import React from 'react';
 import { Player } from './types';
 
@@ -42,15 +43,13 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             isEngineerWin ? 'text-cyan-400' : 'text-rose-400'
           }`}
         >
-          {isEngineerWin ? 'VICTORY // CORE SECURED' : 'DEFEAT // STATION BREACHED'}
+          {isEngineerWin ? tr("VICTORY // CORE SECURED") : tr("DEFEAT // STATION BREACHED")}
         </h2>
-        <p className="mt-2 text-xs text-slate-300 max-w-md">{summary}</p>
+        <p className="mt-2 text-xs text-slate-300 max-w-md">{tr(summary ?? '')}</p>
 
         {/* Rogues Reveal list */}
         <div className="mt-6 w-full rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
-          <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
-            Identified Infiltrators
-          </span>
+          <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">{tr("Identified Infiltrators")}</span>
           <div className="mt-3 flex justify-center gap-3">
             {players
               .filter((p) => p.role === 'rogue_agent')
@@ -79,9 +78,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               ? 'bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/25'
               : 'bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-500/25'
           }`}
-        >
-          RETURN TO LOBBY
-        </button>
+        >{tr("RETURN TO LOBBY")}</button>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr, getIntlLocale } from '../i18n';
 import { useEffect, useState } from 'react';
 import type { CliDefinition } from '../types';
 import { loadRecents, recentKey, RECENTS_CHANGED, type RecentTerminal } from '../lib/terminal-recents';
@@ -19,24 +20,24 @@ export function RecentTerminals({ clis, onOpen }: {
     };
   }, []);
   return <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-    <p className="text-[11px] text-slate-400">Recent CLI & folders · newest first</p>
-    {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
-    {items.length === 0 && <p className="text-xs text-slate-500 py-4">No recent terminals yet. Start a CLI in a folder to see it here.</p>}
+    <p className="text-[11px] text-slate-400">{tr("Recent CLI & folders · newest first")}</p>
+    {error && <p role="alert" className="text-xs text-red-400">{trFeedback(error ?? '')}</p>}
+    {items.length === 0 && <p className="text-xs text-slate-500 py-4">{tr("No recent terminals yet. Start a CLI in a folder to see it here.")}</p>}
     {items.map(item => {
       const key = recentKey(item);
       const available = item.cliName === 'Quick - shell' || clis.some(cli => cli.name === item.cliName);
       return <button key={key} type="button" disabled={!available || opening !== null}
-        title={available ? `Open ${item.cliName} in ${item.workingDir}` : 'CLI is no longer available'}
+        title={available ? tr("Open {v0} in {v1}", { v0: String(item.cliName), v1: String(item.workingDir) }) : tr("CLI is no longer available")}
         onClick={async () => {
           setOpening(key); setError('');
           try { await onOpen(item); } catch (error) { setError(String(error)); }
           finally { setOpening(null); }
         }}
         className="w-full text-left rounded border border-cyber-line bg-cyber-base/30 p-2.5 hover:border-cyber-electric focus-visible:outline focus-visible:outline-cyber-electric disabled:opacity-50 disabled:cursor-not-allowed">
-        <div className="text-xs font-semibold text-cyber-electric truncate">{item.cliName}{opening === key ? ' · Opening...' : ''}</div>
+        <div className="text-xs font-semibold text-cyber-electric truncate">{item.cliName}{opening === key ? tr(" · Opening...") : ''}</div>
         <div className="text-[11px] text-slate-300 break-all mt-1">{item.workingDir}</div>
         <div className="text-[10px] text-slate-500 mt-1">
-          {available ? new Date(item.lastUsed).toLocaleString() : 'CLI unavailable'}
+          {available ? new Date(item.lastUsed).toLocaleString(getIntlLocale()) : tr("CLI unavailable")}
         </div>
       </button>;
     })}

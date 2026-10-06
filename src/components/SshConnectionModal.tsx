@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import { useState, useEffect, useRef } from 'react';
 import type { SshConnection } from '../types';
 import { pickFile, pickFolder } from '../lib/tauri';
@@ -164,7 +165,7 @@ export function SshConnectionModal({
       >
         <header className="mb-4 flex items-center justify-between border-b border-cyber-line pb-3">
           <h2 className="font-display text-base font-bold uppercase tracking-[0.15em] text-cyber-electric">
-            {connection ? 'Edit VM Connection' : 'Add VM Connection'}
+            {connection ? tr("Edit VM Connection") : tr("Add VM Connection")}
           </h2>
           <button 
             type="button" 
@@ -184,9 +185,7 @@ export function SshConnectionModal({
 
           {/* Protocol Toggle (SSH / RDP) */}
           <div>
-            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-2">
-              Protocol / Giao thức
-            </label>
+            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-2">{tr("Protocol / Giao thức")}</label>
             <div className="flex rounded-lg bg-cyber-base/60 p-1 border border-cyber-line/50">
               <button
                 type="button"
@@ -196,9 +195,7 @@ export function SshConnectionModal({
                     ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
-              >
-                📟 SSH (Terminal)
-              </button>
+              >{tr("📟 SSH (Terminal)")}</button>
               <button
                 type="button"
                 onClick={() => handleProtocolChange('rdp')}
@@ -207,36 +204,30 @@ export function SshConnectionModal({
                     ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
-              >
-                💻 RDP (Remote Desktop)
-              </button>
+              >{tr("💻 RDP (Remote Desktop)")}</button>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                Connection Name *
-              </label>
+              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Connection Name *")}</label>
               <input
                 type="text"
                 required
-                placeholder="e.g. AWS Staging"
+                placeholder={tr("e.g. AWS Staging")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric"
               />
             </div>
             <div>
-              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                Group / Category *
-              </label>
+              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Group / Category *")}</label>
               {showNewGroupInput ? (
                 <div className="flex gap-1.5">
                   <input
                     type="text"
                     required
-                    placeholder="New Group Name"
+                    placeholder={tr("New Group Name")}
                     value={newGroupInput}
                     onChange={(e) => setNewGroupInput(e.target.value)}
                     className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric"
@@ -245,9 +236,7 @@ export function SshConnectionModal({
                     type="button"
                     onClick={() => setShowNewGroupInput(false)}
                     className="rounded border border-cyber-line px-2 text-slate-300 hover:text-white"
-                  >
-                    Select
-                  </button>
+                  >{tr("Select")}</button>
                 </div>
               ) : (
                 <div className="flex gap-1.5">
@@ -257,7 +246,7 @@ export function SshConnectionModal({
                     className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 outline-none transition focus:border-cyber-electric font-semibold"
                   >
                     {existingGroups.length === 0 ? (
-                      <option value="Default">Default</option>
+                      <option value="Default">{tr("Default")}</option>
                     ) : (
                       existingGroups.map((g) => (
                         <option key={g} value={g}>{g}</option>
@@ -268,9 +257,7 @@ export function SshConnectionModal({
                     type="button"
                     onClick={() => setShowNewGroupInput(true)}
                     className="rounded border border-cyber-electric/40 px-2 py-0.5 text-cyber-electric hover:bg-cyber-electric/10 transition"
-                  >
-                    + New
-                  </button>
+                  >{tr("+ New")}</button>
                 </div>
               )}
             </div>
@@ -278,22 +265,18 @@ export function SshConnectionModal({
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                Host / IP Address *
-              </label>
+              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Host / IP Address *")}</label>
               <input
                 type="text"
                 required
-                placeholder="e.g. 192.168.1.100 or example.com"
+                placeholder={tr("e.g. 192.168.1.100 or example.com")}
                 value={host}
                 onChange={(e) => setHost(e.target.value)}
                 className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric"
               />
             </div>
             <div>
-              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                Port *
-              </label>
+              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Port *")}</label>
               <input
                 type="number"
                 required
@@ -308,13 +291,11 @@ export function SshConnectionModal({
           </div>
 
           <div>
-            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-              Username *
-            </label>
+            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Username *")}</label>
             <input
               type="text"
               required
-              placeholder={protocol === 'ssh' ? 'e.g. root or ubuntu' : 'e.g. Administrator'}
+              placeholder={protocol === 'ssh' ? tr("e.g. root or ubuntu") : tr("e.g. Administrator")}
               value={user}
               onChange={(e) => setUser(e.target.value)}
               className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric"
@@ -325,9 +306,7 @@ export function SshConnectionModal({
           {protocol === 'ssh' && (
             <>
               <div>
-                <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                  Authentication Method
-                </label>
+                <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-2">{tr("Authentication Method")}</label>
                 <div className="flex rounded-lg bg-cyber-base/60 p-1 border border-cyber-line/50">
                   <button
                     type="button"
@@ -337,9 +316,7 @@ export function SshConnectionModal({
                         ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
-                  >
-                    Password
-                  </button>
+                  >{tr("Password")}</button>
                   <button
                     type="button"
                     onClick={() => setAuthMode('key')}
@@ -348,21 +325,17 @@ export function SshConnectionModal({
                         ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
-                  >
-                    Private Key
-                  </button>
+                  >{tr("Private Key")}</button>
                 </div>
               </div>
 
               {authMode === 'password' ? (
                 <div>
-                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                    Password (Optional)
-                  </label>
+                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Password (Optional)")}</label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Password for VM"
+                      placeholder={tr("Password for VM")}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-10 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric"
@@ -372,20 +345,18 @@ export function SshConnectionModal({
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white transition"
                     >
-                      {showPassword ? 'Hide' : 'Show'}
+                      {showPassword ? tr("Hide") : tr("Show")}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                    Private Key Path *
-                  </label>
+                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Private Key Path *")}</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       required
-                      placeholder="e.g. C:\Users\july1\.ssh\id_rsa"
+                      placeholder={tr("e.g. C:\\Users\\july1\\.ssh\\id_rsa")}
                       value={keyPath}
                       onChange={(e) => setKeyPath(e.target.value)}
                       className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric font-mono text-[11px]"
@@ -394,22 +365,18 @@ export function SshConnectionModal({
                       type="button"
                       onClick={handleBrowseKey}
                       className="rounded border border-cyber-electric bg-cyber-electric/15 px-3 py-2 font-bold uppercase tracking-wider text-cyber-electric transition hover:bg-cyber-electric/25"
-                    >
-                      Browse
-                    </button>
+                    >{tr("Browse")}</button>
                   </div>
                 </div>
               )}
 
               {/* Workspace Directory mapping */}
               <div className="mt-3">
-                <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 text-[10px]">
-                  Local Workspace Folder (Optional)
-                </label>
+                <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1 text-[10px]">{tr("Local Workspace Folder (Optional)")}</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="e.g. C:\Projects\MyProject (mapped local directory)"
+                    placeholder={tr("e.g. C:\\Projects\\MyProject (mapped local directory)")}
                     value={workingDir}
                     onChange={(e) => setWorkingDir(e.target.value)}
                     className="flex-1 rounded border border-cyber-line bg-cyber-base px-3 py-1.5 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-xs font-mono"
@@ -418,9 +385,7 @@ export function SshConnectionModal({
                     type="button"
                     onClick={handleBrowseFolder}
                     className="rounded border border-cyber-electric bg-cyber-electric/15 px-3 py-1.5 font-bold uppercase tracking-wider text-cyber-electric transition hover:bg-cyber-electric/25 text-[10px]"
-                  >
-                    Browse
-                  </button>
+                  >{tr("Browse")}</button>
                 </div>
               </div>
             </>
@@ -430,13 +395,11 @@ export function SshConnectionModal({
           {protocol === 'rdp' && (
             <>
               <div>
-                <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                  Password (Optional)
-                </label>
+                <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Password (Optional)")}</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Saved login password"
+                    placeholder={tr("Saved login password")}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-10 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-electric"
@@ -446,25 +409,23 @@ export function SshConnectionModal({
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white transition"
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {showPassword ? tr("Hide") : tr("Show")}
                   </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                    RDP Resolution
-                  </label>
+                  <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("RDP Resolution")}</label>
                   <select
                     value={rdpResolution}
                     onChange={(e) => setRdpResolution(e.target.value as any)}
                     className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 outline-none transition focus:border-cyber-electric font-semibold"
                   >
-                    <option value="fullscreen">🖥 Fullscreen</option>
+                    <option value="fullscreen">{tr("🖥 Fullscreen")}</option>
                     <option value="1080p">📺 1080p (1920x1080)</option>
                     <option value="720p">📺 720p (1280x720)</option>
-                    <option value="custom">📺 Custom Default</option>
+                    <option value="custom">{tr("📺 Custom Default")}</option>
                   </select>
                 </div>
 
@@ -477,9 +438,7 @@ export function SshConnectionModal({
                       onChange={(e) => setRdpShareClipboard(e.target.checked)}
                       className="h-3.5 w-3.5 rounded border-cyber-line bg-cyber-base text-cyber-electric outline-none focus:ring-0 focus:ring-offset-0 cursor-pointer"
                     />
-                    <label htmlFor="rdp-clipboard" className="font-semibold text-slate-300 cursor-pointer text-[10px] uppercase">
-                      Share Clipboard
-                    </label>
+                    <label htmlFor="rdp-clipboard" className="font-semibold text-slate-300 cursor-pointer text-[10px] uppercase">{tr("Share Clipboard")}</label>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -489,9 +448,7 @@ export function SshConnectionModal({
                       onChange={(e) => setRdpShareDrives(e.target.checked)}
                       className="h-3.5 w-3.5 rounded border-cyber-line bg-cyber-base text-cyber-electric outline-none focus:ring-0 focus:ring-offset-0 cursor-pointer"
                     />
-                    <label htmlFor="rdp-drives" className="font-semibold text-slate-300 cursor-pointer text-[10px] uppercase">
-                      Share Local Drives
-                    </label>
+                    <label htmlFor="rdp-drives" className="font-semibold text-slate-300 cursor-pointer text-[10px] uppercase">{tr("Share Local Drives")}</label>
                   </div>
                 </div>
               </div>
@@ -503,15 +460,11 @@ export function SshConnectionModal({
               type="button"
               onClick={onClose}
               className="rounded border border-cyber-line px-4 py-2 font-bold uppercase tracking-wider text-slate-300 hover:bg-cyber-line/20 transition"
-            >
-              Cancel
-            </button>
+            >{tr("Cancel")}</button>
             <button
               type="submit"
               className="rounded border border-cyber-electric bg-cyber-electric/15 px-5 py-2 font-bold uppercase tracking-wider text-cyber-electric hover:bg-cyber-electric/25 transition shadow-neon-blue-sm"
-            >
-              Save Connection
-            </button>
+            >{tr("Save Connection")}</button>
           </footer>
         </form>
       </div>

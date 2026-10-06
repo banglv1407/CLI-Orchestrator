@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr } from '../i18n';
 import { useCallback, useEffect, useState } from 'react';
 import { getSystemLogs } from '../lib/tauri';
 import type { SystemLogEntry } from '../types';
@@ -49,23 +50,19 @@ export function SystemLogPanel() {
       {/* Header */}
       <div className="flex items-center justify-between p-6 pb-4">
         <div>
-          <h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">System Logs</h2>
-          <p className="text-xs text-slate-400 mt-1">CLX application runtime logs</p>
+          <h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">{tr("System Logs")}</h2>
+          <p className="text-xs text-slate-400 mt-1">{tr("CLX application runtime logs")}</p>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
-            <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} className="accent-cyber-neon" />
-            Auto-refresh
-          </label>
-          <button onClick={refresh} className="px-3 py-1.5 text-xs text-cyber-neon border border-cyber-neon/30 rounded hover:bg-cyber-neon/10 transition uppercase tracking-wider">
-            Refresh
-          </button>
+            <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} className="accent-cyber-neon" />{tr("Auto-refresh")}</label>
+          <button onClick={refresh} className="px-3 py-1.5 text-xs text-cyber-neon border border-cyber-neon/30 rounded hover:bg-cyber-neon/10 transition uppercase tracking-wider">{tr("Refresh")}</button>
         </div>
       </div>
 
       {error && (
         <div className="mx-6 mb-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
-          {error} <button onClick={() => setError(null)} className="ml-2 underline text-xs">Dismiss</button>
+          {trFeedback(error ?? '')} <button onClick={() => setError(null)} className="ml-2 underline text-xs">{tr("Dismiss")}</button>
         </div>
       )}
 
@@ -75,7 +72,7 @@ export function SystemLogPanel() {
           type="text"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter logs..."
+          placeholder={tr("Filter logs...")}
           className="w-full bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"
         />
       </div>
@@ -85,17 +82,17 @@ export function SystemLogPanel() {
         <table className="w-full text-xs font-mono">
           <thead className="sticky top-0 bg-cyber-panel">
             <tr className="text-slate-400 uppercase tracking-wider border-b border-cyber-line/50">
-              <th className="text-left px-2 py-2 w-[140px]">Timestamp</th>
-              <th className="text-left px-2 py-2 w-16">Level</th>
-              <th className="text-left px-2 py-2 w-28">Source</th>
-              <th className="text-left px-2 py-2">Message</th>
+              <th className="text-left px-2 py-2 w-[140px]">{tr("Timestamp")}</th>
+              <th className="text-left px-2 py-2 w-16">{tr("Level")}</th>
+              <th className="text-left px-2 py-2 w-28">{tr("Source")}</th>
+              <th className="text-left px-2 py-2">{tr("Message")}</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={4} className="text-center py-12 text-slate-500">
-                  {logs.length === 0 ? 'No logs yet.' : 'No matching entries.'}
+                  {logs.length === 0 ? tr("No logs yet.") : tr("No matching entries.")}
                 </td>
               </tr>
             ) : (

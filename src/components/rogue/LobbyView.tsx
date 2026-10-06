@@ -1,3 +1,4 @@
+import { t as tr } from '../../i18n';
 import React, { useState } from 'react';
 import { Player } from './types';
 
@@ -49,16 +50,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold font-mono uppercase tracking-wider text-white">
-                  Rogue Node // Quantum Outpost
-                </h1>
-                <span className="rounded-full bg-cyan-500/20 px-2.5 py-0.5 text-[10px] font-mono text-cyan-300 border border-cyan-500/40">
-                  LOBBY
-                </span>
+                <h1 className="text-xl font-bold font-mono uppercase tracking-wider text-white">{tr("Rogue Node // Quantum Outpost")}</h1>
+                <span className="rounded-full bg-cyan-500/20 px-2.5 py-0.5 text-[10px] font-mono text-cyan-300 border border-cyan-500/40">{tr("LOBBY")}</span>
               </div>
-              <p className="text-xs text-slate-400 font-mono mt-1">
-                Room Code: <span className="text-cyan-400 font-bold">{roomId}</span> (Encrypted by Nostr NIP-98)
-              </p>
+              <p className="text-xs text-slate-400 font-mono mt-1">{tr("Room Code: ")}<span className="text-cyan-400 font-bold">{roomId}</span>{tr(" (Encrypted by Nostr NIP-98)")}</p>
             </div>
           </div>
 
@@ -68,7 +63,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-mono font-semibold text-slate-200 hover:border-cyan-500 hover:text-white transition-all shadow-md"
             >
               <span>{copied ? '✓' : '🔗'}</span>
-              <span>{copied ? 'Invite Copied!' : 'Copy Buzz Invite'}</span>
+              <span>{copied ? tr("Invite Copied!") : tr("Copy Buzz Invite")}</span>
             </button>
 
             <button
@@ -76,7 +71,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/25 hover:from-emerald-400 hover:to-teal-500 transition-all hover:scale-105"
             >
               <span>🚀</span>
-              <span>START MISSION</span>
+              <span>{tr("START MISSION")}</span>
             </button>
           </div>
         </header>
@@ -85,9 +80,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
         <div className="grid grid-cols-12 gap-8 flex-1 min-h-0">
           {/* Left: Customization Panel */}
           <div className="col-span-5 flex flex-col gap-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-6">
-            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
-              Android Operator Config
-            </h2>
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">{tr("Android Operator Config")}</h2>
 
             {/* Operator Avatar Preview */}
             <div className="flex items-center gap-4 rounded-xl bg-slate-900/80 p-4 border border-slate-800">
@@ -100,14 +93,14 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               <div>
                 <span className="text-sm font-bold text-white">{localPlayer.name}</span>
                 <p className="text-[11px] font-mono text-cyan-400">
-                  {localPlayer.role === 'rogue_agent' ? '⚔️ Rogue Agent' : '🔧 System Engineer'}
+                  {localPlayer.role === 'rogue_agent' ? tr("⚔️ Rogue Agent") : tr("🔧 System Engineer")}
                 </p>
               </div>
             </div>
 
             {/* Name Input */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-mono text-slate-400">Callsign / Identity Name</label>
+              <label className="text-xs font-mono text-slate-400">{tr("Callsign / Identity Name")}</label>
               <input
                 type="text"
                 value={localPlayer.name}
@@ -118,7 +111,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
             {/* Color Selection Palette */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-mono text-slate-400">Chassis Color Matrix</label>
+              <label className="text-xs font-mono text-slate-400">{tr("Chassis Color Matrix")}</label>
               <div className="grid grid-cols-4 gap-2.5">
                 {COLOR_PALETTE.map((c) => (
                   <button
@@ -130,7 +123,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                         ? 'border-white ring-2 ring-cyan-400 scale-105 shadow-md'
                         : 'border-transparent opacity-80 hover:opacity-100'
                     }`}
-                    title={c.label}
+                    title={tr(c.label)}
                   />
                 ))}
               </div>
@@ -138,7 +131,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
             {/* Role Switcher (For Sandbox / Testing) */}
             <div className="flex flex-col gap-2 mt-auto">
-              <label className="text-xs font-mono text-slate-400">Test Role Override</label>
+              <label className="text-xs font-mono text-slate-400">{tr("Test Role Override")}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => onUpdateRole('system_engineer')}
@@ -147,9 +140,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                       ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50'
                       : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
                   }`}
-                >
-                  🔧 Engineer
-                </button>
+                >{tr("🔧 Engineer")}</button>
                 <button
                   onClick={() => onUpdateRole('rogue_agent')}
                   className={`rounded-xl py-2 text-xs font-semibold border transition-all ${
@@ -157,9 +148,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                       ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
                       : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
                   }`}
-                >
-                  ⚔️ Rogue
-                </button>
+                >{tr("⚔️ Rogue")}</button>
               </div>
             </div>
           </div>
@@ -167,10 +156,9 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           {/* Right: Connected Crew Members (20 Max) */}
           <div className="col-span-7 flex flex-col rounded-2xl border border-slate-800 bg-slate-950/60 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
-                Connected Crew ({players.length}/20)
+              <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">{tr("Connected Crew (")}{players.length}/20)
               </h2>
-              <span className="text-xs font-mono text-emerald-400">● Mesh Synchronized</span>
+              <span className="text-xs font-mono text-emerald-400">{tr("● Mesh Synchronized")}</span>
             </div>
 
             {/* Players List Grid */}
@@ -190,12 +178,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-white">{p.name}</span>
                       {p.id === localPlayer.id && (
-                        <span className="rounded bg-cyan-500/20 px-1 py-0.2 text-[9px] font-mono text-cyan-300 border border-cyan-500/30">
-                          YOU
-                        </span>
+                        <span className="rounded bg-cyan-500/20 px-1 py-0.2 text-[9px] font-mono text-cyan-300 border border-cyan-500/30">{tr("YOU")}</span>
                       )}
                     </div>
-                    <span className="text-[10px] font-mono text-slate-500">READY TO LAUNCH</span>
+                    <span className="text-[10px] font-mono text-slate-500">{tr("READY TO LAUNCH")}</span>
                   </div>
                 </div>
               ))}
@@ -203,9 +189,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
             {/* Instruction Footer */}
             <footer className="mt-4 rounded-xl bg-slate-900/50 border border-slate-800/60 p-3 text-center">
-              <p className="text-[11px] text-slate-400">
-                Controls: <kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-cyan-400 font-mono">WASD</kbd> or <kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-cyan-400 font-mono">ARROWS</kbd> to move · <kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-amber-400 font-mono">[E]</kbd> Tasks & Vents · <kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-rose-400 font-mono">[Q]</kbd> Kill · <kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-rose-400 font-mono">[R]</kbd> Report/Meeting
-              </p>
+              <p className="text-[11px] text-slate-400">{tr("Controls: ")}<kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-cyan-400 font-mono">WASD</kbd>{tr(" or ")}<kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-cyan-400 font-mono">{tr("ARROWS")}</kbd>{tr(" to move · ")}<kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-amber-400 font-mono">[E]</kbd>{tr(" Tasks & Vents · ")}<kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-rose-400 font-mono">[Q]</kbd>{tr(" Kill · ")}<kbd className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-rose-400 font-mono">[R]</kbd>{tr(" Report/Meeting")}</p>
             </footer>
           </div>
         </div>

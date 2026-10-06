@@ -1,3 +1,5 @@
+import { tFeedback as trFeedback, t as tr, useLocale } from '../i18n';
+import { showMessage } from '../lib/dialogs';
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
@@ -311,6 +313,7 @@ export function TerminalPanel({
   contextMenu,
   setContextMenu,
 }: TerminalPanelProps) {
+  const locale = useLocale();
   const uiActive = useUiActive();
   // Search state
   const [searchVisible, setSearchVisible] = useState(false);
@@ -821,7 +824,7 @@ export function TerminalPanel({
               phase: environment.eligible ? 'input' : 'error',
               environment,
               environmentOverride: getDefaultEnvironmentOverride(environment),
-              error: environment.eligible ? null : environment.reason ?? 'Unsupported session',
+              error: environment.eligible ? null : trFeedback(environment.reason ?? 'Unsupported session'),
             };
             terminalCommandPopupRef.current = next;
             return next;
@@ -1274,7 +1277,7 @@ export function TerminalPanel({
     const session = sessions.find((s) => s.id === visibleSessionId);
     if (!session || !session.workingDir) return;
 
-    const newTag = window.prompt('Enter project tag name:', session.projectTag || '');
+    const newTag = window.prompt(tr('Enter project tag name:'), session.projectTag || '');
     if (newTag === null) return;
 
     const trimmed = newTag.trim();
@@ -2166,9 +2169,7 @@ export function TerminalPanel({
   return (
     <section className="flex h-full w-full rounded-xl border border-cyber-line bg-cyber-panel/70 overflow-hidden relative">
       {sessions.length === 0 && !openedFile && activeMainView === 'terminal' ? (
-        <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
-          No interactive sessions. Create one from the sidebar.
-        </div>
+        <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">{tr("No interactive sessions. Create one from the sidebar.")}</div>
       ) : (
         <div className="flex h-full w-full overflow-hidden select-none">
           {/* Main active terminal center panel */}
@@ -2229,20 +2230,20 @@ export function TerminalPanel({
                       if (e.key === 'Enter') { e.preventDefault(); doSearch(searchQuery, e.shiftKey ? 'prev' : 'next'); }
                       if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
                     }}
-                    placeholder="Search terminal… (Enter=next, Shift+Enter=prev)"
+                    placeholder={tr("Search terminal… (Enter=next, Shift+Enter=prev)")}
                     className="flex-1 bg-transparent text-cyber-text text-[12px] font-mono outline-none placeholder:text-cyber-muted/50 caret-cyber-accent"
                     style={{ minWidth: 0 }}
                   />
                   {searchResultCount !== null && (
                     <span className={`text-[10px] font-mono shrink-0 ${searchResultCount === 0 ? 'text-cyber-warn' : 'text-cyber-neon'}`}>
-                      {searchResultCount === 0 ? 'No match' : '✓ Found'}
+                      {searchResultCount === 0 ? tr("No match") : tr("✓ Found")}
                     </span>
                   )}
                   <div className="flex items-center gap-0.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => doSearch(searchQuery, 'prev')}
-                      title="Previous match (Shift+Enter)"
+                      title={tr("Previous match (Shift+Enter)")}
                       className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-accent hover:bg-cyber-accent/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-accent/50"
                     >
                       ↑
@@ -2250,7 +2251,7 @@ export function TerminalPanel({
                     <button
                       type="button"
                       onClick={() => doSearch(searchQuery, 'next')}
-                      title="Next match (Enter)"
+                      title={tr("Next match (Enter)")}
                       className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-accent hover:bg-cyber-accent/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-accent/50"
                     >
                       ↓
@@ -2258,7 +2259,7 @@ export function TerminalPanel({
                     <button
                       type="button"
                       onClick={closeSearch}
-                      title="Close (Esc)"
+                      title={tr("Close (Esc)")}
                       className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-warn hover:bg-cyber-warn/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-warn/50 ml-0.5"
                     >
                       ✕
@@ -2319,13 +2320,12 @@ export function TerminalPanel({
                   className="absolute bottom-4 left-4 z-50 flex flex-col w-96 max-h-60 rounded-xl border border-cyber-neon/60 bg-[#0a0f1f]/95 shadow-2xl shadow-cyber-neon/15 backdrop-blur-sm select-none font-mono text-[11px] overflow-hidden animate-slide-up"
                 >
                   <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/50 bg-[#0d1527]">
-                    <span className="text-cyber-neon text-[10px] font-bold tracking-wider">
-                      ⚡ MENTION FILE/FOLDER <span className="text-[9px] text-cyber-neon/70 font-normal ml-1">(Ctrl+Alt+2)</span>
+                    <span className="text-cyber-neon text-[10px] font-bold tracking-wider">{tr("⚡ MENTION FILE/FOLDER ")}<span className="text-[9px] text-cyber-neon/70 font-normal ml-1">(Ctrl+Alt+2)</span>
                     </span>
                     {fileIndexLoading ? (
-                      <span className="text-[10px] text-cyber-electric animate-pulse">Indexing...</span>
+                      <span className="text-[10px] text-cyber-electric animate-pulse">{tr("Indexing...")}</span>
                     ) : (
-                      <span className="text-[9px] text-slate-500">{mentionResults.length} matches</span>
+                      <span className="text-[9px] text-slate-500">{mentionResults.length}{tr(" matches")}</span>
                     )}
                   </div>
 
@@ -2356,7 +2356,7 @@ export function TerminalPanel({
                           closeMention();
                         }
                       }}
-                      placeholder="type to search..."
+                      placeholder={tr("type to search...")}
                       className="flex-1 bg-transparent text-cyber-text text-xs outline-none caret-cyber-neon"
                     />
                   </div>
@@ -2364,7 +2364,7 @@ export function TerminalPanel({
                   <div ref={mentionListRef} className="flex-1 overflow-y-auto scrollbar-thin p-1 max-h-40">
                     {mentionResults.length === 0 ? (
                       <div className="p-3 text-center text-slate-500 italic text-[10px]">
-                        {fileIndexLoading ? 'Loading directory files...' : 'No files or folders found'}
+                        {fileIndexLoading ? tr("Loading directory files...") : tr("No files or folders found")}
                       </div>
                     ) : (
                       mentionResults.map((item, index) => {
@@ -2399,9 +2399,9 @@ export function TerminalPanel({
                   </div>
 
                   <div className="px-3 py-1.5 border-t border-cyber-line/30 bg-[#0d1527] flex items-center justify-between text-[9px] text-slate-500">
-                    <span>↑↓ Navigate</span>
-                    <span>⏎ Select</span>
-                    <span>Esc Close</span>
+                    <span>{tr("↑↓ Navigate")}</span>
+                    <span>{tr("⏎ Select")}</span>
+                    <span>{tr("Esc Close")}</span>
                   </div>
                 </div>
               )}
@@ -2412,13 +2412,12 @@ export function TerminalPanel({
                   className="absolute bottom-4 left-4 z-50 flex flex-col w-96 max-h-60 rounded-xl border border-cyber-electric/60 bg-[#0a0f1f]/95 shadow-2xl shadow-cyber-electric/15 backdrop-blur-sm select-none font-mono text-[11px] overflow-hidden animate-slide-up"
                 >
                   <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/50 bg-[#0c162b]">
-                    <span className="text-cyber-electric text-[10px] font-bold tracking-wider">
-                      🔍 RIPGREP SEARCH <span className="text-[9px] text-cyber-electric/70 font-normal ml-1">(Ctrl+Alt+1)</span>
+                    <span className="text-cyber-electric text-[10px] font-bold tracking-wider">{tr("🔍 RIPGREP SEARCH ")}<span className="text-[9px] text-cyber-electric/70 font-normal ml-1">(Ctrl+Alt+1)</span>
                     </span>
                     {rgLoading ? (
-                      <span className="text-[10px] text-cyber-electric animate-pulse">Searching...</span>
+                      <span className="text-[10px] text-cyber-electric animate-pulse">{tr("Searching...")}</span>
                     ) : (
-                      <span className="text-[9px] text-slate-500">{rgResults.length} matches</span>
+                      <span className="text-[9px] text-slate-500">{rgResults.length}{tr(" matches")}</span>
                     )}
                   </div>
 
@@ -2449,7 +2448,7 @@ export function TerminalPanel({
                           closeRg();
                         }
                       }}
-                      placeholder="text to find inside files..."
+                      placeholder={tr("text to find inside files...")}
                       className="flex-1 bg-transparent text-cyber-text text-xs outline-none caret-cyber-electric"
                     />
                   </div>
@@ -2457,7 +2456,7 @@ export function TerminalPanel({
                   <div ref={rgListRef} className="flex-1 overflow-y-auto scrollbar-thin p-1 max-h-40">
                     {rgResults.length === 0 ? (
                       <div className="p-3 text-center text-slate-500 italic text-[10px]">
-                        {rgLoading ? 'Searching file contents...' : 'Type something to search inside files'}
+                        {rgLoading ? tr("Searching file contents...") : tr("Type something to search inside files")}
                       </div>
                     ) : (
                       rgResults.map((item, index) => {
@@ -2482,7 +2481,7 @@ export function TerminalPanel({
                               </span>
                             </div>
                             <span className="text-[10px] truncate text-slate-200 font-mono pl-1 border-l border-slate-700/50 italic">
-                              {item.content || '(empty line)'}
+                              {item.content || tr("(empty line)")}
                             </span>
                           </div>
                         );
@@ -2491,9 +2490,9 @@ export function TerminalPanel({
                   </div>
 
                   <div className="px-3 py-1.5 border-t border-cyber-line/30 bg-[#0c162b] flex items-center justify-between text-[9px] text-slate-500">
-                    <span>↑↓ Navigate</span>
-                    <span>⏎ Select</span>
-                    <span>Esc Close</span>
+                    <span>{tr("↑↓ Navigate")}</span>
+                    <span>{tr("⏎ Select")}</span>
+                    <span>{tr("Esc Close")}</span>
                   </div>
                 </div>
               )}
@@ -2561,7 +2560,7 @@ export function TerminalPanel({
                   <div className="ssh-drag-overlay">
                     <div className="ssh-drag-content">
                       <span className="ssh-drag-icon">📤</span>
-                      <span>Drop files to upload to server</span>
+                      <span>{tr("Drop files to upload to server")}</span>
                     </div>
                   </div>
                 )}
@@ -2603,15 +2602,13 @@ export function TerminalPanel({
                           ({openedFile.path})
                         </span>
                         {fileDirty && (
-                          <span className="ml-1 h-2 w-2 shrink-0 rounded-full bg-cyber-warn animate-pulse shadow-neon-sm" title="Unsaved changes" />
+                          <span className="ml-1 h-2 w-2 shrink-0 rounded-full bg-cyber-warn animate-pulse shadow-neon-sm" title={tr("Unsaved changes")} />
                         )}
 
                         {/* Syntax Validation Status Badge */}
                         {isConfigFile(openedFile.name) && (
                           fileValidation.valid ? (
-                            <span className="ml-2 rounded bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/30 font-mono">
-                              ✓ Valid Syntax
-                            </span>
+                            <span className="ml-2 rounded bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/30 font-mono">{tr("✓ Valid Syntax")}</span>
                           ) : (
                             <span className="ml-2 rounded bg-rose-500/15 px-2 py-0.5 text-[9px] font-bold text-rose-400 border border-rose-500/40 font-mono truncate max-w-[250px]" title={fileValidation.error}>
                               ⚠️ {fileValidation.error}
@@ -2630,9 +2627,7 @@ export function TerminalPanel({
                                   ? 'bg-cyber-neon/15 text-cyber-neon shadow-neon-sm'
                                   : 'text-slate-400 hover:text-slate-200'
                               }`}
-                            >
-                              Diff
-                            </button>
+                            >{tr("Diff")}</button>
                             <button
                               type="button"
                               onClick={() => setViewMode('edit')}
@@ -2641,9 +2636,7 @@ export function TerminalPanel({
                                   ? 'bg-cyber-electric/15 text-cyber-electric shadow-neon-blue-sm'
                                   : 'text-slate-400 hover:text-slate-200'
                               }`}
-                            >
-                              Edit
-                            </button>
+                            >{tr("Edit")}</button>
                           </div>
                         )}
                       </div>
@@ -2656,26 +2649,22 @@ export function TerminalPanel({
                             onClick={() => {
                               const res = formatConfigContent(openedFile.name, fileContent);
                               if (res.error) {
-                                alert(res.error);
+                                void showMessage(trFeedback(res.error));
                               } else if (res.changed) {
                                 setFileContent(res.formatted);
                               }
                             }}
-                            title="Format & clean indentation (JSON/YAML/TOML)"
+                            title={tr("Format & clean indentation (JSON/YAML/TOML)")}
                             className="rounded border border-cyber-electric/50 px-2 py-1 text-[10px] font-bold uppercase text-cyber-electric transition hover:bg-cyber-electric/10 font-mono"
-                          >
-                            ⚡ Format
-                          </button>
+                          >{tr("⚡ Format")}</button>
                         )}
                         {viewMode === 'edit' && fileDirty && (
                           <button
                             type="button"
                             onClick={() => setFileContent(fileOriginalContent)}
-                            title="Revert changes"
+                            title={tr("Revert changes")}
                             className="rounded border border-cyber-warn/50 px-2 py-1 text-[10px] font-bold uppercase text-cyber-warn transition hover:bg-cyber-warn/10 font-mono"
-                          >
-                            Revert
-                          </button>
+                          >{tr("Revert")}</button>
                         )}
                         {viewMode === 'edit' && (
                           <>
@@ -2683,10 +2672,10 @@ export function TerminalPanel({
                               type="button"
                               onClick={onSaveFile}
                               disabled={!fileDirty || isSavingFile}
-                              title="Save file (Ctrl+S)"
+                              title={tr("Save file (Ctrl+S)")}
                               className="rounded border border-cyber-neon/50 px-2.5 py-1 text-[10px] font-bold uppercase text-cyber-neon transition hover:bg-cyber-neon/10 disabled:opacity-30 disabled:cursor-not-allowed shadow-neon-sm-faint font-mono"
                             >
-                              {isSavingFile ? 'Saving…' : 'Save'}
+                              {isSavingFile ? tr("Saving…") : tr("Save")}
                             </button>
 
                             {/* Save & Restart Session button */}
@@ -2698,18 +2687,16 @@ export function TerminalPanel({
                                   onSendInput(activeSessionId, '\x03');
                                 }}
                                 disabled={isSavingFile}
-                                title="Save file and send restart signal (Ctrl+C) to active CLI session"
+                                title={tr("Save file and send restart signal (Ctrl+C) to active CLI session")}
                                 className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[10px] font-bold uppercase text-amber-400 transition hover:bg-amber-500/20 disabled:opacity-30 font-mono"
-                              >
-                                Save & Restart
-                              </button>
+                              >{tr("Save & Restart")}</button>
                             )}
                           </>
                         )}
                         <button
                           type="button"
                           onClick={onCloseFile}
-                          title="Close file"
+                          title={tr("Close file")}
                           className="flex h-6 w-6 items-center justify-center rounded border border-cyber-line bg-cyber-base/40 text-slate-400 hover:text-white transition text-xs font-bold"
                         >
                           ✕
@@ -2720,19 +2707,15 @@ export function TerminalPanel({
                     {/* Editor body */}
                     <div className="relative min-h-0 flex-1 overflow-hidden">
                       {isFileLoading ? (
-                        <div className="flex h-full items-center justify-center text-xs text-slate-500 italic">
-                          Loading file content…
-                        </div>
+                        <div className="flex h-full items-center justify-center text-xs text-slate-500 italic">{tr("Loading file content…")}</div>
                       ) : fileLoadError ? (
                         <div className="p-6 text-xs text-cyber-warn leading-relaxed">
-                          <p className="font-semibold mb-2 text-sm">Cannot display this file</p>
-                          <p className="text-slate-400 break-words font-mono bg-black/30 p-3 rounded border border-cyber-line/20">{fileLoadError}</p>
+                          <p className="font-semibold mb-2 text-sm">{tr("Cannot display this file")}</p>
+                          <p className="text-slate-400 break-words font-mono bg-black/30 p-3 rounded border border-cyber-line/20">{trFeedback(fileLoadError ?? '')}</p>
                         </div>
                       ) : viewMode === 'diff' ? (
                         isDiffLoading ? (
-                          <div className="flex h-full items-center justify-center text-xs text-slate-500 italic">
-                            Loading diff…
-                          </div>
+                          <div className="flex h-full items-center justify-center text-xs text-slate-500 italic">{tr("Loading diff…")}</div>
                         ) : (
                           <div
                             key={`diff-${openedFile.path}`}
@@ -2758,7 +2741,7 @@ export function TerminalPanel({
                                 );
                               })
                             ) : (
-                              <div className="text-slate-500 italic p-2">No differences found.</div>
+                              <div className="text-slate-500 italic p-2">{tr("No differences found.")}</div>
                             )}
                           </div>
                         )
@@ -2838,8 +2821,7 @@ export function TerminalPanel({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <h3 className="font-display text-[9px] uppercase tracking-[0.15em] text-cyber-electric font-bold">
-                      ⚡ CMD ({sshSessions.length})
+                    <h3 className="font-display text-[9px] uppercase tracking-[0.15em] text-cyber-electric font-bold">{tr("⚡ CMD (")}{sshSessions.length})
                     </h3>
                     <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-0.5 scale-90 select-none">
                       <span className="text-[7px] font-mono text-cyber-electric/70 font-semibold tabular-nums min-w-[22px] text-right">{Math.round(miniTerminalScale * 100)}%</span>
@@ -2853,24 +2835,20 @@ export function TerminalPanel({
                           localStorage.setItem('clx-mini-terminal-scale', v.toFixed(1));
                         }}
                         className="w-14 h-1 accent-cyber-electric cursor-pointer"
-                        title="Mini terminal scale"
+                        title={tr("Mini terminal scale")}
                       />
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => onQuickSession?.('bottom')}
-                    title="New Terminal (dock to bottom)"
+                    title={tr("New Terminal (dock to bottom)")}
                     className="flex items-center gap-0.5 rounded border border-cyber-electric/50 bg-cyber-electric/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-cyber-electric transition hover:bg-cyber-electric/25 hover:border-cyber-electric shadow-neon-blue-sm-faint"
-                  >
-                    + New
-                  </button>
+                  >{tr("+ New")}</button>
                 </div>
                 
                 {sshSessions.length === 0 ? (
-                  <div className="flex-1 border-2 border-dashed border-cyber-electric/30 hover:border-cyber-electric/70 rounded-lg flex items-center justify-center text-[10px] text-cyber-electric/80 font-mono italic p-3 animate-pulse transition-colors">
-                    ⚡ Drag here to dock CMD sessions at the bottom
-                  </div>
+                  <div className="flex-1 border-2 border-dashed border-cyber-electric/30 hover:border-cyber-electric/70 rounded-lg flex items-center justify-center text-[10px] text-cyber-electric/80 font-mono italic p-3 animate-pulse transition-colors">{tr("⚡ Drag here to dock CMD sessions at the bottom")}</div>
                 ) : (
                   <div className="flex-1 flex gap-3 overflow-x-auto overflow-y-hidden justify-start items-center scrollbar-thin pb-1">
                     {sshSessions.map((session, idx) => {
@@ -2962,7 +2940,7 @@ export function TerminalPanel({
                                 fontSize: thumbSizes.cardHeight < 70 ? '7px' : '9px',
                               }}
                               className="absolute top-1 right-1 z-30 flex items-center justify-center rounded bg-rose-500/80 hover:bg-rose-600 text-white transition font-bold opacity-75 hover:opacity-100 shadow-sm"
-                              title="Stop / Close Session"
+                              title={tr("Stop / Close Session")}
                             >
                               ✕
                             </button>
@@ -2997,7 +2975,7 @@ export function TerminalPanel({
                   type="button"
                   onClick={() => setRightPanelVisible(true)}
                   className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex h-14 w-5 items-center justify-center rounded-l border border-l-0 border-cyber-neon/50 bg-[#0a0f1f]/90 text-cyber-neon hover:bg-cyber-neon hover:text-black transition cursor-pointer select-none font-bold text-[10px]"
-                  title="Show Right Panel"
+                  title={tr("Show Right Panel")}
                 >
                   ◀
                 </button>
@@ -3019,8 +2997,7 @@ export function TerminalPanel({
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">
-                      AI AGENT ({cliSessions.length})
+                    <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">{tr("AI AGENT (")}{cliSessions.length})
                     </h3>
                   <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-1 select-none shrink-0">
                     <span className="text-[7px] font-mono text-cyber-electric/70 font-semibold tabular-nums min-w-[22px] text-right">{Math.round(miniTerminalScale * 100)}%</span>
@@ -3034,22 +3011,20 @@ export function TerminalPanel({
                         localStorage.setItem('clx-mini-terminal-scale', v.toFixed(1));
                       }}
                       className="w-14 h-1 accent-cyber-electric cursor-pointer"
-                      title="Mini terminal scale"
+                      title={tr("Mini terminal scale")}
                     />
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onQuickSession?.('right')}
-                  title="New Terminal (dock to right)"
+                  title={tr("New Terminal (dock to right)")}
                   className="flex items-center gap-0.5 rounded border border-cyber-neon/50 bg-cyber-neon/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-cyber-neon transition hover:bg-cyber-neon/25 hover:border-cyber-neon shadow-neon-sm-faint shrink-0"
-                >
-                  + New
-                </button>
+                >{tr("+ New")}</button>
                 <button
                   type="button"
                   onClick={() => setRightPanelVisible(false)}
-                  title="Collapse panel"
+                  title={tr("Collapse panel")}
                   className="flex items-center justify-center w-5 h-5 text-[10px] text-slate-500 hover:text-cyber-neon hover:bg-white/5 rounded transition ml-1 shrink-0"
                 >
                   ▶
@@ -3057,9 +3032,7 @@ export function TerminalPanel({
               </div>
               
               {cliSessions.length === 0 ? (
-                <div className="flex-1 border-2 border-dashed border-cyber-neon/30 hover:border-cyber-neon/70 rounded-lg flex items-center justify-center text-[10px] text-cyber-neon/80 font-mono italic p-4 text-center animate-pulse transition-colors">
-                  👾 Drag here to dock AI Agents on the right
-                </div>
+                <div className="flex-1 border-2 border-dashed border-cyber-neon/30 hover:border-cyber-neon/70 rounded-lg flex items-center justify-center text-[10px] text-cyber-neon/80 font-mono italic p-4 text-center animate-pulse transition-colors">{tr("👾 Drag here to dock AI Agents on the right")}</div>
               ) : (
                 <div className="flex-1 flex flex-col gap-2 overflow-y-auto overflow-x-hidden scrollbar-thin justify-start items-center w-full">
                   {cliSessions.map((session, idx) => {
@@ -3151,7 +3124,7 @@ export function TerminalPanel({
                               fontSize: thumbSizes.cardHeight < 70 ? '7px' : '9px',
                             }}
                             className="absolute top-1 right-1 z-30 flex items-center justify-center rounded bg-rose-500/80 hover:bg-rose-600 text-white transition font-bold opacity-75 hover:opacity-100 shadow-sm"
-                            title="Stop / Close Session"
+                            title={tr("Stop / Close Session")}
                           >
                             ✕
                           </button>
@@ -3212,16 +3185,12 @@ export function TerminalPanel({
                     type="button"
                     onClick={() => { void copyMode('exact'); setContextMenu(null); }}
                     className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition cursor-pointer"
-                  >
-                    📋 Copy
-                  </button>
+                  >{tr("📋 Copy")}</button>
                   <button
                     type="button"
                     onClick={() => { void copyMode('code'); setContextMenu(null); }}
                     className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition cursor-pointer"
-                  >
-                    🧩 Copy as code
-                  </button>
+                  >{tr("🧩 Copy as code")}</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -3230,9 +3199,7 @@ export function TerminalPanel({
                       setContextMenu(null);
                     }}
                     className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition cursor-pointer"
-                  >
-                    💡 Giải thích bằng AI
-                  </button>
+                  >{tr("💡 Giải thích bằng AI")}</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -3241,9 +3208,7 @@ export function TerminalPanel({
                       setContextMenu(null);
                     }}
                     className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon text-cyber-neon transition cursor-pointer"
-                  >
-                    ✨ Tối ưu văn bản
-                  </button>
+                  >{tr("✨ Tối ưu văn bản")}</button>
                   <div className="my-1 border-t border-cyber-line/50" />
                 </>
               );
@@ -3266,9 +3231,7 @@ export function TerminalPanel({
                 setContextMenu(null);
               }}
               className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
-            >
-              📋 Paste
-            </button>
+            >{tr("📋 Paste")}</button>
           )}
 
           {contextMenu.sessionId && (
@@ -3279,9 +3242,7 @@ export function TerminalPanel({
                 setContextMenu(null);
               }}
               className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition cursor-pointer"
-            >
-              🔄 Refresh Terminal
-            </button>
+            >{tr("🔄 Refresh Terminal")}</button>
           )}
 
           {contextMenu.workingDir && (
@@ -3292,9 +3253,7 @@ export function TerminalPanel({
                 setContextMenu(null);
               }}
               className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
-            >
-              📂 Reveal in Explorer
-            </button>
+            >{tr("📂 Reveal in Explorer")}</button>
           )}
 
           {contextMenu.sessionId && (
@@ -3305,9 +3264,7 @@ export function TerminalPanel({
                 setContextMenu(null);
               }}
               className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
-            >
-              📋 Copy Session ID
-            </button>
+            >{tr("📋 Copy Session ID")}</button>
           )}
           {contextMenu.sessionId && (() => {
             const ctxSession = sessions.find(s => s.id === contextMenu.sessionId);
@@ -3319,16 +3276,14 @@ export function TerminalPanel({
                 <button
                   type="button"
                   onClick={async () => {
-                    const remotePath = prompt('Enter remote file path to download:');
+                    const remotePath = prompt(tr('Enter remote file path to download:'));
                     if (remotePath) {
                       setTransferDialog({ mode: 'download', remotePath });
                     }
                     setContextMenu(null);
                   }}
                   className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
-                >
-                  ⬇️ Download File from Server
-                </button>
+                >{tr("⬇️ Download File from Server")}</button>
                 <button
                   type="button"
                   onClick={async () => {
@@ -3350,9 +3305,7 @@ export function TerminalPanel({
                     setContextMenu(null);
                   }}
                   className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
-                >
-                  ⬆️ Upload File to Server
-                </button>
+                >{tr("⬆️ Upload File to Server")}</button>
               </>
             );
           })()}
@@ -3367,9 +3320,7 @@ export function TerminalPanel({
                   setContextMenu(null);
                 }}
                 className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 font-bold transition cursor-pointer"
-              >
-                ❌ Stop / Close Session
-              </button>
+              >{tr("❌ Stop / Close Session")}</button>
             </>
           )}
         </div>

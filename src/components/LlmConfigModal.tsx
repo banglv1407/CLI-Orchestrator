@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import { useState, useEffect } from 'react';
 import type { LlmConfig } from '../types';
 
@@ -76,9 +77,7 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
         onClick={(e) => e.stopPropagation()}
       >
         <header className="mb-4 flex items-center justify-between border-b border-cyber-line pb-3">
-          <h2 className="font-display text-base font-bold uppercase tracking-[0.15em] text-cyber-neon">
-            LLM Configuration
-          </h2>
+          <h2 className="font-display text-base font-bold uppercase tracking-[0.15em] text-cyber-neon">{tr("LLM Configuration")}</h2>
           <button 
             type="button" 
             onClick={onClose} 
@@ -96,13 +95,11 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
           )}
 
           <div>
-            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-              API Base URL (OpenAI Compatible)
-            </label>
+            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("API Base URL (OpenAI Compatible)")}</label>
             <input
               type="url"
               required
-              placeholder="e.g. https://api.openai.com/v1"
+              placeholder={tr("e.g. https://api.openai.com/v1")}
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon"
@@ -111,25 +108,21 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                Model Name
-              </label>
+              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Model Name")}</label>
               <input
                 type="text"
                 required
-                placeholder="e.g. gpt-4o-mini"
+                placeholder={tr("e.g. gpt-4o-mini")}
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon"
               />
             </div>
             <div>
-              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-                API Key
-              </label>
+              <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("API Key")}</label>
               <input
                 type="password"
-                placeholder="Secret API Key"
+                placeholder={tr("Secret API Key")}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon"
@@ -138,30 +131,26 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
           </div>
 
           <div>
-            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-              Reasoning Effort
-            </label>
+            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Reasoning Effort")}</label>
             <select
               value={reasoningEffort}
               onChange={(e) => setReasoningEffort(e.target.value)}
               className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 outline-none transition focus:border-cyber-neon"
             >
-              <option value="">Default (None)</option>
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-              <option value="xhigh">xhigh</option>
-              <option value="max">max</option>
+              <option value="">{tr("Default (None)")}</option>
+              <option value="low">{tr("low")}</option>
+              <option value="medium">{tr("medium")}</option>
+              <option value="high">{tr("high")}</option>
+              <option value="xhigh">{tr("xhigh")}</option>
+              <option value="max">{tr("max")}</option>
             </select>
           </div>
 
           <div>
-            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-              Custom Headers (JSON Object)
-            </label>
+            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("Custom Headers (JSON Object)")}</label>
             <textarea
               rows={3}
-              placeholder='e.g. { "User-Agent": "Custom-Agent-Value" }'
+              placeholder={tr("e.g. { \"User-Agent\": \"Custom-Agent-Value\" }")}
               value={headersJson}
               onChange={(e) => setHeadersJson(e.target.value)}
               className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 font-mono text-[11px] text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon"
@@ -169,12 +158,10 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
           </div>
 
           <div>
-            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">
-              System Prompt
-            </label>
+            <label className="block font-semibold uppercase tracking-wider text-slate-300 mb-1">{tr("System Prompt")}</label>
             <textarea
               rows={3}
-              placeholder="System prompt to guide the AI assistant..."
+              placeholder={tr("System prompt to guide the AI assistant...")}
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyber-neon"
@@ -192,9 +179,7 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
             <label 
               htmlFor="llm-stream" 
               className="font-semibold uppercase tracking-wider text-slate-300 cursor-pointer"
-            >
-              Enable Stream Mode (Set to false if server doesn't support SSE)
-            </label>
+            >{tr("Enable Stream Mode (Set to false if server doesn't support SSE)")}</label>
           </div>
 
           <footer className="flex justify-end gap-3 pt-3 border-t border-cyber-line">
@@ -202,15 +187,11 @@ export function LlmConfigModal({ isOpen, onClose, config, onSave }: LlmConfigMod
               type="button"
               onClick={onClose}
               className="rounded border border-cyber-line px-4 py-2 font-bold uppercase tracking-wider text-slate-300 hover:bg-cyber-line/20 transition"
-            >
-              Cancel
-            </button>
+            >{tr("Cancel")}</button>
             <button
               type="submit"
               className="rounded border border-cyber-neon bg-cyber-neon/15 px-5 py-2 font-bold uppercase tracking-wider text-cyber-neon hover:bg-cyber-neon/25 transition shadow-neon-sm"
-            >
-              Save Configuration
-            </button>
+            >{tr("Save Configuration")}</button>
           </footer>
         </form>
       </div>

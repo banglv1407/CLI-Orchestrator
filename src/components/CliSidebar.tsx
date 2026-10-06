@@ -1,3 +1,4 @@
+import { t as tr, useLocale, getIntlLocale } from '../i18n';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry, SpecialConfigFile } from '../types';
@@ -8,7 +9,7 @@ import { ProxyPanel } from './ProxyPanel';
 import { AIChatPanel } from './AIChatPanel';
 import { RecentTerminals } from './RecentTerminals';
 import type { RecentTerminal } from '../lib/terminal-recents';
-import { loadSpecialConfigFiles, saveSpecialConfigFile, deleteSpecialConfigFile } from '../lib/configFiles';
+import { loadSpecialConfigFiles, saveSpecialConfigFile, deleteSpecialConfigFile, getSpecialConfigDisplay } from '../lib/configFiles';
 import { SpecialConfigModal } from './SpecialConfigModal';
 
 import { 
@@ -262,6 +263,7 @@ function joinWorkspacePath(rootPath: string, relativePath: string): string {
 
 
 function ApiHistoryList() {
+  const locale = useLocale();
   const [history, setHistory] = useState<ApiHistoryEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -295,15 +297,15 @@ function ApiHistoryList() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex shrink-0 items-center justify-between border-b border-cyber-line p-4">
-        <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">API History</h2>
-        <button type="button" onClick={handleClear} className="rounded border border-cyber-line/40 px-2 py-0.5 text-[9px] font-semibold text-slate-400 hover:text-red-400 hover:border-red-400/40 transition uppercase">Clear</button>
+        <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">{tr("API History")}</h2>
+        <button type="button" onClick={handleClear} className="rounded border border-cyber-line/40 px-2 py-0.5 text-[9px] font-semibold text-slate-400 hover:text-red-400 hover:border-red-400/40 transition uppercase">{tr("Clear")}</button>
       </div>
       {/* Search Box */}
       <div className="shrink-0 p-2 border-b border-cyber-line/50">
         <div className="relative">
           <input
             type="text"
-            placeholder="Search URL or method..."
+            placeholder={tr("Search URL or method...")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
@@ -321,9 +323,9 @@ function ApiHistoryList() {
       </div>
       <div className="flex-1 overflow-y-auto">
         {history.length === 0 ? (
-          <div className="p-6 text-center text-[11px] text-slate-600">No requests yet.<br/><span className="text-[10px]">Send a request from the API Client to see it here.</span></div>
+          <div className="p-6 text-center text-[11px] text-slate-600">{tr("No requests yet.")}<br/><span className="text-[10px]">{tr("Send a request from the API Client to see it here.")}</span></div>
         ) : filteredHistory.length === 0 ? (
-          <div className="p-6 text-center text-[11px] text-slate-600">No results for "{searchQuery}".</div>
+          <div className="p-6 text-center text-[11px] text-slate-600">{tr("No results for \"")}{searchQuery}".</div>
         ) : (
           filteredHistory.map((entry, idx) => (
             <button key={entry.url + entry.method + idx} type="button" onClick={() => handleSelect(entry)} className="w-full text-left px-4 py-2.5 border-b border-cyber-line/20 hover:bg-cyber-neon/5 transition flex items-start gap-2 group">
@@ -331,10 +333,10 @@ function ApiHistoryList() {
               <div className="min-w-0 flex-1">
                 <div className="text-[11px] text-slate-300 truncate font-mono leading-tight">{entry.url}</div>
                 <div className="text-[9px] text-slate-600 mt-0.5 flex items-center gap-2">
-                  <span>{new Date(entry.timestamp).toLocaleString()}</span>
+                  <span>{new Date(entry.timestamp).toLocaleString(getIntlLocale())}</span>
                   {entry.headers?.length > 0 && <span className="text-cyber-electric/60">{entry.headers.length}h</span>}
                   {entry.params?.length > 0 && <span className="text-cyber-neon/60">{entry.params.length}p</span>}
-                  {entry.body && <span className="text-slate-500">{'·'} body</span>}
+                  {entry.body && <span className="text-slate-500">{'·'}{tr(" body")}</span>}
                 </div>
               </div>
             </button>
@@ -383,6 +385,7 @@ export function CliSidebar({
   onProxyTabChange,
   onLogsTabChange,
 }: CliSidebarProps) {
+  const locale = useLocale();
   const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
   const [cliSubTab, setCliSubTab] = useState<'clis' | 'recent' | 'operator' | 'configs' | 'explorer'>('clis');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -555,7 +558,7 @@ export function CliSidebar({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleTabDrop(e, 'cli-manager')}
             onClick={() => handleSetActiveTab('cli-manager')}
-            title="Terminal Orchestor"
+            title={tr("Terminal Orchestor")}
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
               activeTab === 'cli-manager'
                 ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
@@ -586,7 +589,7 @@ export function CliSidebar({
                 ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25 ring-1 ring-amber-400/30'
                 : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
             }`}
-            title="Buzz Workspace"
+            title={tr("Buzz Workspace")}
           >
             <BuzzIcon />
             {buzzUnreadCount > 0 && (
@@ -612,7 +615,7 @@ export function CliSidebar({
                 ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/25 ring-1 ring-fuchsia-400/30'
                 : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
             }`}
-            title="Entertainment"
+            title={tr("Entertainment")}
           >
             <GameIcon />
           </div>
@@ -628,7 +631,7 @@ export function CliSidebar({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleTabDrop(e, 'agent-sessions')}
             onClick={() => handleSetActiveTab('agent-sessions')}
-            title="Agent Sessions"
+            title={tr("Agent Sessions")}
             className={`group relative flex h-10 w-10 items-center justify-center rounded-xl text-xs font-semibold cursor-pointer transition-all duration-200 ${
               activeTab === 'agent-sessions'
                 ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25 ring-1 ring-amber-400/30'
@@ -655,7 +658,7 @@ export function CliSidebar({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleTabDrop(e, 'quickapps')}
             onClick={() => handleSetActiveTab('quickapps')}
-            title="Quick Apps (favorite apps launcher)"
+            title={tr("Quick Apps (favorite apps launcher)")}
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
               activeTab === 'quickapps'
                 ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
@@ -681,7 +684,7 @@ export function CliSidebar({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleTabDrop(e, 'apiclient')}
             onClick={() => handleSetActiveTab('apiclient')}
-            title="API Client (Postman-like)"
+            title={tr("API Client (Postman-like)")}
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
               activeTab === 'apiclient'
                 ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
@@ -707,7 +710,7 @@ export function CliSidebar({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleTabDrop(e, 'dashboard')}
             onClick={() => handleSetActiveTab('dashboard')}
-            title="Dashboard"
+            title={tr("Dashboard")}
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
               activeTab === 'dashboard'
                 ? 'text-cyber-electric bg-cyber-electric/10 shadow-neon-blue-sm'
@@ -738,7 +741,7 @@ export function CliSidebar({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleTabDrop(e, 'settings')}
             onClick={() => handleSetActiveTab('settings')}
-            title="Settings"
+            title={tr("Settings")}
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none outline-none ${
               activeTab === 'settings'
                 ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
@@ -1070,12 +1073,12 @@ export function CliSidebar({
       const assistantMsg: LlmChatMessage = {
         role: 'assistant',
         content: `Suggested CLI Command:\n\`\`\`bash\n${reply.trim()}\n\`\`\`,`,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: new Date().toLocaleTimeString(getIntlLocale()),
       };
       
       const updatedHistory = [
         ...chatHistory,
-        { role: 'user', content: `Suggest command for: ${chatInput.trim()}`, timestamp: new Date().toLocaleTimeString() } as LlmChatMessage,
+        { role: 'user', content: `Suggest command for: ${chatInput.trim()}`, timestamp: new Date().toLocaleTimeString(getIntlLocale()) } as LlmChatMessage,
         assistantMsg
       ];
       setChatHistory(updatedHistory);
@@ -1124,12 +1127,12 @@ export function CliSidebar({
       const assistantMsg: LlmChatMessage = {
         role: 'assistant',
         content: `Summary:\n${reply.trim()}`,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: new Date().toLocaleTimeString(getIntlLocale()),
       };
       
       const updatedHistory = [
         ...chatHistory,
-        { role: 'user', content: `Summarize text...`, timestamp: new Date().toLocaleTimeString() } as LlmChatMessage,
+        { role: 'user', content: `Summarize text...`, timestamp: new Date().toLocaleTimeString(getIntlLocale()) } as LlmChatMessage,
         assistantMsg
       ];
       setChatHistory(updatedHistory);
@@ -1173,12 +1176,12 @@ export function CliSidebar({
       const assistantMsg: LlmChatMessage = {
         role: 'assistant',
         content: `Generated Title: "${reply.trim()}"`,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: new Date().toLocaleTimeString(getIntlLocale()),
       };
       
       const updatedHistory = [
         ...chatHistory,
-        { role: 'user', content: `Generate title for: ${chatInput.trim().slice(0, 30)}...`, timestamp: new Date().toLocaleTimeString() } as LlmChatMessage,
+        { role: 'user', content: `Generate title for: ${chatInput.trim().slice(0, 30)}...`, timestamp: new Date().toLocaleTimeString(getIntlLocale()) } as LlmChatMessage,
         assistantMsg
       ];
       setChatHistory(updatedHistory);
@@ -1425,7 +1428,7 @@ export function CliSidebar({
     const userMsg: LlmChatMessage = {
       role: 'user',
       content: userMessageContent,
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: new Date().toLocaleTimeString(getIntlLocale()),
     };
 
     const newHistory = [...chatHistory, userMsg];
@@ -1459,7 +1462,7 @@ export function CliSidebar({
       const assistantMsg: LlmChatMessage = {
         role: 'assistant',
         content: reply,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: new Date().toLocaleTimeString(getIntlLocale()),
       };
 
       const updatedHistory = [...newHistory, assistantMsg];
@@ -1500,7 +1503,7 @@ export function CliSidebar({
           const assistantMsg: LlmChatMessage = {
             role: 'assistant',
             content: `[Local Fallback] ${reply}`,
-            timestamp: new Date().toLocaleTimeString(),
+            timestamp: new Date().toLocaleTimeString(getIntlLocale()),
           };
 
           const updatedHistory = [...newHistory, assistantMsg];
@@ -1524,7 +1527,7 @@ export function CliSidebar({
       const assistantMsg: LlmChatMessage = {
         role: 'assistant',
         content: `Error: ${errorMsg}\n\nPlease check your LLM configuration, custom API endpoint URL, network connections, or headers (User-Agent).`,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: new Date().toLocaleTimeString(getIntlLocale()),
       };
 
       const updatedHistory = [...newHistory, assistantMsg];
@@ -1632,10 +1635,10 @@ export function CliSidebar({
 
       if (configSearchQuery.trim()) {
         const query = configSearchQuery.toLowerCase();
-        const matchesName = entry.name.toLowerCase().includes(query);
+        const matchesName = (specialMatch ? getSpecialConfigDisplay(specialMatch, 'name') : entry.name).toLowerCase().includes(query);
         const matchesPath = entry.path.toLowerCase().includes(query);
-        const matchesDesc = specialMatch?.description?.toLowerCase().includes(query) ?? false;
-        const matchesGroup = specialMatch?.group?.toLowerCase().includes(query) ?? false;
+        const matchesDesc = specialMatch ? getSpecialConfigDisplay(specialMatch, 'description').toLowerCase().includes(query) : false;
+        const matchesGroup = specialMatch ? getSpecialConfigDisplay(specialMatch, 'group').toLowerCase().includes(query) : false;
         if (!matchesName && !matchesPath && !matchesDesc && !matchesGroup) {
           return;
         }
@@ -1649,7 +1652,7 @@ export function CliSidebar({
     });
 
     return map;
-  }, [quickConfigFiles, specialConfigs, configSearchQuery]);
+  }, [locale, quickConfigFiles, specialConfigs, configSearchQuery]);
 
   // Ctrl+P search states
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -2041,9 +2044,7 @@ export function CliSidebar({
               <p 
                 style={{ paddingLeft: `${(depth + 1) * 14 + 20}px` }}
                 className="py-1 text-xs italic text-slate-500"
-              >
-                (empty)
-              </p>
+              >{tr("(empty)")}</p>
             ) : (
               children.map((child) => renderFileNode(child, depth + 1))
             )}
@@ -2062,7 +2063,7 @@ export function CliSidebar({
         conn.name.toLowerCase().includes(query) ||
         conn.host.toLowerCase().includes(query) ||
         conn.user.toLowerCase().includes(query) ||
-        conn.group.toLowerCase().includes(query) ||
+        (conn.group || tr('Default')).toLowerCase().includes(query) ||
         (conn.protocol || 'ssh').toLowerCase().includes(query)
       );
     });
@@ -2076,7 +2077,7 @@ export function CliSidebar({
       groups[g].push(conn);
     });
     return groups;
-  }, [sshConnections, sshSearchQuery]);
+  }, [locale, sshConnections, sshSearchQuery]);
 
   // --- CLI Grouping and Filtering ---
   const [cliSearchQuery, setCliSearchQuery] = useState('');
@@ -2089,7 +2090,7 @@ export function CliSidebar({
       return (
         cli.name.toLowerCase().includes(query) ||
         cli.command.toLowerCase().includes(query) ||
-        (cli.group || 'Default').toLowerCase().includes(query)
+        (cli.group || tr('Default')).toLowerCase().includes(query)
       );
     });
 
@@ -2102,7 +2103,7 @@ export function CliSidebar({
       groups[g].push(cli);
     });
     return groups;
-  }, [clis, cliSearchQuery]);
+  }, [locale, clis, cliSearchQuery]);
 
   return (
     <div
@@ -2145,17 +2146,15 @@ export function CliSidebar({
             <div className="flex shrink-0 flex-col border-b border-cyber-line bg-cyber-base/20">
               <div className="flex items-center justify-between px-4 pt-3 pb-2">
                 <div>
-                  <h1 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">Terminal Orchestor</h1>
-                  <p className="text-[10px] text-slate-400 mt-0.5 font-mono">CLIs, Operator, Configs & Explorer</p>
+                  <h1 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">{tr("Terminal Orchestor")}</h1>
+                  <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{tr("CLIs, Operator, Configs & Explorer")}</p>
                 </div>
               </div>
 
               {/* Sub-Navigation Pills */}
               <div className="flex items-center gap-1 px-3 pb-2.5">
                 <button type="button" onClick={() => setCliSubTab('recent')}
-                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold transition ${cliSubTab === 'recent' ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40' : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'}`}>
-                  Recent
-                </button>
+                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold transition ${cliSubTab === 'recent' ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40' : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'}`}>{tr("Recent")}</button>
                 <button
                   type="button"
                   onClick={() => setCliSubTab('clis')}
@@ -2164,9 +2163,7 @@ export function CliSidebar({
                       ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40 shadow-neon-blue-sm-faint font-bold'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
                   }`}
-                >
-                  💻 CLIs
-                </button>
+                >{tr("💻 CLIs")}</button>
                 <button
                   type="button"
                   onClick={() => setCliSubTab('operator')}
@@ -2175,9 +2172,7 @@ export function CliSidebar({
                       ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40 shadow-neon-blue-sm-faint font-bold'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
                   }`}
-                >
-                  ☁️ VM
-                </button>
+                >{tr("☁️ VM")}</button>
                 <button
                   type="button"
                   onClick={() => setCliSubTab('configs')}
@@ -2186,9 +2181,7 @@ export function CliSidebar({
                       ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40 shadow-neon-blue-sm-faint font-bold'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
                   }`}
-                >
-                  ⚡ Configs
-                </button>
+                >{tr("⚡ Configs")}</button>
                 <button
                   type="button"
                   onClick={() => setCliSubTab('explorer')}
@@ -2197,9 +2190,7 @@ export function CliSidebar({
                       ? 'bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/40 shadow-neon-sm-faint font-bold'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'
                   }`}
-                >
-                  📁 Explorer
-                </button>
+                >{tr("📁 Explorer")}</button>
               </div>
             </div>
 
@@ -2209,14 +2200,12 @@ export function CliSidebar({
               <div className="flex flex-1 flex-col overflow-hidden">
                 {/* Action bar */}
                 <div className="flex shrink-0 items-center justify-between border-b border-cyber-line/40 px-3 py-2 bg-cyber-base/10">
-                  <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">CLI Connections</span>
+                  <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">{tr("CLI Connections")}</span>
                   <button
                     type="button"
                     onClick={onAddCli}
                     className="rounded border border-cyber-neon/40 px-2 py-0.5 text-[10px] font-semibold text-cyber-neon transition hover:border-cyber-neon hover:bg-cyber-neon/10 shadow-neon-sm-faint"
-                  >
-                    Add CLI
-                  </button>
+                  >{tr("Add CLI")}</button>
                 </div>
 
                 {/* Search Box */}
@@ -2224,7 +2213,7 @@ export function CliSidebar({
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search CLI name, command or group..."
+                      placeholder={tr("Search CLI name, command or group...")}
                       value={cliSearchQuery}
                       onChange={(e) => setCliSearchQuery(e.target.value)}
                       className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-neon text-[11px]"
@@ -2246,9 +2235,9 @@ export function CliSidebar({
                   {Object.keys(groupedClis).length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8 select-none">
                       <TerminalIcon />
-                      <p className="mt-4 text-xs font-semibold text-slate-300">No CLIs Found</p>
+                      <p className="mt-4 text-xs font-semibold text-slate-300">{tr("No CLIs Found")}</p>
                       <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-                        {cliSearchQuery ? 'Try adjusting your search query.' : 'Add your first CLI connection above to start.'}
+                        {cliSearchQuery ? tr("Try adjusting your search query.") : tr("Add your first CLI connection above to start.")}
                       </p>
                     </div>
                   ) : (
@@ -2263,7 +2252,7 @@ export function CliSidebar({
                           >
                             <div className="flex items-center gap-1.5 font-bold">
                               <FolderArrowIcon isExpanded={!isCollapsed} />
-                              <span>{groupName}</span>
+                              <span>{cliList.some((item) => item.group) ? groupName : tr('Default')}</span>
                               <span className="text-[9px] opacity-60 font-semibold lowercase">({cliList.length})</span>
                             </div>
                           </button>
@@ -2293,8 +2282,8 @@ export function CliSidebar({
                                           e.stopPropagation();
                                           onOpenCliInteraction(cli);
                                         }}
-                                        aria-label={`Start ${cli.name}`}
-                                        title="Start Session"
+                                        aria-label={tr("Start {v0}", { v0: String(cli.name) })}
+                                        title={tr("Start Session")}
                                         className="flex h-5 w-5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
                                       >
                                         <PlayIcon />
@@ -2305,8 +2294,8 @@ export function CliSidebar({
                                           e.stopPropagation();
                                           onEditCli(cli);
                                         }}
-                                        aria-label={`Edit ${cli.name}`}
-                                        title="Edit CLI"
+                                        aria-label={tr("Edit {v0}", { v0: String(cli.name) })}
+                                        title={tr("Edit CLI")}
                                         className="flex h-5 w-5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
                                       >
                                         <EditIcon />
@@ -2317,8 +2306,8 @@ export function CliSidebar({
                                           e.stopPropagation();
                                           onDeleteCli(cli);
                                         }}
-                                        aria-label={`Delete ${cli.name}`}
-                                        title="Delete CLI"
+                                        aria-label={tr("Delete {v0}", { v0: String(cli.name) })}
+                                        title={tr("Delete CLI")}
                                         className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
                                       >
                                         <TrashIcon />
@@ -2342,14 +2331,12 @@ export function CliSidebar({
               <div className="flex flex-1 flex-col overflow-hidden">
                 {/* Action bar */}
                 <div className="flex shrink-0 items-center justify-between border-b border-cyber-line/40 px-3 py-2 bg-cyber-base/10">
-                  <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">VM Connections</span>
+                  <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">{tr("VM Connections")}</span>
                   <button
                     type="button"
                     onClick={onAddSsh}
                     className="rounded border border-cyber-electric/50 px-2 py-0.5 text-[10px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10 shadow-neon-blue-sm-faint"
-                  >
-                    Add VM
-                  </button>
+                  >{tr("Add VM")}</button>
                 </div>
 
                 {/* Search Box */}
@@ -2357,7 +2344,7 @@ export function CliSidebar({
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search VM, host, user or group..."
+                      placeholder={tr("Search VM, host, user or group...")}
                       value={sshSearchQuery}
                       onChange={(e) => setSshSearchQuery(e.target.value)}
                       className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
@@ -2379,9 +2366,9 @@ export function CliSidebar({
                   {Object.keys(groupedConnections).length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8 select-none">
                       <CloudIcon />
-                      <p className="mt-4 text-xs font-semibold text-slate-300">No Connections Found</p>
+                      <p className="mt-4 text-xs font-semibold text-slate-300">{tr("No Connections Found")}</p>
                       <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-                        {sshSearchQuery ? 'Try adjusting your search query.' : 'Add your first VM connection above to start.'}
+                        {sshSearchQuery ? tr("Try adjusting your search query.") : tr("Add your first VM connection above to start.")}
                       </p>
                     </div>
                   ) : (
@@ -2396,7 +2383,7 @@ export function CliSidebar({
                           >
                             <div className="flex items-center gap-1.5 font-bold">
                               <FolderArrowIcon isExpanded={!isCollapsed} />
-                              <span>{groupName}</span>
+                              <span>{conns.some((item) => item.group) ? groupName : tr('Default')}</span>
                               <span className="text-[9px] opacity-60 font-semibold lowercase">({conns.length})</span>
                             </div>
                           </button>
@@ -2424,7 +2411,7 @@ export function CliSidebar({
                                           ? 'bg-cyber-electric/10 border-cyber-electric/40 text-cyber-electric'
                                           : 'bg-cyber-neon/10 border-cyber-neon/40 text-cyber-neon'
                                       }`}>
-                                        {conn.protocol === 'rdp' ? 'RDP' : conn.authMode === 'key' ? 'KEY' : 'SSH'}
+                                        {conn.protocol === 'rdp' ? 'RDP' : conn.authMode === 'key' ? tr("KEY") : 'SSH'}
                                       </span>
                                       <button
                                         type="button"
@@ -2434,8 +2421,8 @@ export function CliSidebar({
                                           else onConnectSsh(conn);
                                           setCliSubTab('explorer');
                                         }}
-                                        aria-label={conn.protocol === 'rdp' ? `Remote Desktop to ${conn.name}` : `Connect SSH to ${conn.name}`}
-                                        title={conn.protocol === 'rdp' ? "Launch RDP" : "Connect SSH"}
+                                        aria-label={conn.protocol === 'rdp' ? tr("Remote Desktop to {v0}", { v0: String(conn.name) }) : tr("Connect SSH to {v0}", { v0: String(conn.name) })}
+                                        title={conn.protocol === 'rdp' ? tr("Launch RDP") : tr("Connect SSH")}
                                         className="flex h-5 w-5 items-center justify-center rounded border border-cyber-neon/70 text-cyber-neon transition hover:bg-cyber-neon/10"
                                       >
                                         <PlayIcon />
@@ -2443,8 +2430,8 @@ export function CliSidebar({
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); onEditSsh(conn); }}
-                                        aria-label={`Edit ${conn.name}`}
-                                        title="Edit"
+                                        aria-label={tr("Edit {v0}", { v0: String(conn.name) })}
+                                        title={tr("Edit")}
                                         className="flex h-5 w-5 items-center justify-center rounded border border-cyber-electric/60 text-cyber-electric transition hover:bg-cyber-electric/10"
                                       >
                                         <EditIcon />
@@ -2452,8 +2439,8 @@ export function CliSidebar({
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); onDeleteSsh(conn); }}
-                                        aria-label={`Delete ${conn.name}`}
-                                        title="Delete"
+                                        aria-label={tr("Delete {v0}", { v0: String(conn.name) })}
+                                        title={tr("Delete")}
                                         className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
                                       >
                                         <TrashIcon />
@@ -2478,7 +2465,7 @@ export function CliSidebar({
                 {/* Action bar */}
                 <div className="flex shrink-0 items-center justify-between border-b border-cyber-line/40 px-3 py-2 bg-cyber-base/10">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">Quick Config Files</span>
+                    <span className="font-display text-[10px] uppercase tracking-wider text-slate-400 font-bold">{tr("Quick Config Files")}</span>
                     {quickConfigFiles.length > 0 && (
                       <span className="rounded bg-cyber-electric/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-electric border border-cyber-electric/30 font-mono">
                         {quickConfigFiles.length}
@@ -2492,9 +2479,7 @@ export function CliSidebar({
                       setSpecialModalOpen(true);
                     }}
                     className="rounded border border-cyber-electric/50 px-2 py-0.5 text-[10px] font-semibold text-cyber-electric transition hover:border-cyber-electric hover:bg-cyber-electric/10 shadow-neon-blue-sm-faint"
-                  >
-                    + Add Config
-                  </button>
+                  >{tr("+ Add Config")}</button>
                 </div>
 
                 {/* Search Box */}
@@ -2502,7 +2487,7 @@ export function CliSidebar({
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search config name, path, description or group..."
+                      placeholder={tr("Search config name, path, description or group...")}
                       value={configSearchQuery}
                       onChange={(e) => setConfigSearchQuery(e.target.value)}
                       className="w-full rounded border border-cyber-line bg-cyber-base pl-3 pr-8 py-1.5 text-slate-200 placeholder-slate-500 outline-none transition focus:border-cyber-electric text-[11px]"
@@ -2524,9 +2509,9 @@ export function CliSidebar({
                   {Object.keys(groupedConfigs).length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 py-8 select-none">
                       <span className="text-3xl mb-1">⚡</span>
-                      <p className="mt-2 text-xs font-semibold text-slate-300">No Config Files Found</p>
+                      <p className="mt-2 text-xs font-semibold text-slate-300">{tr("No Config Files Found")}</p>
                       <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-                        {configSearchQuery ? 'Try adjusting your search query.' : 'Add your first config file above to start.'}
+                        {configSearchQuery ? tr("Try adjusting your search query.") : tr("Add your first config file above to start.")}
                       </p>
                     </div>
                   ) : (
@@ -2541,7 +2526,7 @@ export function CliSidebar({
                           >
                             <div className="flex items-center gap-1.5 font-bold">
                               <FolderArrowIcon isExpanded={!isCollapsed} />
-                              <span>{groupName}</span>
+                              <span>{items[0]?.specialMatch?.group ? getSpecialConfigDisplay(items[0].specialMatch, 'group') : tr('General Configs')}</span>
                               <span className="text-[9px] opacity-60 font-semibold lowercase">({items.length})</span>
                             </div>
                           </button>
@@ -2566,7 +2551,7 @@ export function CliSidebar({
                                       <div className="min-w-0 flex-1 text-left">
                                         <div className="flex items-center justify-between gap-1">
                                           <span className="truncate text-[11px] font-semibold text-slate-200 leading-tight">
-                                            {specialMatch?.name || entry.name}
+                                            {specialMatch ? getSpecialConfigDisplay(specialMatch, 'name') || entry.name : entry.name}
                                           </span>
                                           <span className="shrink-0 text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-cyber-electric/10 text-cyber-electric border border-cyber-electric/20 font-mono">
                                             {ext}
@@ -2577,13 +2562,13 @@ export function CliSidebar({
                                         </span>
                                         {specialMatch?.description && (
                                           <p className="text-[9px] text-slate-400 leading-tight mt-1 line-clamp-2">
-                                            {specialMatch.description}
+                                            {getSpecialConfigDisplay(specialMatch, 'description')}
                                           </p>
                                         )}
                                       </div>
                                     </div>
                                     <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-cyber-line/20">
-                                      <span className="text-[8px] text-slate-500 font-mono italic">Double-click or ⚡ to edit content</span>
+                                      <span className="text-[8px] text-slate-500 font-mono italic">{tr("Double-click or ⚡ to edit content")}</span>
                                       <div className="flex items-center gap-1">
                                         <button
                                           type="button"
@@ -2591,11 +2576,9 @@ export function CliSidebar({
                                             e.stopPropagation();
                                             void onFileClick(entry, rootPath);
                                           }}
-                                          title="Fast Access: Open file in editor immediately for quick editing"
+                                          title={tr("Fast Access: Open file in editor immediately for quick editing")}
                                           className="flex items-center gap-1 rounded border border-cyber-electric/60 px-2 py-0.5 text-[9px] font-semibold text-cyber-electric transition hover:bg-cyber-electric/20"
-                                        >
-                                          ⚡ Open
-                                        </button>
+                                        >{tr("⚡ Open")}</button>
                                         <button
                                           type="button"
                                           onClick={(e) => {
@@ -2610,7 +2593,7 @@ export function CliSidebar({
                                             );
                                             setSpecialModalOpen(true);
                                           }}
-                                          title="Edit Entry Info"
+                                          title={tr("Edit Entry Info")}
                                           className="flex h-5 w-5 items-center justify-center rounded border border-slate-600 text-slate-400 transition hover:border-slate-300 hover:text-white"
                                         >
                                           <EditIcon />
@@ -2622,7 +2605,7 @@ export function CliSidebar({
                                               e.stopPropagation();
                                               deleteSpecialConfigFile(specialMatch.id);
                                             }}
-                                            title="Delete Config Entry"
+                                            title={tr("Delete Config Entry")}
                                             className="flex h-5 w-5 items-center justify-center rounded border border-cyber-warn/60 text-cyber-warn transition hover:bg-cyber-warn/10"
                                           >
                                             <TrashIcon />
@@ -2657,12 +2640,11 @@ export function CliSidebar({
                             <span className="font-display text-[10px] uppercase font-bold tracking-wider text-cyber-neon truncate">
                               {isSshSession
                                 ? `SSH: ${sshConnection?.user ? sshConnection.user + '@' : ''}${sshConnection?.host || sshConnectionName || 'Remote'}`
-                                : 'Local Workspace'}
+                                : tr("Local Workspace")}
                             </span>
                           </div>
                           {isSshSession && (
-                            <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-semibold bg-cyber-electric/15 text-cyber-electric border border-cyber-electric/30">
-                              Port {sshConnection?.port || 22}
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-semibold bg-cyber-electric/15 text-cyber-electric border border-cyber-electric/30">{tr("Port ")}{sshConnection?.port || 22}
                             </span>
                           )}
                         </div>
@@ -2676,7 +2658,7 @@ export function CliSidebar({
                               navigator.clipboard.writeText(rootPath);
                             }}
                             className="text-slate-500 hover:text-cyber-electric transition p-0.5"
-                            title="Copy workspace path"
+                            title={tr("Copy workspace path")}
                           >
                             📋
                           </button>
@@ -2693,7 +2675,7 @@ export function CliSidebar({
                         >
                           <div className="flex items-center gap-2">
                             <FolderArrowIcon isExpanded={workspaceFilesExpanded} />
-                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">Workspace Files</span>
+                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">{tr("Workspace Files")}</span>
                           </div>
                           <span className="truncate max-w-[120px] font-mono text-[9px] font-semibold text-cyber-electric/80" title={rootPath}>
                             {rootPath.split(/[/\\]/).pop() || rootPath}
@@ -2722,7 +2704,7 @@ export function CliSidebar({
                         >
                           <div className="flex items-center gap-2">
                             <FolderArrowIcon isExpanded={gitDiffExpanded} />
-                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">Git Diff (Changes)</span>
+                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">{tr("Git Diff (Changes)")}</span>
                           </div>
                           {gitStatusList.length > 0 && (
                             <span className="rounded bg-cyber-neon/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-neon border border-cyber-neon/30 font-mono">
@@ -2734,7 +2716,7 @@ export function CliSidebar({
                         {gitDiffExpanded && (
                           <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
                             {gitStatusList.length === 0 ? (
-                              <p className="px-4 py-3 text-xs italic text-slate-500 font-mono">No changed files in workspace.</p>
+                              <p className="px-4 py-3 text-xs italic text-slate-500 font-mono">{tr("No changed files in workspace.")}</p>
                             ) : (
                               <div className="space-y-1">
                                 {(() => {
@@ -2799,13 +2781,13 @@ export function CliSidebar({
                                     <>
                                       {staged.length > 0 && (
                                         <div>
-                                          <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-emerald-400 border-b border-cyber-line/20">Changes to be committed</div>
+                                          <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-emerald-400 border-b border-cyber-line/20">{tr("Changes to be committed")}</div>
                                           {staged.map(renderItem)}
                                         </div>
                                       )}
                                       {unstaged.length > 0 && (
                                         <div>
-                                          <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-rose-400 border-b border-cyber-line/20">Changes not staged for commit</div>
+                                          <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-rose-400 border-b border-cyber-line/20">{tr("Changes not staged for commit")}</div>
                                           {unstaged.map(renderItem)}
                                         </div>
                                       )}
@@ -2821,17 +2803,13 @@ export function CliSidebar({
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center p-6 text-center">
                       <ExplorerIcon />
-                      <p className="mt-4 text-xs font-semibold text-slate-300">No Folder Opened</p>
-                      <p className="mt-1 text-[11px] text-slate-500 leading-normal">
-                        Start an interactive session or select a project directory to explore files.
-                      </p>
+                      <p className="mt-4 text-xs font-semibold text-slate-300">{tr("No Folder Opened")}</p>
+                      <p className="mt-1 text-[11px] text-slate-500 leading-normal">{tr("Start an interactive session or select a project directory to explore files.")}</p>
                       <button
                         type="button"
                         onClick={handleSelectFolder}
                         className="mt-4 rounded border border-cyber-electric bg-cyber-electric/15 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-cyber-electric transition hover:bg-cyber-electric/25"
-                      >
-                        Select Folder
-                      </button>
+                      >{tr("Select Folder")}</button>
                     </div>
                   )}
                 </div>
@@ -2854,7 +2832,7 @@ export function CliSidebar({
           <div className="w-full max-w-lg rounded-xl border border-cyber-line/80 bg-cyber-panel shadow-2xl overflow-hidden flex flex-col max-h-[450px]">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-cyber-line/55 bg-cyber-base/40 px-4 py-3">
-              <span className="font-display text-[10px] uppercase tracking-wider text-cyber-neon font-bold">Search Files</span>
+              <span className="font-display text-[10px] uppercase tracking-wider text-cyber-neon font-bold">{tr("Search Files")}</span>
               <button 
                 type="button" 
                 onClick={() => setIsSearchModalOpen(false)}
@@ -2872,7 +2850,7 @@ export function CliSidebar({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Type name to find files..."
+                placeholder={tr("Type name to find files...")}
                 className="w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-xs font-semibold text-slate-100 placeholder-slate-500 outline-none focus:border-cyber-neon transition"
               />
             </div>
@@ -2882,12 +2860,10 @@ export function CliSidebar({
               {isSearchLoading ? (
                 <div className="flex flex-col items-center justify-center py-8 text-xs text-slate-400 gap-2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyber-neon border-t-transparent" />
-                  <span>Scanning workspace files...</span>
+                  <span>{tr("Scanning workspace files...")}</span>
                 </div>
               ) : filteredFiles.length === 0 ? (
-                <div className="text-center py-8 text-xs text-slate-500">
-                  No files match your search query.
-                </div>
+                <div className="text-center py-8 text-xs text-slate-500">{tr("No files match your search query.")}</div>
               ) : (
                 <div className="space-y-0.5 font-mono">
                   {filteredFiles.map((file, idx) => {
@@ -2932,16 +2908,12 @@ export function CliSidebar({
             type="button"
             onClick={() => handleTriggerRewriteAction('rewrite', inputContextMenu.text)}
             className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon transition cursor-pointer w-full"
-          >
-            ✨ Optimize Prompt
-          </button>
+          >{tr("✨ Optimize Prompt")}</button>
           <button
             type="button"
             onClick={() => handleTriggerRewriteAction('suggest', inputContextMenu.text)}
             className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/25 hover:text-cyber-neon transition cursor-pointer w-full"
-          >
-            💻 Fix/Suggest Command
-          </button>
+          >{tr("💻 Fix/Suggest Command")}</button>
         </div>
       )}
 
@@ -2962,9 +2934,7 @@ export function CliSidebar({
               setFileContextMenu(null);
             }}
             className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
-          >
-            📋 Copy Path
-          </button>
+          >{tr("📋 Copy Path")}</button>
           {!fileContextMenu.target.connection && (
             <button
               type="button"
@@ -2975,9 +2945,7 @@ export function CliSidebar({
                 catch (e) { console.error('Reveal failed:', e); }
               }}
               className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
-            >
-              📂 Reveal in Explorer
-            </button>
+            >{tr("📂 Reveal in Explorer")}</button>
           )}
           {/* Download option for SSH remote files */}
           {fileContextMenu.target.connection && !fileContextMenu.target.isDir && (
@@ -2999,9 +2967,7 @@ export function CliSidebar({
                 }
               }}
               className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
-            >
-              ⬇️ Download to Local
-            </button>
+            >{tr("⬇️ Download to Local")}</button>
           )}
           {fileContextMenu.target.canDelete && (
             <>
@@ -3011,9 +2977,7 @@ export function CliSidebar({
                 onClick={() => openDeleteConfirmation(fileContextMenu.target)}
                 className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-500/20 hover:text-rose-400 transition"
               >
-                <TrashIcon />
-                Delete
-              </button>
+                <TrashIcon />{tr("Delete")}</button>
             </>
           )}
         </div>
@@ -3028,11 +2992,11 @@ export function CliSidebar({
             aria-labelledby="delete-confirmation-title"
             className="w-96 max-w-[calc(100vw-2rem)] rounded-lg border border-rose-500/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none"
           >
-            <h2 id="delete-confirmation-title" className="font-display text-sm uppercase tracking-[0.2em] text-rose-400 font-bold mb-4">Delete Confirmation</h2>
+            <h2 id="delete-confirmation-title" className="font-display text-sm uppercase tracking-[0.2em] text-rose-400 font-bold mb-4">{tr("Delete Confirmation")}</h2>
             <p className="text-sm text-slate-300 mb-2">
               {deleteConfirm.isDir
-                ? 'This permanently deletes the folder and all of its contents:'
-                : 'This permanently deletes the file:'}
+                ? tr("This permanently deletes the folder and all of its contents:")
+                : tr("This permanently deletes the file:")}
             </p>
             <p className="text-sm text-rose-300 font-mono bg-cyber-base/50 p-2 rounded border border-cyber-line mb-6 break-all">
               {deleteConfirm.name}
@@ -3047,15 +3011,13 @@ export function CliSidebar({
                 onClick={() => setDeleteConfirm(null)}
                 disabled={deleteConfirm.deleting}
                 className="px-4 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
+              >{tr("Cancel")}</button>
               <button
                 onClick={() => void handleConfirmDelete()}
                 disabled={deleteConfirm.deleting}
                 className="min-w-20 px-4 py-1.5 text-xs font-bold text-rose-400 bg-rose-500/20 border border-rose-500/40 rounded hover:bg-rose-500/30 uppercase tracking-wider transition disabled:cursor-wait disabled:opacity-60"
               >
-                {deleteConfirm.deleting ? 'Deleting...' : 'Delete'}
+                {deleteConfirm.deleting ? tr("Deleting...") : tr("Delete")}
               </button>
             </div>
           </div>
@@ -3067,25 +3029,25 @@ export function CliSidebar({
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-[480px] rounded-xl border border-cyber-neon/50 bg-cyber-panel/95 p-6 shadow-2xl backdrop-blur-md select-none">
             <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-neon font-bold mb-4">
-              {rewriteModal.type === 'suggest' ? '💻 AI Command Suggester' : '✨ AI Prompt Optimizer'}
+              {rewriteModal.type === 'suggest' ? tr("💻 AI Command Suggester") : tr("✨ AI Prompt Optimizer")}
             </h2>
 
             <div className="mb-4">
-              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Original Message</label>
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">{tr("Original Message")}</label>
               <div className="max-h-24 overflow-y-auto rounded border border-cyber-line bg-cyber-base/50 px-3 py-2 text-[11px] text-slate-400 font-mono whitespace-pre-wrap break-all">
                 {rewriteModal.originalText}
               </div>
             </div>
 
             <div className="mb-4">
-              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">Optimized Result</label>
+              <label className="block text-[10px] uppercase tracking-wide text-slate-400 mb-1">{tr("Optimized Result")}</label>
               {rewriteModal.loading ? (
                 <div className="flex flex-col items-center justify-center py-8 rounded border border-cyber-line bg-cyber-base/30 text-cyber-neon/80 text-xs font-mono">
                   <svg className="animate-spin h-5 w-5 mb-2 text-cyber-neon" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>Running local inference...</span>
+                  <span>{tr("Running local inference...")}</span>
                 </div>
               ) : rewriteModal.error ? (
                 <div className="rounded border border-red-500/30 bg-red-950/20 px-3 py-2 text-[11px] text-red-400 font-mono whitespace-pre-wrap break-all">
@@ -3111,18 +3073,14 @@ export function CliSidebar({
                       setRewriteModal(null);
                     }}
                     className="rounded border border-cyber-neon/40 bg-cyber-neon/15 px-4 py-2 hover:bg-cyber-neon/25 text-cyber-neon transition uppercase font-bold"
-                  >
-                    ✔️ Apply (Replace Input)
-                  </button>
+                  >{tr("✔️ Apply (Replace Input)")}</button>
                 </>
               )}
               <button
                 type="button"
                 onClick={() => setRewriteModal(null)}
                 className="rounded border border-cyber-line px-4 py-2 hover:bg-cyber-line/20 text-slate-300 transition uppercase"
-              >
-                Cancel
-              </button>
+              >{tr("Cancel")}</button>
             </div>
           </div>
         </div>

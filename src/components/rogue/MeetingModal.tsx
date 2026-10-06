@@ -1,3 +1,4 @@
+import { t as tr } from '../../i18n';
 import React, { useState } from 'react';
 import { Player } from './types';
 
@@ -50,20 +51,17 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({
                 🚨
               </span>
               <div>
-                <h2 className="text-base font-bold uppercase tracking-wider text-rose-400 font-mono">
-                  KERNEL LOCKDOWN // DIAGNOSTIC MEETING
-                </h2>
+                <h2 className="text-base font-bold uppercase tracking-wider text-rose-400 font-mono">{tr("KERNEL LOCKDOWN // DIAGNOSTIC MEETING")}</h2>
                 <p className="text-xs text-slate-400">
-                  {isDiscussion ? '🔒 Discussion Phase: Review subroutines' : '🗳️ Voting Phase: Cast deallocation vote'}
+                  {isDiscussion ? tr("🔒 Discussion Phase: Review subroutines") : tr("🗳️ Voting Phase: Cast deallocation vote")}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 border border-slate-800">
-              <span className="text-xs text-slate-400 font-mono">COUNTDOWN:</span>
+              <span className="text-xs text-slate-400 font-mono">{tr("COUNTDOWN:")}</span>
               <span className="text-lg font-bold font-mono text-amber-400">
-                {timeLeft}s
-              </span>
+                {timeLeft}{tr("s")}</span>
             </div>
           </header>
 
@@ -102,13 +100,11 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-white">{p.name}</span>
                         {isSelf && (
-                          <span className="text-[9px] font-mono rounded bg-slate-800 px-1.5 py-0.5 text-slate-400">
-                            YOU
-                          </span>
+                          <span className="text-[9px] font-mono rounded bg-slate-800 px-1.5 py-0.5 text-slate-400">{tr("YOU")}</span>
                         )}
                       </div>
                       <span className="text-[11px] font-mono text-slate-500">
-                        {p.isAlive ? 'SUBROUTINE ACTIVE' : 'TERMINATED'}
+                        {p.isAlive ? tr("SUBROUTINE ACTIVE") : tr("TERMINATED")}
                       </span>
                     </div>
                   </div>
@@ -121,9 +117,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({
                         handleVote(p.id);
                       }}
                       className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-500 shadow-md"
-                    >
-                      VOTE
-                    </button>
+                    >{tr("VOTE")}</button>
                   )}
                 </div>
               );
@@ -140,14 +134,11 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({
                   ? 'opacity-40 cursor-not-allowed bg-slate-900 text-slate-500'
                   : 'bg-slate-900 text-slate-300 hover:border-amber-500/50 hover:bg-slate-800 hover:text-white'
               }`}
-            >
-              ⏭️ Skip Diagnostic Vote
-            </button>
+            >{tr("⏭️ Skip Diagnostic Vote")}</button>
 
             {hasVoted && (
               <span className="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
-                <span>✓</span> Vote Recorded by Kernel
-              </span>
+                <span>✓</span>{tr(" Vote Recorded by Kernel")}</span>
             )}
           </footer>
         </div>
@@ -156,9 +147,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({
         <div className="flex w-80 flex-col bg-slate-900/50 p-4">
           <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-3">
             <span className="text-sm">💬</span>
-            <span className="text-xs font-mono font-bold uppercase text-slate-300 tracking-wider">
-              Emergency Comms
-            </span>
+            <span className="text-xs font-mono font-bold uppercase text-slate-300 tracking-wider">{tr("Emergency Comms")}</span>
           </div>
 
           {/* Messages list */}
@@ -174,7 +163,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({
               >
                 <div className="flex items-center justify-between font-mono text-[10px] text-slate-400 mb-1">
                   <span className="font-bold text-cyan-400">{msg.sender}</span>
-                  {msg.isGhost && <span className="text-purple-400">[ECHO]</span>}
+                  {msg.isGhost && <span className="text-purple-400">{tr("[ECHO]")}</span>}
                 </div>
                 <p className="break-words">{msg.text}</p>
               </div>
@@ -185,7 +174,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({
           <form onSubmit={handleChatSubmit} className="mt-3 flex gap-2">
             <input
               type="text"
-              placeholder={localPlayer.isAlive ? "State your reasoning..." : "Dead units comm channel..."}
+              placeholder={localPlayer.isAlive ? tr("State your reasoning...") : tr("Dead units comm channel...")}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
@@ -193,9 +182,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({
             <button
               type="submit"
               className="rounded-xl bg-cyan-600 px-3 py-2 text-xs font-bold text-white hover:bg-cyan-500"
-            >
-              Send
-            </button>
+            >{tr("Send")}</button>
           </form>
         </div>
 

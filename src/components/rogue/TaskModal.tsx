@@ -1,3 +1,4 @@
+import { t as tr } from '../../i18n';
 import React, { useState } from 'react';
 import { TaskPoint } from './types';
 
@@ -44,8 +45,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onComplete, onClose 
           <div className="flex items-center gap-2">
             <span className="text-xl">🛠️</span>
             <div>
-              <h3 className="font-bold text-sm text-cyan-400">{task.name}</h3>
-              <p className="text-[11px] text-slate-400">{task.room} - Quantum Subsystem</p>
+              <h3 className="font-bold text-sm text-cyan-400">{tr(task.name)}</h3>
+              <p className="text-[11px] text-slate-400">{task.room}{tr(" - Quantum Subsystem")}</p>
             </div>
           </div>
           <button
@@ -59,9 +60,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onComplete, onClose 
         {/* Task type: Fix Wires */}
         {task.type === 'wires' && (
           <div className="flex flex-col gap-4 py-4">
-            <p className="text-xs text-slate-300 text-center">
-              Connect matching optical fiber frequencies:
-            </p>
+            <p className="text-xs text-slate-300 text-center">{tr("Connect matching optical fiber frequencies:")}</p>
             <div className="flex justify-between items-center px-6">
               <div className="flex flex-col gap-4">
                 {colors.map((c, i) => (
@@ -98,8 +97,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onComplete, onClose 
         {task.type === 'card_swipe' && (
           <div className="flex flex-col items-center gap-6 py-6">
             <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 w-full text-center">
-              <span className="text-xs font-mono uppercase tracking-widest text-slate-400">
-                STATUS: {swipeStatus.toUpperCase()}
+              <span className="text-xs font-mono uppercase tracking-widest text-slate-400">{tr("STATUS: ")}{tr(swipeStatus.toUpperCase())}
               </span>
               <div className="mt-2 h-2 w-full rounded-full bg-slate-800 overflow-hidden">
                 <div
@@ -124,7 +122,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onComplete, onClose 
               }}
               className="w-full h-8 accent-cyan-400 cursor-pointer"
             />
-            <p className="text-[11px] text-slate-400">Drag authorization card across the scanner</p>
+            <p className="text-[11px] text-slate-400">{tr("Drag authorization card across the scanner")}</p>
           </div>
         )}
 
@@ -132,13 +130,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({ task, onComplete, onClose 
         {(task.type === 'quantum_disk' || task.type === 'download_data') && (
           <div className="flex flex-col items-center gap-6 py-6 text-center">
             <div className="text-4xl animate-spin">💿</div>
-            <p className="text-xs text-slate-300">Synchronizing Quantum Memory Sector...</p>
+            <p className="text-xs text-slate-300">{tr("Synchronizing Quantum Memory Sector...")}</p>
             <button
               onClick={() => onComplete(task.id)}
               className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-2.5 text-xs font-bold text-white shadow-lg hover:from-cyan-400 hover:to-blue-500"
-            >
-              Verify Quantum Hash
-            </button>
+            >{tr("Verify Quantum Hash")}</button>
           </div>
         )}
       </div>

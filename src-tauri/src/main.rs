@@ -7,9 +7,14 @@ mod companion;
 mod core;
 mod runners;
 mod terminal;
+mod ui_language;
 
 use app_state::AppState;
+use commands::language_commands::{set_ui_language, NativeLanguageState};
 use commands::{
+    agent_session_commands::{
+        agent_export_session_context, agent_list_sessions, agent_session_preview,
+    },
     api_proxy::{api_proxy_abort, api_proxy_request, api_proxy_stream},
     builtin_llm_commands::{
         builtin_llm_generate, builtin_llm_get_config, builtin_llm_load, builtin_llm_save_config,
@@ -39,9 +44,9 @@ use commands::{
     },
     nes_commands::{
         nes_accept_invite, nes_create_public_room, nes_create_room_and_invite, nes_end_room,
-        nes_get_config, nes_get_pubkey, nes_has_state, nes_join_room, nes_leave_room, nes_list_rooms,
-        nes_load_state, nes_open_rom, nes_refresh_connection, nes_save_config, nes_save_state,
-        nes_test_server,
+        nes_get_config, nes_get_pubkey, nes_has_state, nes_join_room, nes_leave_room,
+        nes_list_rooms, nes_load_state, nes_open_rom, nes_refresh_connection, nes_save_config,
+        nes_save_state, nes_test_server,
     },
     notepad_commands::{get_notepad, save_notepad},
     pet_commands::{pet_install_pack, pet_list_packs, pet_load_asset},
@@ -55,9 +60,6 @@ use commands::{
     },
     rtk_commands::rtk_get_status,
     system_commands::{adjust_window_scale, get_system_logs, get_window_size},
-    agent_session_commands::{
-        agent_export_session_context, agent_list_sessions, agent_session_preview,
-    },
 };
 use companion::commands::{
     companion_cancel, companion_clear_history, companion_get_catalog, companion_get_config,
@@ -69,6 +71,7 @@ use companion::terminal_command::{
     terminal_command_cancel, terminal_command_detect_environment, terminal_command_suggest,
 };
 use tauri::{Emitter, Manager};
+use ui_language::UiLanguage;
 
 fn cleanup_for_exit(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
@@ -94,6 +97,7 @@ fn main() {
         .manage(state.api_proxy.clone())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
+            set_ui_language,
             buzz_get_config,
             buzz_set_config,
             buzz_list_channels,
@@ -247,7 +251,7 @@ fn main() {
             agent_list_sessions,
             agent_session_preview,
             agent_export_session_context,
-                    ])
+        ])
         .setup(|app| {
             // Initialize companion with app handle for event emission
             if let Some(state) = app.try_state::<AppState>() {
@@ -278,14 +282,25 @@ fn main() {
                 }
             }
 
-            let show =
-                tauri::menu::MenuItem::with_id(app, "show", "Hiện ứng dụng", true, None::<&str>)?;
-            let hide = tauri::menu::MenuItem::with_id(
-                app, "hide", "Ẩn xuống khay hệ thống", true, None::<&str>,
-            )?;
-            let quit =
-                tauri::menu::MenuItem::with_id(app, "quit", "Thoát hoàn toàn", true, None::<&str>)?;
+            let preference_path = app
+                .state::<AppState>()
+                .registry
+                .data_dirs()
+                .root_dir
+                .join("ui-language");
+            let language = UiLanguage::load(&preference_path);
+            let copy = language.copy();
+            let show = tauri::menu::MenuItem::with_id(app, "show", copy.show, true, None::<&str>)?;
+            let hide = tauri::menu::MenuItem::with_id(app, "hide", copy.hide, true, None::<&str>)?;
+            let quit = tauri::menu::MenuItem::with_id(app, "quit", copy.quit, true, None::<&str>)?;
             let tray_menu = tauri::menu::Menu::with_items(app, &[&show, &hide, &quit])?;
+            app.manage(NativeLanguageState {
+                language: std::sync::Mutex::new(language),
+                show,
+                hide,
+                quit,
+                preference_path,
+            });
 
             let _tray = tauri::tray::TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -340,14 +355,23 @@ fn main() {
                 api.prevent_close();
                 use tauri_plugin_dialog::DialogExt;
                 let w = window.clone();
+                let language = window
+                    .app_handle()
+                    .state::<NativeLanguageState>()
+                    .language
+                    .lock()
+                    .map(|language| *language)
+                    .unwrap_or_default();
+                let copy = language.copy();
                 window
                     .dialog()
-                    .message(
-                        "Bạn có muốn ẩn ứng dụng xuống khay hệ thống (minitray) không?\nChọn 'Yes' để ẩn xuống khay, 'No' để thoát hoàn toàn ứng dụng.",
-                    )
-                    .title("Thoát ứng dụng")
+                    .message(copy.exit_message)
+                    .title(copy.exit_title)
                     .kind(tauri_plugin_dialog::MessageDialogKind::Info)
-                    .buttons(tauri_plugin_dialog::MessageDialogButtons::YesNo)
+                    .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom(
+                        copy.hide_button.into(),
+                        copy.quit_button.into(),
+                    ))
                     .show(move |result| {
                         if result {
                             let _ = w.emit("app-window-visibility", false);

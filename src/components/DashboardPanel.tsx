@@ -1,5 +1,6 @@
+import { tFeedback as trFeedback, t as tr, getIntlLocale } from '../i18n';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { confirm } from '@tauri-apps/plugin-dialog';
+import { confirm } from '../lib/dialogs';
 import {
   dashboardGetResourceUsage,
   dashboardDeleteMonitor,
@@ -107,7 +108,7 @@ function ExpandModal({ title, onClose, children }: { title: string; onClose: () 
       <div className="w-full max-w-5xl h-[85vh] rounded-xl border border-cyber-line/50 bg-cyber-panel shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-cyber-line/30 shrink-0">
           <h2 className="text-xs uppercase tracking-[0.15em] text-cyber-electric font-black">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded border border-slate-600/30 px-2 py-1 text-[10px] font-bold uppercase text-slate-400 hover:text-slate-200 hover:border-slate-400/50">Close</button>
+          <button type="button" onClick={onClose} className="rounded border border-slate-600/30 px-2 py-1 text-[10px] font-bold uppercase text-slate-400 hover:text-slate-200 hover:border-slate-400/50">{tr("Close")}</button>
         </div>
         <div className="flex-1 overflow-y-auto min-h-0">
           {children}
@@ -353,7 +354,7 @@ export function DashboardPanel() {
           for (const port of ports.filter((value) => Number.isInteger(value) && value > 0 && value <= 65535 && !existingLocal.has(value))) {
             await dashboardUpsertMonitor({
               id: crypto.randomUUID(),
-              label: `Local :${port}`,
+              label: tr("Local :{v0}", { v0: String(port) }),
               servicePort: port,
               targetType: 'local',
               target: null,
@@ -383,7 +384,7 @@ export function DashboardPanel() {
   }, [refreshAll]);
 
   const removeMonitor = async (monitor: MonitorConfig) => {
-    const accepted = await confirm(`Remove monitor “${monitor.label}” for ${monitorTargetLabel(monitor)}:${monitor.servicePort}?`, { title: 'Remove monitor', kind: 'warning' });
+    const accepted = await confirm(tr("Remove monitor “{v0}” for {v1}:{v2}?", { v0: String(monitor.label), v1: String(monitorTargetLabel(monitor)), v2: String(monitor.servicePort) }), { title: tr("Remove monitor"), kind: 'warning' });
     if (!accepted) return;
     try {
       await dashboardDeleteMonitor(monitor.id);
@@ -418,7 +419,7 @@ export function DashboardPanel() {
 
   const confirmKill = async (monitor: MonitorConfig, processes: MonitorProcessIdentity[], mode: 'normal' | 'force') => {
     const pidText = processes.map((process) => process.pid).join(', ');
-    const accepted = await confirm(`${mode === 'force' ? 'Force kill' : 'Stop'} PID ${pidText} on ${monitorTargetLabel(monitor)}:${monitor.servicePort}? The backend will reject any PID whose start identity changed.`, { title: mode === 'force' ? 'Force kill listener' : 'Stop listener', kind: 'warning' });
+    const accepted = await confirm(tr("{v0} PID {v1} on {v2}:{v3}? The backend will reject any PID whose start identity changed.", { v0: tr(mode === 'force' ? 'Force kill' : 'Stop'), v1: String(pidText), v2: String(monitorTargetLabel(monitor)), v3: String(monitor.servicePort) }), { title: mode === 'force' ? tr("Force kill listener") : tr("Stop listener"), kind: 'warning' });
     if (accepted) await runKill(monitor, processes, mode);
   };
 
@@ -452,14 +453,14 @@ export function DashboardPanel() {
           <>
             <span className="text-xl font-black text-cyber-neon leading-none">{fmtMemShort(usage.uiMemoryMb)}</span>
             <div className="flex flex-col leading-none">
-              <span className="text-[9px] text-slate-500">UI-owned · full service tree {fmtMemShort(usage.treeMemoryMb)}</span>
-              <span className="text-[9px] text-slate-600">{usage.processCount} processes · {usage.webviewCount} WebViews · lag p95 {uiHealth.p95LagMs.toFixed(0)} ms{uiHealth.maxLongTaskMs ? ` · long ${uiHealth.maxLongTaskMs.toFixed(0)} ms` : ''}</span>
+              <span className="text-[9px] text-slate-500">{tr("UI-owned · full service tree ")}{fmtMemShort(usage.treeMemoryMb)}</span>
+              <span className="text-[9px] text-slate-600">{usage.processCount}{tr(" processes · ")}{usage.webviewCount}{tr(" WebViews · lag p95 ")}{uiHealth.p95LagMs.toFixed(0)} ms{uiHealth.maxLongTaskMs ? tr(" · long {v0} ms", { v0: String(uiHealth.maxLongTaskMs.toFixed(0)) }) : ''}</span>
             </div>
           </>
         ) : (
-          <span className="text-[9px] text-slate-700 italic">loading…</span>
+          <span className="text-[9px] text-slate-700 italic">{tr("loading…")}</span>
         )}
-        {resError && <span className="text-[9px] text-red-400 ml-2">{resError}</span>}
+        {resError && <span className="text-[9px] text-red-400 ml-2">{trFeedback(resError ?? '')}</span>}
       </div>
 
       {/* ═══ 2×2 Grid ═══ */}
@@ -469,12 +470,12 @@ export function DashboardPanel() {
           <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/10 flex flex-col overflow-hidden min-h-0 cursor-pointer" onClick={() => setExpandedWidget('syslogs')}>
             <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/20 shrink-0">
               <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">System Logs</h3>
-                <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={TOOLTIPS.syslogs}>?</span>
+                <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">{tr("System Logs")}</h3>
+                <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={tr(TOOLTIPS.syslogs)}>?</span>
               </div>
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{sysLogs.length} entries</span>
-                <button type="button" onClick={() => toggleWidget('syslogs')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">OFF</button>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{sysLogs.length}{tr(" entries")}</span>
+                <button type="button" onClick={() => toggleWidget('syslogs')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">{tr("OFF")}</button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-1.5 min-h-0 space-y-0.5">
@@ -490,14 +491,14 @@ export function DashboardPanel() {
                   </div>
                 ))
               )}
-              <div className="text-[8px] text-slate-600 text-center pt-1">Click to expand → full log viewer with level filter</div>
+              <div className="text-[8px] text-slate-600 text-center pt-1">{tr("Click to expand → full log viewer with level filter")}</div>
             </div>
           </div>
         ) : (
           <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/5 flex items-center justify-center min-h-0">
             <div className="flex flex-col items-center gap-3">
-              <span className="text-[9px] uppercase tracking-wider text-slate-600">System Logs off</span>
-              <button type="button" onClick={() => toggleWidget('syslogs')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">Turn ON</button>
+              <span className="text-[9px] uppercase tracking-wider text-slate-600">{tr("System Logs off")}</span>
+              <button type="button" onClick={() => toggleWidget('syslogs')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">{tr("Turn ON")}</button>
             </div>
           </div>
         )}
@@ -507,21 +508,21 @@ export function DashboardPanel() {
           <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/10 flex flex-col overflow-hidden min-h-0">
             <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/20 shrink-0">
               <div className="flex items-center gap-1.5">
-                <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">Port Monitor</h3>
-                <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={TOOLTIPS.portmon}>?</span>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{monitors.length} tracked</span>
+                <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">{tr("Port Monitor")}</h3>
+                <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={tr(TOOLTIPS.portmon)}>?</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{monitors.length}{tr(" tracked")}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => toggleWidget('portmon')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">OFF</button>
-                <button type="button" onClick={() => { setEditingMonitor(null); setEditorOpen(true); }} className="rounded border border-cyber-electric/40 bg-cyber-electric/5 px-2 py-1 text-[8px] font-black uppercase text-cyber-electric hover:bg-cyber-electric/10">+ Monitor</button>
+                <button type="button" onClick={() => toggleWidget('portmon')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">{tr("OFF")}</button>
+                <button type="button" onClick={() => { setEditingMonitor(null); setEditorOpen(true); }} className="rounded border border-cyber-electric/40 bg-cyber-electric/5 px-2 py-1 text-[8px] font-black uppercase text-cyber-electric hover:bg-cyber-electric/10">{tr("+ Monitor")}</button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-2 min-h-0">
               {monitorErrors._load && <div className="mb-2 rounded border border-red-500/30 bg-red-500/5 p-2 text-[9px] text-red-300">{monitorErrors._load}</div>}
               {monitors.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-600">
-                  <span className="text-[9px] uppercase tracking-wider">No services tracked</span>
-                  <button type="button" onClick={() => { setEditingMonitor(null); setEditorOpen(true); }} className="rounded border border-cyber-electric/40 px-3 py-1.5 text-[9px] font-bold uppercase text-cyber-electric">Add local or SSH monitor</button>
+                  <span className="text-[9px] uppercase tracking-wider">{tr("No services tracked")}</span>
+                  <button type="button" onClick={() => { setEditingMonitor(null); setEditorOpen(true); }} className="rounded border border-cyber-electric/40 px-3 py-1.5 text-[9px] font-bold uppercase text-cyber-electric">{tr("Add local or SSH monitor")}</button>
                 </div>
               ) : (
                 <div className={`grid gap-2 ${portGridCols === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
@@ -542,7 +543,7 @@ export function DashboardPanel() {
                             <div className="flex min-w-0 items-center gap-1.5"><span className="truncate text-[10px] font-bold text-slate-100">{monitor.label}</span><span className="text-[10px] font-black text-cyan-400">:{monitor.servicePort}</span></div>
                             <div className="truncate text-[8px] text-slate-600" title={monitorTargetLabel(monitor)}>{monitorTargetLabel(monitor)}</div>
                           </div>
-                          {monitor.targetType === 'ssh' && <span className="rounded border border-amber-500/20 px-1 py-0.5 text-[7px] font-black text-amber-400">UNVERIFIED</span>}
+                          {monitor.targetType === 'ssh' && <span className="rounded border border-amber-500/20 px-1 py-0.5 text-[7px] font-black text-amber-400">{tr("UNVERIFIED")}</span>}
                           <span className="text-[8px] uppercase text-slate-500">{status}</span>
                           <span className="text-slate-600">{isExpanded ? '▴' : '▾'}</span>
                         </button>
@@ -550,18 +551,18 @@ export function DashboardPanel() {
                         {alive && listeners[0] && (
                           <div className="mt-1.5 flex items-center gap-3 text-[9px]">
                             <span className="text-green-400">{fmtMemShort(listeners.reduce((sum, item) => sum + item.memoryMb, 0))}</span>
-                            <span className="text-slate-600">{listeners.length} PID{listeners.length === 1 ? '' : 's'}</span>
+                            <span className="text-slate-600">{listeners.length} PID{listeners.length === 1 ? '' : tr("s")}</span>
                             <span className="text-amber-400">{fmtUptime(Math.max(...listeners.map((item) => item.uptimeSeconds)))}</span>
-                            <button type="button" onClick={() => setLogMonitorId(monitor.id)} className="ml-auto rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-amber-300">Logs</button>
+                            <button type="button" onClick={() => setLogMonitorId(monitor.id)} className="ml-auto rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-amber-300">{tr("Logs")}</button>
                           </div>
                         )}
                         {alive && !listeners[0] && (
                           <div className="mt-1.5 flex items-center gap-2 text-[9px] text-slate-500">
-                            <span>TCP listener found · process metadata unavailable</span>
-                            {monitor.logSource.kind !== 'auto' && <button type="button" onClick={() => setLogMonitorId(monitor.id)} className="ml-auto rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-amber-300">Logs</button>}
+                            <span>{tr("TCP listener found · process metadata unavailable")}</span>
+                            {monitor.logSource.kind !== 'auto' && <button type="button" onClick={() => setLogMonitorId(monitor.id)} className="ml-auto rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-amber-300">{tr("Logs")}</button>}
                           </div>
                         )}
-                        {!alive && <div className="mt-1 text-[9px] text-slate-500">{snapshot?.error || (status === 'notListening' ? 'TCP port is not listening' : 'Waiting for probe…')}</div>}
+                        {!alive && <div className="mt-1 text-[9px] text-slate-500">{snapshot?.error || (status === 'notListening' ? tr("TCP port is not listening") : tr("Waiting for probe…"))}</div>}
                         {monitorErrors[monitor.id] && <div className="mt-1 break-words text-[8px] text-red-300">{monitorErrors[monitor.id]}</div>}
                         {isExpanded && (
                           <div className="mt-2 space-y-2 border-t border-cyber-line/20 pt-2">
@@ -571,17 +572,17 @@ export function DashboardPanel() {
                               const canKill = listener.startToken.trim().length > 0;
                               return (
                                 <div key={`${listener.pid}:${listener.startToken}`} className="rounded border border-cyber-line/30 bg-black/20 p-2">
-                                  <div className="flex items-center gap-2"><span className="font-bold text-slate-200">PID {listener.pid}</span><span className="min-w-0 flex-1 truncate text-[9px] text-slate-500">{listener.processName}</span><button type="button" title={canKill ? 'Revalidates PID and start identity before stopping' : 'Stable process start identity is unavailable'} disabled={!canKill || killBusy === actionKey} onClick={() => void confirmKill(monitor, [listener], force ? 'force' : 'normal')} className={`rounded border px-1.5 py-0.5 text-[8px] font-black uppercase disabled:opacity-50 ${force ? 'border-red-500 bg-red-500/20 text-red-200' : 'border-red-500/40 text-red-400'}`}>{force ? 'Force' : 'Stop'}</button></div>
+                                  <div className="flex items-center gap-2"><span className="font-bold text-slate-200">PID {listener.pid}</span><span className="min-w-0 flex-1 truncate text-[9px] text-slate-500">{listener.processName}</span><button type="button" title={canKill ? tr("Revalidates PID and start identity before stopping") : tr("Stable process start identity is unavailable")} disabled={!canKill || killBusy === actionKey} onClick={() => void confirmKill(monitor, [listener], force ? 'force' : 'normal')} className={`rounded border px-1.5 py-0.5 text-[8px] font-black uppercase disabled:opacity-50 ${force ? 'border-red-500 bg-red-500/20 text-red-200' : 'border-red-500/40 text-red-400'}`}>{force ? tr("Force") : tr("Stop")}</button></div>
                                   {listener.exePath && <div className="mt-1 truncate text-[8px] text-slate-600" title={listener.exePath}>{fmtPath(listener.exePath, 58)}</div>}
-                                  <div className="mt-1 flex gap-3 text-[8px] text-slate-600"><span>{fmtMemShort(listener.memoryMb)}</span><span>CPU {listener.cpuTimeSeconds.toFixed(1)}s</span><span>{fmtUptime(listener.uptimeSeconds)}</span></div>
+                                  <div className="mt-1 flex gap-3 text-[8px] text-slate-600"><span>{fmtMemShort(listener.memoryMb)}</span><span>CPU {listener.cpuTimeSeconds.toFixed(1)}{tr("s")}</span><span>{fmtUptime(listener.uptimeSeconds)}</span></div>
                                 </div>
                               );
                             })}
-                            {killableListeners.length > 1 && <button type="button" onClick={() => void confirmKill(monitor, killableListeners, killableListeners.some((item) => forceSet.has(item.pid)) ? 'force' : 'normal')} className="w-full rounded border border-red-500/40 bg-red-500/5 py-1 text-[8px] font-black uppercase text-red-400">{killableListeners.some((item) => forceSet.has(item.pid)) ? 'Force all confirmed PIDs' : 'Stop all confirmed PIDs'}</button>}
+                            {killableListeners.length > 1 && <button type="button" onClick={() => void confirmKill(monitor, killableListeners, killableListeners.some((item) => forceSet.has(item.pid)) ? 'force' : 'normal')} className="w-full rounded border border-red-500/40 bg-red-500/5 py-1 text-[8px] font-black uppercase text-red-400">{killableListeners.some((item) => forceSet.has(item.pid)) ? tr("Force all confirmed PIDs") : tr("Stop all confirmed PIDs")}</button>}
                             <div className="grid grid-cols-3 gap-1.5">
-                              <button type="button" disabled={!canOpenLogs} onClick={() => setLogMonitorId(monitor.id)} className="rounded border border-amber-500/40 py-1 text-[8px] font-bold uppercase text-amber-300 disabled:opacity-40">Live logs</button>
-                              <button type="button" onClick={() => { setEditingMonitor(monitor); setEditorOpen(true); }} className="rounded border border-cyber-line py-1 text-[8px] font-bold uppercase text-slate-400">Edit</button>
-                              <button type="button" onClick={() => void removeMonitor(monitor)} className="rounded border border-red-500/30 py-1 text-[8px] font-bold uppercase text-red-400">Remove</button>
+                              <button type="button" disabled={!canOpenLogs} onClick={() => setLogMonitorId(monitor.id)} className="rounded border border-amber-500/40 py-1 text-[8px] font-bold uppercase text-amber-300 disabled:opacity-40">{tr("Live logs")}</button>
+                              <button type="button" onClick={() => { setEditingMonitor(monitor); setEditorOpen(true); }} className="rounded border border-cyber-line py-1 text-[8px] font-bold uppercase text-slate-400">{tr("Edit")}</button>
+                              <button type="button" onClick={() => void removeMonitor(monitor)} className="rounded border border-red-500/30 py-1 text-[8px] font-bold uppercase text-red-400">{tr("Remove")}</button>
                             </div>
                           </div>
                         )}
@@ -595,8 +596,8 @@ export function DashboardPanel() {
         ) : (
           <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/5 flex items-center justify-center min-h-0">
             <div className="flex flex-col items-center gap-3">
-              <span className="text-[9px] uppercase tracking-wider text-slate-600">Port Monitor off</span>
-              <button type="button" onClick={() => toggleWidget('portmon')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">Turn ON</button>
+              <span className="text-[9px] uppercase tracking-wider text-slate-600">{tr("Port Monitor off")}</span>
+              <button type="button" onClick={() => toggleWidget('portmon')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">{tr("Turn ON")}</button>
             </div>
           </div>
         )}
@@ -606,16 +607,16 @@ export function DashboardPanel() {
           <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/10 flex flex-col overflow-hidden min-h-0 cursor-pointer" onClick={() => setExpandedWidget('proxy')}>
             <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-line/20 shrink-0">
               <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">LLM Proxy</h3>
-                <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={TOOLTIPS.proxy}>?</span>
+                <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">{tr("LLM Proxy")}</h3>
+                <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={tr(TOOLTIPS.proxy, { port: pxyStatus?.port ?? 0 })}>?</span>
               </div>
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 {pxyStatus && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{pxyStatus.activeBackends} backends</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{pxyStatus.activeBackends}{tr(" backends")}</span>
                 )}
-                <button type="button" onClick={() => toggleWidget('proxy')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">OFF</button>
+                <button type="button" onClick={() => toggleWidget('proxy')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">{tr("OFF")}</button>
                 <button type="button" onClick={toggleProxy} disabled={pxyLoading} className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border transition-colors ${pxyStatus?.running ? 'border-red-500/40 bg-red-500/8 text-red-400 hover:bg-red-500/15' : 'border-green-500/40 bg-green-500/8 text-green-400 hover:bg-green-500/15'} ${pxyLoading ? 'opacity-50' : ''}`}>
-                  {pxyLoading ? '…' : pxyStatus?.running ? 'STOP' : 'START'}
+                  {pxyLoading ? '…' : pxyStatus?.running ? tr("STOP") : tr("START")}
                 </button>
               </div>
             </div>
@@ -628,8 +629,8 @@ export function DashboardPanel() {
                     <div className="flex items-center gap-2 text-[10px] pb-1.5 border-b border-cyber-line/15 mb-1">
                       <div className={`w-2 h-2 rounded-full ${pxyStatus.running ? 'bg-green-400 shadow-[0_0_5px_rgba(74,222,128,0.5)]' : 'bg-red-500'}`} />
                       <span className="text-cyber-electric font-bold">:{pxyStatus.port}</span>
-                      <span className="text-slate-500">{pxyStatus.running ? 'running' : 'stopped'}</span>
-                      {pxyStatus.running && <span className="text-slate-600 ml-auto">{pxyStatus.totalRequests} req</span>}
+                      <span className="text-slate-500">{pxyStatus.running ? tr("running") : tr("stopped")}</span>
+                      {pxyStatus.running && <span className="text-slate-600 ml-auto">{pxyStatus.totalRequests}{tr(" req")}</span>}
                     </div>
                   )}
                   {[...pxyLogs].reverse().slice(0, 10).map((l) => {
@@ -643,20 +644,20 @@ export function DashboardPanel() {
                             <span className={`font-semibold min-w-[28px] ${l.success ? 'text-green-400' : 'text-red-400'}`}>{l.status}</span>
                             <span className="text-cyan-500/70 truncate flex-1 min-w-0">{l.backend}/{l.model}</span>
                             <span className="text-slate-500 shrink-0">{l.durationMs}ms</span>
-                            {l.totalTokens > 0 && <span className="text-[8px] text-slate-600 shrink-0">{l.totalTokens.toLocaleString()}t</span>}
+                            {l.totalTokens > 0 && <span className="text-[8px] text-slate-600 shrink-0">{l.totalTokens.toLocaleString(getIntlLocale())}t</span>}
                           </div>
                           {(lastUserMsg || respPreview) && (
                             <div className="flex flex-col gap-0.5 mt-0.5 text-[9px]">
-                              {lastUserMsg && <span className="text-amber-400/80 truncate max-w-full">Q: {lastUserMsg}</span>}
-                              {respPreview && <span className="text-green-400/70 truncate max-w-full">A: {respPreview}</span>}
+                              {lastUserMsg && <span className="text-amber-400/80 truncate max-w-full">{tr("Q: ")}{lastUserMsg}</span>}
+                              {respPreview && <span className="text-green-400/70 truncate max-w-full">{tr("A: ")}{respPreview}</span>}
                             </div>
                           )}
                         </div>
                       </div>
                     );
                   })}
-                  {pxyLogs.length === 0 && <div className="flex items-center justify-center h-full text-[10px] text-slate-600 italic">No proxy requests yet</div>}
-                  <div className="text-[8px] text-slate-600 text-center pt-1">Click to expand → full proxy log</div>
+                  {pxyLogs.length === 0 && <div className="flex items-center justify-center h-full text-[10px] text-slate-600 italic">{tr("No proxy requests yet")}</div>}
+                  <div className="text-[8px] text-slate-600 text-center pt-1">{tr("Click to expand → full proxy log")}</div>
                 </>
               )}
             </div>
@@ -664,8 +665,8 @@ export function DashboardPanel() {
         ) : (
           <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/5 flex items-center justify-center min-h-0">
             <div className="flex flex-col items-center gap-3">
-              <span className="text-[9px] uppercase tracking-wider text-slate-600">LLM Proxy off</span>
-              <button type="button" onClick={() => toggleWidget('proxy')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">Turn ON</button>
+              <span className="text-[9px] uppercase tracking-wider text-slate-600">{tr("LLM Proxy off")}</span>
+              <button type="button" onClick={() => toggleWidget('proxy')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">{tr("Turn ON")}</button>
             </div>
           </div>
         )}
@@ -677,33 +678,33 @@ export function DashboardPanel() {
             <div className="flex flex-col flex-1 min-h-0 border-b border-cyber-line/20">
               <div className="flex items-center justify-between px-3 py-1.5 shrink-0">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">Target Monitor</h3>
-                  <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={TOOLTIPS.targetmon}>?</span>
+                  <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">{tr("Target Monitor")}</h3>
+                  <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={tr(TOOLTIPS.targetmon)}>?</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{targetConns.length} conns</span>
-                  <button type="button" onClick={() => toggleWidget('targetmon')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">OFF</button>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{targetConns.length}{tr(" conns")}</span>
+                  <button type="button" onClick={() => toggleWidget('targetmon')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">{tr("OFF")}</button>
                 </div>
               </div>
               <div className="flex items-center gap-2 px-3 pb-1.5 shrink-0">
                 <input type="text" value={targetInput} onChange={(e) => setTargetInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { setTarget(targetInput.trim()); void refreshAll(); } }}
-                  placeholder="IP or domain (e.g. 8.8.8.8, github.com)"
+                  placeholder={tr("IP or domain (e.g. 8.8.8.8, github.com)")}
                   className="flex-1 rounded border border-cyber-line/50 bg-cyber-base px-2 py-0.5 text-[10px] text-slate-200 outline-none focus:border-cyber-electric" />
                 <button type="button" onClick={() => { setTarget(targetInput.trim()); void refreshAll(); }}
-                  className="rounded border border-cyber-electric/40 bg-cyber-electric/5 px-2 py-0.5 text-[8px] font-black uppercase text-cyber-electric hover:bg-cyber-electric/10">Track</button>
+                  className="rounded border border-cyber-electric/40 bg-cyber-electric/5 px-2 py-0.5 text-[8px] font-black uppercase text-cyber-electric hover:bg-cyber-electric/10">{tr("Track")}</button>
                 {target && (
                   <button type="button" onClick={() => { setTarget(''); setTargetInput(''); setTargetConns([]); setTargetError(null); }}
-                    className="rounded border border-red-500/30 px-2 py-0.5 text-[8px] font-black uppercase text-red-400">Clear</button>
+                    className="rounded border border-red-500/30 px-2 py-0.5 text-[8px] font-black uppercase text-red-400">{tr("Clear")}</button>
                 )}
               </div>
               <div className="flex-1 overflow-y-auto px-3 pb-1 min-h-0 space-y-0.5">
                 {targetError ? (
-                  <div className="text-[10px] text-red-400 text-center py-2">{targetError}</div>
+                  <div className="text-[10px] text-red-400 text-center py-2">{trFeedback(targetError ?? '')}</div>
                 ) : !target ? (
-                  <div className="flex items-center justify-center h-full text-[9px] text-slate-600">Enter a target IP/domain</div>
+                  <div className="flex items-center justify-center h-full text-[9px] text-slate-600">{tr("Enter a target IP/domain")}</div>
                 ) : targetConns.length === 0 ? (
-                  <div className="text-[9px] text-slate-600 text-center py-2">No active connections to {target}</div>
+                  <div className="text-[9px] text-slate-600 text-center py-2">{tr("No active connections to ")}{target}</div>
                 ) : (
                   targetConns.map((conn, i) => (
                     <div key={i} className="flex items-center gap-1 text-[9px] leading-relaxed py-0.5 border-b border-cyber-line/10">
@@ -719,8 +720,8 @@ export function DashboardPanel() {
             </div>
           ) : (
             <div className="flex flex-col flex-1 min-h-0 border-b border-cyber-line/20 items-center justify-center gap-3">
-              <span className="text-[9px] uppercase tracking-wider text-slate-600">Target Monitor off</span>
-              <button type="button" onClick={() => toggleWidget('targetmon')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">Turn ON</button>
+              <span className="text-[9px] uppercase tracking-wider text-slate-600">{tr("Target Monitor off")}</span>
+              <button type="button" onClick={() => toggleWidget('targetmon')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">{tr("Turn ON")}</button>
             </div>
           )}
 
@@ -729,19 +730,19 @@ export function DashboardPanel() {
             <div className="flex flex-col flex-1 min-h-0 cursor-pointer" onClick={() => setExpandedWidget('connlog')}>
               <div className="flex items-center justify-between px-3 py-1.5 shrink-0 border-b border-cyber-line/20">
                 <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                  <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">Connection Log</h3>
-                  <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={TOOLTIPS.connlog}>?</span>
+                  <h3 className="text-[9px] uppercase tracking-[0.12em] text-slate-500 font-bold">{tr("Connection Log")}</h3>
+                  <span className="cursor-help rounded-full border border-slate-600/50 w-3.5 h-3.5 flex items-center justify-center text-[8px] text-slate-500 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors leading-none" title={tr(TOOLTIPS.connlog)}>?</span>
                 </div>
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{allConns.length} conns</span>
-                  <button type="button" onClick={() => toggleWidget('connlog')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">OFF</button>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/5 text-cyan-400">{allConns.length}{tr(" conns")}</span>
+                  <button type="button" onClick={() => toggleWidget('connlog')} className="rounded border border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-400 hover:bg-amber-500/15">{tr("OFF")}</button>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-3 pb-1 min-h-0 space-y-0.5">
                 {allConnsError ? (
-                  <div className="text-[10px] text-red-400 text-center py-2">{allConnsError}</div>
+                  <div className="text-[10px] text-red-400 text-center py-2">{trFeedback(allConnsError ?? '')}</div>
                 ) : allConns.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-[10px] text-slate-600 italic">No active connections</div>
+                  <div className="flex items-center justify-center h-full text-[10px] text-slate-600 italic">{tr("No active connections")}</div>
                 ) : (
                   (() => {
                     const sorted = sortConnsByRemoteFreq(allConns);
@@ -756,13 +757,13 @@ export function DashboardPanel() {
                     ));
                   })()
                 )}
-                <div className="text-[8px] text-slate-600 text-center pt-1">Click to expand → aggregate stats + full list</div>
+                <div className="text-[8px] text-slate-600 text-center pt-1">{tr("Click to expand → aggregate stats + full list")}</div>
               </div>
             </div>
           ) : (
             <div className="flex flex-col flex-1 min-h-0 items-center justify-center gap-3">
-              <span className="text-[9px] uppercase tracking-wider text-slate-600">Connection Log off</span>
-              <button type="button" onClick={() => toggleWidget('connlog')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">Turn ON</button>
+              <span className="text-[9px] uppercase tracking-wider text-slate-600">{tr("Connection Log off")}</span>
+              <button type="button" onClick={() => toggleWidget('connlog')} className="rounded border border-green-500/40 bg-green-500/5 px-3 py-1.5 text-[9px] font-black uppercase text-green-400 hover:bg-green-500/15">{tr("Turn ON")}</button>
             </div>
           )}
         </div>
@@ -797,21 +798,19 @@ export function DashboardPanel() {
               void runKill(sudoPrompt.monitor, sudoPrompt.processes, sudoPrompt.mode, sudoPassword);
             }}
           >
-            <h2 className="font-display text-xs font-black uppercase tracking-[0.12em] text-amber-300">Elevation required</h2>
-            <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
-              Enter the sudo password for {monitorTargetLabel(sudoPrompt.monitor)}. It is sent only to this action and is never stored.
-            </p>
+            <h2 className="font-display text-xs font-black uppercase tracking-[0.12em] text-amber-300">{tr("Elevation required")}</h2>
+            <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{tr("Enter the sudo password for ")}{monitorTargetLabel(sudoPrompt.monitor)}{tr(". It is sent only to this action and is never stored.")}</p>
             <input
               autoFocus
               type="password"
               value={sudoPassword}
               onChange={(event) => setSudoPassword(event.target.value)}
-              placeholder="sudo password"
+              placeholder={tr("sudo password")}
               className="mt-4 w-full rounded border border-amber-500/30 bg-cyber-base px-3 py-2 text-[11px] text-slate-100 outline-none focus:border-amber-400"
             />
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => { setSudoPrompt(null); setSudoPassword(''); }} className="rounded border border-cyber-line px-3 py-1.5 text-[9px] font-bold uppercase text-slate-400">Cancel</button>
-              <button type="submit" disabled={!sudoPassword || !!killBusy} className="rounded border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-amber-300 disabled:opacity-50">{killBusy ? 'Working…' : 'Retry with sudo'}</button>
+              <button type="button" onClick={() => { setSudoPrompt(null); setSudoPassword(''); }} className="rounded border border-cyber-line px-3 py-1.5 text-[9px] font-bold uppercase text-slate-400">{tr("Cancel")}</button>
+              <button type="submit" disabled={!sudoPassword || !!killBusy} className="rounded border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-[9px] font-black uppercase text-amber-300 disabled:opacity-50">{killBusy ? tr("Working…") : tr("Retry with sudo")}</button>
             </div>
           </form>
         </div>
@@ -819,7 +818,7 @@ export function DashboardPanel() {
 
       {/* ═══ Expand Modals ═══ */}
       {expandedWidget === 'syslogs' && (
-        <ExpandModal title="System Logs — Full Viewer" onClose={() => setExpandedWidget(null)}>
+        <ExpandModal title={tr("System Logs — Full Viewer")} onClose={() => setExpandedWidget(null)}>
           <div className="p-4 space-y-1">
             {sysLogs.map((l, i) => (
               <div key={i} className="text-[10px] leading-relaxed border-b border-cyber-line/10 py-1">
@@ -834,15 +833,15 @@ export function DashboardPanel() {
       )}
 
       {expandedWidget === 'proxy' && (
-        <ExpandModal title="LLM Proxy — Full Log" onClose={() => setExpandedWidget(null)}>
+        <ExpandModal title={tr("LLM Proxy — Full Log")} onClose={() => setExpandedWidget(null)}>
           <div className="p-4 space-y-2">
             {pxyStatus && (
               <div className="flex items-center gap-3 text-[11px] pb-3 border-b border-cyber-line/20 mb-3">
                 <div className={`w-2 h-2 rounded-full ${pxyStatus.running ? 'bg-green-400' : 'bg-red-500'}`} />
-                <span className="text-cyber-electric font-bold">Port :{pxyStatus.port}</span>
-                <span className="text-slate-500">{pxyStatus.running ? 'running' : 'stopped'}</span>
-                <span className="text-slate-600">{pxyStatus.totalRequests} total requests</span>
-                <span className="text-slate-600 ml-auto">{pxyStatus.activeBackends} backends</span>
+                <span className="text-cyber-electric font-bold">{tr("Port :")}{pxyStatus.port}</span>
+                <span className="text-slate-500">{pxyStatus.running ? tr("running") : tr("stopped")}</span>
+                <span className="text-slate-600">{pxyStatus.totalRequests}{tr(" total requests")}</span>
+                <span className="text-slate-600 ml-auto">{pxyStatus.activeBackends}{tr(" backends")}</span>
               </div>
             )}
             {[...pxyLogs].reverse().map((l) => {
@@ -859,12 +858,12 @@ export function DashboardPanel() {
                   </div>
                   <div className="mt-1 grid grid-cols-2 gap-2">
                     <div>
-                      <div className="text-[8px] uppercase text-slate-600 mb-1">Request</div>
+                      <div className="text-[8px] uppercase text-slate-600 mb-1">{tr("Request")}</div>
                       <pre className="text-[9px] text-amber-300/80 bg-black/20 rounded p-2 max-h-[200px] overflow-y-auto whitespace-pre-wrap">{l.requestJson}</pre>
                     </div>
                     <div>
-                      <div className="text-[8px] uppercase text-slate-600 mb-1">Response</div>
-                      <pre className="text-[9px] text-green-300/80 bg-black/20 rounded p-2 max-h-[200px] overflow-y-auto whitespace-pre-wrap">{l.normalizedResponseJson || l.responseJson || '(empty)'}</pre>
+                      <div className="text-[8px] uppercase text-slate-600 mb-1">{tr("Response")}</div>
+                      <pre className="text-[9px] text-green-300/80 bg-black/20 rounded p-2 max-h-[200px] overflow-y-auto whitespace-pre-wrap">{l.normalizedResponseJson || l.responseJson || tr("(empty)")}</pre>
                     </div>
                   </div>
                 </div>
@@ -875,7 +874,7 @@ export function DashboardPanel() {
       )}
 
       {expandedWidget === 'connlog' && (
-        <ExpandModal title="Connection Log — Aggregate Stats + Full List" onClose={() => setExpandedWidget(null)}>
+        <ExpandModal title={tr("Connection Log — Aggregate Stats + Full List")} onClose={() => setExpandedWidget(null)}>
           <div className="p-4 space-y-4">
             {(() => {
               const stats = computeConnAggregates(connHistoryRef.current);
@@ -888,20 +887,20 @@ export function DashboardPanel() {
                       if (!s) return null;
                       return (
                         <div key={label} className="rounded-lg border border-cyber-line/30 bg-black/20 p-3">
-                          <div className="text-[8px] uppercase tracking-[0.12em] text-slate-500 mb-2">Last {label}</div>
+                          <div className="text-[8px] uppercase tracking-[0.12em] text-slate-500 mb-2">{tr("Last ")}{tr(label)}</div>
                           <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
-                            <span className="text-slate-600">Established</span>
+                            <span className="text-slate-600">{tr("Established")}</span>
                             <span className="text-green-400 text-right font-bold">{s.established}</span>
-                            <span className="text-slate-600">Listening</span>
+                            <span className="text-slate-600">{tr("Listening")}</span>
                             <span className="text-cyan-400 text-right font-bold">{s.listening}</span>
-                            <span className="text-slate-600">Total</span>
+                            <span className="text-slate-600">{tr("Total")}</span>
                             <span className="text-slate-300 text-right font-bold">{s.total}</span>
-                            <span className="text-slate-600">Unique remotes</span>
+                            <span className="text-slate-600">{tr("Unique remotes")}</span>
                             <span className="text-amber-400 text-right font-bold">{s.uniqueRemotes}</span>
                           </div>
                           {s.topRemotes.length > 0 && (
                             <div className="mt-2 pt-2 border-t border-cyber-line/20">
-                              <div className="text-[8px] uppercase text-slate-600 mb-1">Top remotes</div>
+                              <div className="text-[8px] uppercase text-slate-600 mb-1">{tr("Top remotes")}</div>
                               {s.topRemotes.map(([addr, count], j) => (
                                 <div key={j} className="flex items-center justify-between text-[9px] text-slate-400">
                                   <span className="truncate max-w-[140px]">{addr}</span>
@@ -917,7 +916,7 @@ export function DashboardPanel() {
 
                   {/* Full connection list */}
                   <div>
-                    <div className="text-[8px] uppercase tracking-[0.12em] text-slate-500 mb-2">All connections (sorted by frequency)</div>
+                    <div className="text-[8px] uppercase tracking-[0.12em] text-slate-500 mb-2">{tr("All connections (sorted by frequency)")}</div>
                     <div className="space-y-0.5 max-h-[50vh] overflow-y-auto">
                       {sortConnsByRemoteFreq(allConns).map((conn, i) => (
                         <div key={i} className="flex items-center gap-2 text-[10px] border-b border-cyber-line/10 py-1">

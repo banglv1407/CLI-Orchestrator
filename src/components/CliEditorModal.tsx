@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr, useLocale } from '../i18n';
 import { useEffect, useMemo, useState } from 'react';
 import type { CliDefinition } from '../types';
 
@@ -9,6 +10,7 @@ interface CliEditorModalProps {
 }
 
 export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEditorModalProps) {
+  const locale = useLocale();
   const [name, setName] = useState('');
   const [command, setCommand] = useState('');
   const [group, setGroup] = useState('');
@@ -33,7 +35,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
     setSaving(false);
   }, [initialCli, isOpen]);
 
-  const title = useMemo(() => (initialCli ? 'Edit CLI' : 'Add CLI'), [initialCli]);
+  const title = useMemo(() => tr(initialCli ? 'Edit CLI' : 'Add CLI'), [locale, initialCli]);
 
   if (!isOpen) {
     return null;
@@ -48,15 +50,11 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
             type="button"
             onClick={onClose}
             className="rounded border border-cyber-line px-2 py-1 text-xs text-slate-300"
-          >
-            Close
-          </button>
+          >{tr("Close")}</button>
         </div>
 
         <div className="grid gap-3">
-          <label className="text-xs uppercase tracking-wider text-slate-400">
-            Name
-            <input
+          <label className="text-xs uppercase tracking-wider text-slate-400">{tr("Name")}<input
               value={name}
               onChange={(event) => setName(event.target.value)}
               className="mt-1 w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
@@ -64,9 +62,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
             />
           </label>
 
-          <label className="text-xs uppercase tracking-wider text-slate-400">
-            Command
-            <input
+          <label className="text-xs uppercase tracking-wider text-slate-400">{tr("Command")}<input
               value={command}
               onChange={(event) => setCommand(event.target.value)}
               className="mt-1 w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
@@ -74,19 +70,15 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
             />
           </label>
 
-          <label className="text-xs uppercase tracking-wider text-slate-400">
-            Group (Optional)
-            <input
+          <label className="text-xs uppercase tracking-wider text-slate-400">{tr("Group (Optional)")}<input
               value={group}
               onChange={(event) => setGroup(event.target.value)}
               className="mt-1 w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
-              placeholder="Default"
+              placeholder={tr("Default")}
             />
           </label>
 
-          <label className="text-xs uppercase tracking-wider text-slate-400">
-            Default Working Directory (Optional)
-            <input
+          <label className="text-xs uppercase tracking-wider text-slate-400">{tr("Default Working Directory (Optional)")}<input
               value={defaultWorkingDir}
               onChange={(event) => setDefaultWorkingDir(event.target.value)}
               className="mt-1 w-full rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
@@ -94,9 +86,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
             />
           </label>
 
-          <label className="text-xs uppercase tracking-wider text-slate-400">
-            Startup Args (one per line)
-            <textarea
+          <label className="text-xs uppercase tracking-wider text-slate-400">{tr("Startup Args (one per line)")}<textarea
               value={argsText}
               onChange={(event) => setArgsText(event.target.value)}
               className="mt-1 h-24 w-full resize-none rounded border border-cyber-line bg-cyber-base px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyber-neon"
@@ -112,22 +102,20 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
               className="rounded border-cyber-line bg-cyber-base text-cyber-neon focus:ring-cyber-neon accent-cyber-neon"
             />
             <span className="text-xs text-slate-200 font-medium flex items-center gap-1">
-              ⚡ <span className="text-cyber-electric font-semibold">Enable RTK Token Compression</span>
-              <span className="text-[10px] text-slate-400 font-normal">(Auto wrap command with rtk)</span>
+              ⚡ <span className="text-cyber-electric font-semibold">{tr("Enable RTK Token Compression")}</span>
+              <span className="text-[10px] text-slate-400 font-normal">{tr("(Auto wrap command with rtk)")}</span>
             </span>
           </label>
         </div>
 
-        {error ? <p className="mt-3 text-sm text-cyber-warn">{error}</p> : null}
+        {error ? <p className="mt-3 text-sm text-cyber-warn">{trFeedback(error ?? '')}</p> : null}
 
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
             className="rounded border border-cyber-line px-3 py-2 text-xs uppercase tracking-wider text-slate-300"
-          >
-            Cancel
-          </button>
+          >{tr("Cancel")}</button>
           <button
             type="button"
             disabled={saving}
@@ -176,7 +164,7 @@ export function CliEditorModal({ isOpen, initialCli, onClose, onSubmit }: CliEdi
             }}
             className="rounded border border-cyber-neon px-3 py-2 text-xs uppercase tracking-wider text-cyber-neon disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? tr("Saving...") : tr("Save")}
           </button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr, useLocale, getIntlLocale } from '../i18n';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import {
@@ -187,23 +188,23 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
 
   const rmBackend = useCallback(async (name: string) => { try { await proxyRemoveBackend(name); await refresh(); } catch(e: any) { setError(String(e)); } }, [refresh]);
 
-  if(!config) return <div className="flex h-full items-center justify-center text-slate-500">Loading...</div>;
+  if(!config) return <div className="flex h-full items-center justify-center text-slate-500">{tr("Loading...")}</div>;
 
   if (isInSidebar) {
     return (
       <div className="h-full flex flex-col p-4 space-y-4 overflow-y-auto">
         <div className="border-b border-cyber-line pb-2">
           <h2 className="font-display text-sm uppercase tracking-widest text-cyber-neon font-bold">CliProxyAI</h2>
-          <p className="text-[10px] text-slate-400 mt-0.5">API proxy configurations</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{tr("API proxy configurations")}</p>
         </div>
         
         {/* Toggle Status */}
         <div className="flex items-center justify-between rounded-lg border border-cyber-line bg-cyber-base/40 p-3 text-xs">
           <div>
-            <span className="font-semibold text-slate-200 block">Status</span>
+            <span className="font-semibold text-slate-200 block">{tr("Status")}</span>
             {status && (
               <span className={`text-[10px] uppercase font-mono font-bold ${status.running ? 'text-green-400' : 'text-slate-400'}`}>
-                {status.running ? 'Running' : 'Stopped'}
+                {status.running ? tr("Running") : tr("Stopped")}
               </span>
             )}
           </div>
@@ -216,16 +217,16 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
             }`}
           >
             {status?.running ? <StopIcon /> : <PlayIcon />}
-            {status?.running ? 'Stop' : 'Start'}
+            {status?.running ? tr("Stop") : tr("Start")}
           </button>
         </div>
 
         {/* Port */}
         <div className="space-y-3 rounded-lg border border-cyber-line bg-cyber-base/40 p-3 text-xs">
-          <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Server Settings</h3>
+          <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">{tr("Server Settings")}</h3>
           <div className="space-y-3">
             <label className="block space-y-1">
-              <span className="text-[9px] uppercase tracking-wider text-slate-500">Port</span>
+              <span className="text-[9px] uppercase tracking-wider text-slate-500">{tr("Port")}</span>
               <input
                 type="number"
                 value={config.port}
@@ -241,18 +242,18 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
         {/* Small Logs Summary */}
         <div className="flex-1 flex flex-col min-h-[220px] border border-cyber-line/50 rounded-lg p-3 bg-cyber-base/20 overflow-hidden">
           <div className="flex justify-between items-center border-b border-cyber-line/30 pb-2 mb-2">
-            <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Request Logs</h3>
+            <h3 className="text-[10px] uppercase font-bold tracking-wider text-slate-400">{tr("Request Logs")}</h3>
             <button onClick={refresh} className="text-slate-500 hover:text-slate-300"><RefreshIcon /></button>
           </div>
           <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-thin text-[10px] font-mono leading-tight">
             {logs.length === 0 ? (
-              <div className="text-slate-500 italic text-center py-4">No requests yet.</div>
+              <div className="text-slate-500 italic text-center py-4">{tr("No requests yet.")}</div>
             ) : (
               logs.slice().reverse().map(l => (
                 <div key={l.id} className="flex justify-between items-start gap-1 p-1 rounded hover:bg-cyber-line/10">
                   <span className="text-slate-500 shrink-0">{l.timestamp.split(' ')[1] || l.timestamp}</span>
                   <span className="text-slate-300 truncate max-w-[80px]">{l.backend}</span>
-                  <span className={l.success ? 'text-green-400' : 'text-red-400'}>{l.status || 'ERR'}</span>
+                  <span className={l.success ? 'text-green-400' : 'text-red-400'}>{l.status || tr("ERR")}</span>
                   <span className="text-slate-500 text-[9px]">{l.durationMs}ms</span>
                 </div>
               ))
@@ -268,32 +269,32 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between p-6 pb-4">
         <div>
-          <h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">CliProxyAI Backend Configuration</h2>
-          <p className="text-xs text-slate-400 mt-1">Manage upstream AI backend servers and monitor logs</p>
+          <h2 className="font-display text-lg uppercase tracking-widest text-cyber-neon">{tr("CliProxyAI Backend Configuration")}</h2>
+          <p className="text-xs text-slate-400 mt-1">{tr("Manage upstream AI backend servers and monitor logs")}</p>
         </div>
         <div className="flex items-center gap-3">
-          {status && (<span className={'px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider '+(status.running?'bg-green-500/20 text-green-400 border border-green-500/30':'bg-slate-500/20 text-slate-400 border border-slate-500/30')}>{status.running?'Running':'Stopped'}</span>)}
-          <button onClick={toggle} className={'flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold uppercase tracking-wider transition '+(status?.running?'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30':'bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 hover:bg-cyber-neon/30')}>{status?.running?<><StopIcon/>Stop</>:<><PlayIcon/>Start</>}</button>
+          {status && (<span className={'px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider '+(status.running?'bg-green-500/20 text-green-400 border border-green-500/30':'bg-slate-500/20 text-slate-400 border border-slate-500/30')}>{status.running?tr("Running"):tr("Stopped")}</span>)}
+          <button onClick={toggle} className={'flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold uppercase tracking-wider transition '+(status?.running?'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30':'bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 hover:bg-cyber-neon/30')}>{status?.running?<><StopIcon/>{tr("Stop")}</>:<><PlayIcon/>{tr("Start")}</>}</button>
         </div>
       </div>
 
       {status?.running && (
         <div className="flex gap-4 text-xs text-slate-400 bg-cyber-line/20 border-y border-cyber-line/30 px-6 py-2">
-          <span>Port: <b className="text-cyber-electric">{status.port}</b></span>
-          <span>Active Backends: <b className="text-cyber-electric">{status.activeBackends}</b></span>
-          <span>Total Requests: <b className="text-cyber-electric">{status.totalRequests}</b></span>
+          <span>{tr("Port: ")}<b className="text-cyber-electric">{status.port}</b></span>
+          <span>{tr("Active Backends: ")}<b className="text-cyber-electric">{status.activeBackends}</b></span>
+          <span>{tr("Total Requests: ")}<b className="text-cyber-electric">{status.totalRequests}</b></span>
         </div>
       )}
 
       {error && (
         <div className="mx-6 mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
-          {error}
-          <button onClick={()=>setError(null)} className="ml-2 underline text-xs">Dismiss</button>
+          {trFeedback(error ?? '')}
+          <button onClick={()=>setError(null)} className="ml-2 underline text-xs">{tr("Dismiss")}</button>
         </div>
       )}
 
       <div className="flex gap-1 px-6 pt-4 border-b border-cyber-line">
-        {(['config','logs'] as SubTab[]).map(t=>(<button key={t} onClick={()=>setSubTab(t)} className={'px-4 py-2 text-xs font-semibold uppercase tracking-wider transition border-b-2 -mb-[1px] '+(subTab===t?'text-cyber-neon border-cyber-neon':'text-slate-500 border-transparent hover:text-slate-300')}>{t==='config'?'Backend Configurations':'Detailed Logs & Inspector'}{t==='logs'&&logs.length>0&&(<span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-cyber-line/40 text-slate-400">{logs.length}</span>)}</button>))}
+        {(['config','logs'] as SubTab[]).map(t=>(<button key={t} onClick={()=>setSubTab(t)} className={'px-4 py-2 text-xs font-semibold uppercase tracking-wider transition border-b-2 -mb-[1px] '+(subTab===t?'text-cyber-neon border-cyber-neon':'text-slate-500 border-transparent hover:text-slate-300')}>{t==='config'?tr("Backend Configurations"):tr("Detailed Logs & Inspector")}{t==='logs'&&logs.length>0&&(<span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-cyber-line/40 text-slate-400">{logs.length}</span>)}</button>))}
         <div className="flex-1"/><button onClick={refresh} className="px-3 py-2 text-slate-500 hover:text-slate-300 transition"><RefreshIcon/></button>
       </div>
 
@@ -304,30 +305,30 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
               {/* Left Column: Backend servers configurations */}
               <div className="col-span-2 space-y-4">
                 <div className="flex items-center justify-between border-b border-cyber-line pb-2">
-                  <h3 className="font-display text-sm uppercase tracking-widest text-slate-300">Upstream Backend Servers ({config.backends.length})</h3>
-                  <button onClick={()=>{resetForm();setShowAdd(true);}} className="flex items-center gap-1 text-xs text-cyber-neon hover:text-cyber-electric transition uppercase tracking-wider"><PlusIcon/>Add Backend</button>
+                  <h3 className="font-display text-sm uppercase tracking-widest text-slate-300">{tr("Upstream Backend Servers (")}{config.backends.length})</h3>
+                  <button onClick={()=>{resetForm();setShowAdd(true);}} className="flex items-center gap-1 text-xs text-cyber-neon hover:text-cyber-electric transition uppercase tracking-wider"><PlusIcon/>{tr("Add Backend")}</button>
                 </div>
 
                 {(showAdd || editingIdx !== null) && (
                   <div className="bg-cyber-line/10 border border-cyber-neon/30 rounded-lg p-4 space-y-3">
-                    <h4 className="text-xs uppercase tracking-widest text-cyber-neon">{editingIdx !== null ? 'Edit Upstream Server' : 'New Upstream Server'}</h4>
+                    <h4 className="text-xs uppercase tracking-widest text-cyber-neon">{editingIdx !== null ? tr("Edit Upstream Server") : tr("New Upstream Server")}</h4>
                     <div className="grid grid-cols-2 gap-3">
-                      <input value={nName} onChange={e=>setNName(e.target.value)} placeholder="Name (e.g. OpenAI)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
-                      <input value={nUrl} onChange={e=>setNUrl(e.target.value)} placeholder="Endpoint URL (e.g. https://api.openai.com/v1)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
-                      <input value={nKey} onChange={e=>setNKey(e.target.value)} placeholder="API Key" type="password" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
-                      <input value={nModel} onChange={e=>setNModel(e.target.value)} placeholder="Model identifier (e.g. gpt-4o)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
-                      <input value={nUa} onChange={e=>setNUa(e.target.value)} placeholder="User-Agent (optional, e.g. CliProxyAI/1.0)" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nName} onChange={e=>setNName(e.target.value)} placeholder={tr("Name (e.g. OpenAI)")} className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nUrl} onChange={e=>setNUrl(e.target.value)} placeholder={tr("Endpoint URL (e.g. https://api.openai.com/v1)")} className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nKey} onChange={e=>setNKey(e.target.value)} placeholder={tr("API Key")} type="password" className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nModel} onChange={e=>setNModel(e.target.value)} placeholder={tr("Model identifier (e.g. gpt-4o)")} className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
+                      <input value={nUa} onChange={e=>setNUa(e.target.value)} placeholder={tr("User-Agent (optional, e.g. CliProxyAI/1.0)")} className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"/>
                       <select
                         value={nReasoningEffort}
                         onChange={e => setNReasoningEffort(e.target.value)}
                         className="bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200 focus:border-cyber-neon outline-none"
                       >
-                        <option value="">Reasoning Effort: Default (None)</option>
-                        <option value="low">Reasoning Effort: low</option>
-                        <option value="medium">Reasoning Effort: medium</option>
-                        <option value="high">Reasoning Effort: high</option>
-                        <option value="xhigh">Reasoning Effort: xhigh</option>
-                        <option value="max">Reasoning Effort: max</option>
+                        <option value="">{tr("Reasoning Effort: Default (None)")}</option>
+                        <option value="low">{tr("Reasoning Effort: low")}</option>
+                        <option value="medium">{tr("Reasoning Effort: medium")}</option>
+                        <option value="high">{tr("Reasoning Effort: high")}</option>
+                        <option value="xhigh">{tr("Reasoning Effort: xhigh")}</option>
+                        <option value="max">{tr("Reasoning Effort: max")}</option>
                       </select>
                       
                       <label className="col-span-2 flex items-center gap-2 cursor-pointer pt-1">
@@ -338,8 +339,8 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                           className="rounded border-cyber-line bg-cyber-base text-cyber-neon focus:ring-cyber-neon accent-cyber-neon"
                         />
                         <span className="text-xs text-slate-200 font-medium flex items-center gap-1">
-                          ⚡ <span className="text-cyber-electric font-semibold">Enable RTK Token Compression</span>
-                          <span className="text-[10px] text-slate-400 font-normal">(Cắt 60–90% token output command)</span>
+                          ⚡ <span className="text-cyber-electric font-semibold">{tr("Enable RTK Token Compression")}</span>
+                          <span className="text-[10px] text-slate-400 font-normal">{tr("(Cắt 60–90% token output command)")}</span>
                         </span>
                       </label>
 
@@ -351,21 +352,21 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                           className="rounded border-cyber-line bg-cyber-base text-cyber-neon focus:ring-cyber-neon accent-cyber-neon"
                         />
                         <span className="text-xs text-slate-200 font-medium flex items-center gap-1">
-                          👱‍♂️ <span className="text-purple-300 font-semibold">Enable Ponytail Anti-Bloat</span>
-                          <span className="text-[10px] text-slate-400 font-normal">(Lazy Senior Dev System Prompt Injector)</span>
+                          👱‍♂️ <span className="text-purple-300 font-semibold">{tr("Enable Ponytail Anti-Bloat")}</span>
+                          <span className="text-[10px] text-slate-400 font-normal">{tr("(Lazy Senior Dev System Prompt Injector)")}</span>
                         </span>
                       </label>
                     </div>
                     <ProxyHopEditor value={nHop} onChange={setNHop} />
                     <div className="flex gap-2 justify-end">
-                      <button onClick={resetForm} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">Cancel</button>
-                      <button onClick={addBackend} disabled={!nName||!nUrl||!nKey||!nModel} className="px-3 py-1.5 text-xs bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 rounded hover:bg-cyber-neon/30 uppercase tracking-wider disabled:opacity-40">{editingIdx !== null ? 'Update' : 'Save Backend'}</button>
+                      <button onClick={resetForm} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">{tr("Cancel")}</button>
+                      <button onClick={addBackend} disabled={!nName||!nUrl||!nKey||!nModel} className="px-3 py-1.5 text-xs bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 rounded hover:bg-cyber-neon/30 uppercase tracking-wider disabled:opacity-40">{editingIdx !== null ? tr("Update") : tr("Save Backend")}</button>
                     </div>
                   </div>
                 )}
 
                 {config.backends.length===0 ? (
-                  <div className="text-center py-8 text-slate-500 text-sm">No backend servers configured. Requests will return error.</div>
+                  <div className="text-center py-8 text-slate-500 text-sm">{tr("No backend servers configured. Requests will return error.")}</div>
                 ) : (
                   config.backends.map((b,i)=>(
                     <div
@@ -392,62 +393,59 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                         <div className="flex items-center gap-2">
                           <div className="text-sm text-slate-200 font-semibold truncate">{b.name}</div>
                           {b.enableRtk && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-0.5" title="RTK Token Compression Enabled">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-0.5" title={tr("RTK Token Compression Enabled")}>
                               ⚡ RTK
                             </span>
                           )}
                           {b.enablePonytail && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-0.5" title="Ponytail Anti-Bloat Enabled">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-0.5" title={tr("Ponytail Anti-Bloat Enabled")}>
                               👱‍♂️ Ponytail
                             </span>
                           )}
                           {b.reasoningEffort && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-0.5" title={`Reasoning Effort: ${b.reasoningEffort}`}>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-0.5" title={tr("Reasoning Effort: {v0}", { v0: tr(b.reasoningEffort) })}>
                               🧠 {b.reasoningEffort}
                             </span>
                           )}
                         </div>
                         <div className="text-xs text-slate-500 truncate">{b.model} @ {b.url}</div>
-                        <div className="text-xs text-cyber-neon">Hop: {b.hop ? b.hop.kind.toUpperCase() : 'Direct'}</div>
+                        <div className="text-xs text-cyber-neon">{tr("Hop: ")}{b.hop ? b.hop.kind.toUpperCase() : tr("Direct")}</div>
                         {b.customUserAgent && <div className="text-[10px] text-cyber-neon/60 truncate">UA: {b.customUserAgent}</div>}
                         
                         {/* Durable Usage Statistics */}
                         {b.id && usageMap[b.id] && (
                           <div className="mt-2 space-y-0.5 border-t border-cyber-line/20 pt-1.5 text-[10px] text-slate-400 font-mono">
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                              <span>Prompt: <span className="text-slate-200">{usageMap[b.id].promptTokens.toLocaleString()}</span></span>
-                              <span>Completion: <span className="text-slate-200">{usageMap[b.id].completionTokens.toLocaleString()}</span></span>
-                              <span>Total: <span className="text-cyber-electric font-bold">{usageMap[b.id].totalTokens.toLocaleString()}</span></span>
+                              <span>{tr("Prompt: ")}<span className="text-slate-200">{usageMap[b.id].promptTokens.toLocaleString(getIntlLocale())}</span></span>
+                              <span>{tr("Completion: ")}<span className="text-slate-200">{usageMap[b.id].completionTokens.toLocaleString(getIntlLocale())}</span></span>
+                              <span>{tr("Total: ")}<span className="text-cyber-electric font-bold">{usageMap[b.id].totalTokens.toLocaleString(getIntlLocale())}</span></span>
                             </div>
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-500">
-                              <span>Requests: <span className="text-slate-300">{usageMap[b.id].reportedRequests}</span></span>
+                              <span>{tr("Requests: ")}<span className="text-slate-300">{usageMap[b.id].reportedRequests}</span></span>
                               {usageMap[b.id].unreportedRequests > 0 && (
-                                <span className="text-amber-400 font-semibold" title="Success requests without reported usage">
-                                  Unreported: {usageMap[b.id].unreportedRequests}*
+                                <span className="text-amber-400 font-semibold" title={tr("Success requests without reported usage")}>{tr("Unreported: ")}{usageMap[b.id].unreportedRequests}*
                                 </span>
                               )}
                               {usageMap[b.id].resetAt && (
-                                <span>Reset: {new Date(usageMap[b.id].resetAt).toLocaleDateString()} {new Date(usageMap[b.id].resetAt).toLocaleTimeString()}</span>
+                                <span>{tr("Reset: ")}{new Date(usageMap[b.id].resetAt).toLocaleDateString(getIntlLocale())} {new Date(usageMap[b.id].resetAt).toLocaleTimeString(getIntlLocale())}</span>
                               )}
                             </div>
                             {usageMap[b.id].unreportedRequests > 0 && (
-                              <div className="text-[9px] text-amber-500/80 italic mt-0.5">
-                                * Totals are incomplete: unreported requests found.
-                              </div>
+                              <div className="text-[9px] text-amber-500/80 italic mt-0.5">{tr("* Totals are incomplete: unreported requests found.")}</div>
                             )}
                           </div>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={async ()=>{const n=[...config.backends];if(i>0){[n[i-1],n[i]]=[n[i],n[i-1]];try{setConfig(await proxySaveConfig({...config,backends:n}));}catch{}}}}
-                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition p-1 disabled:opacity-10" title="Move up" disabled={i===0}>
+                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition p-1 disabled:opacity-10" title={tr("Move up")} disabled={i===0}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5"/></svg>
                         </button>
                         <button onClick={async ()=>{const n=[...config.backends];if(i<config.backends.length-1){[n[i],n[i+1]]=[n[i+1],n[i]];try{setConfig(await proxySaveConfig({...config,backends:n}));}catch{}}}}
-                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition p-1 disabled:opacity-10" title="Move down" disabled={i===config.backends.length-1}>
+                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition p-1 disabled:opacity-10" title={tr("Move down")} disabled={i===config.backends.length-1}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
                         </button>
-                        <span className="text-[10px] text-slate-500 font-semibold">Max Retries:</span>
+                        <span className="text-[10px] text-slate-500 font-semibold">{tr("Max Retries:")}</span>
                         <input
                           type="number"
                           value={b.maxRetries||2}
@@ -460,12 +458,12 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                           min={1}
                           max={10}
                         />
-                        <button onClick={() => duplicateBackend(b)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyber-electric transition p-1" title="Duplicate Backend">
+                        <button onClick={() => duplicateBackend(b)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyber-electric transition p-1" title={tr("Duplicate Backend")}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v9.25c0 .621-.504 1.125-1.125 1.125Z"/></svg>
                         </button>
-                        <button onClick={()=>loadBackend(b,i)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyber-neon transition p-1" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.86 3.49a2.2 2.2 0 1 1 3.11 3.11L8 18.57l-4 1 1-4 11.86-12.08Z"/></svg></button>
+                        <button onClick={()=>loadBackend(b,i)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyber-neon transition p-1" title={tr("Edit")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.86 3.49a2.2 2.2 0 1 1 3.11 3.11L8 18.57l-4 1 1-4 11.86-12.08Z"/></svg></button>
                         {b.id && (
-                          <button onClick={()=>setResetConfirmId(b.id!)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-amber-400 transition p-1" title="Reset Usage">
+                          <button onClick={()=>setResetConfirmId(b.id!)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-amber-400 transition p-1" title={tr("Reset Usage")}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
                           </button>
                         )}
@@ -479,10 +477,10 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
               {/* Right Column: Server settings and Usage */}
               <div className="col-span-1 space-y-6">
                 <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4 space-y-4">
-                  <h3 className="text-xs uppercase font-bold tracking-wider text-slate-400">Server Settings</h3>
+                  <h3 className="text-xs uppercase font-bold tracking-wider text-slate-400">{tr("Server Settings")}</h3>
                   <div className="space-y-4">
                     <label className="block space-y-1">
-                      <span className="text-[10px] uppercase tracking-wider text-slate-400">Port</span>
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400">{tr("Port")}</span>
                       <input
                         type="number"
                         value={config.port}
@@ -496,7 +494,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                 </div>
 
                 <div className="bg-cyber-line/5 border border-cyber-line/20 rounded-lg p-4 space-y-2">
-                  <h4 className="text-xs uppercase tracking-widest text-slate-400">Usage Example</h4>
+                  <h4 className="text-xs uppercase tracking-widest text-slate-400">{tr("Usage Example")}</h4>
                   <code className="text-[10px] text-cyber-neon block bg-cyber-base rounded p-2 overflow-x-auto scrollbar-none font-mono select-all">
                     curl http://127.0.0.1:{config.port}/v1/chat/completions
                   </code>
@@ -504,11 +502,8 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
 
                 <div className="rounded-xl border border-cyber-line/30 bg-cyber-base/20 p-4 text-xs leading-relaxed text-slate-400 space-y-2">
                   <div className="font-bold text-slate-300 flex items-center gap-1.5">
-                    <span>💡</span> API Proxy Server
-                  </div>
-                  <p>
-                    All API requests sent to port <span className="text-cyber-neon font-mono font-bold">{config.port}</span> will be load-balanced and proxy-passed to the active backends.
-                  </p>
+                    <span>💡</span>{tr(" API Proxy Server")}</div>
+                  <p>{tr("All API requests sent to port ")}<span className="text-cyber-neon font-mono font-bold">{config.port}</span>{tr(" will be load-balanced and proxy-passed to the active backends.")}</p>
                 </div>
               </div>
             </div>
@@ -522,11 +517,11 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
       {resetConfirmId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-xl border border-cyber-line/80 bg-cyber-panel p-6 shadow-2xl space-y-4">
-            <h3 className="font-display text-sm uppercase tracking-widest text-amber-400 font-bold">Confirm Reset Usage</h3>
-            <p className="text-xs text-slate-300">Are you sure you want to reset the accumulated token usage for this backend to zero? This action cannot be undone.</p>
+            <h3 className="font-display text-sm uppercase tracking-widest text-amber-400 font-bold">{tr("Confirm Reset Usage")}</h3>
+            <p className="text-xs text-slate-300">{tr("Are you sure you want to reset the accumulated token usage for this backend to zero? This action cannot be undone.")}</p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setResetConfirmId(null)} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">Cancel</button>
-              <button onClick={() => handleResetUsage(resetConfirmId)} className="px-3 py-1.5 text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded hover:bg-amber-500/30 uppercase tracking-wider">Reset Usage</button>
+              <button onClick={() => setResetConfirmId(null)} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">{tr("Cancel")}</button>
+              <button onClick={() => handleResetUsage(resetConfirmId)} className="px-3 py-1.5 text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded hover:bg-amber-500/30 uppercase tracking-wider">{tr("Reset Usage")}</button>
             </div>
           </div>
         </div>
@@ -536,6 +531,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
 }
 
 function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
+  const locale = useLocale();
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [copyState, setCopyState] = useState<{ key: CopyKey; status: 'copied' | 'failed' } | null>(null);
@@ -625,8 +621,8 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
     try { parsed = JSON.parse(entry.normalizedResponseJson || entry.responseJson); } catch { return null; }
     const renderBlock = (label: string, content: string) => (
       <div key={label} className="mb-2">
-        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">{label}</div>
-        <pre className="text-[11px] text-slate-300 bg-black/30 rounded p-2.5 overflow-auto max-h-48 whitespace-pre-wrap font-mono select-text" onClick={(e) => e.stopPropagation()}>{content || '(empty)'}</pre>
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">{tr(label)}</div>
+        <pre className="text-[11px] text-slate-300 bg-black/30 rounded p-2.5 overflow-auto max-h-48 whitespace-pre-wrap font-mono select-text" onClick={(e) => e.stopPropagation()}>{content || tr("(empty)")}</pre>
       </div>
     );
     const sections: React.ReactNode[] = [];
@@ -687,19 +683,19 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
   };
 
   if (logs.length === 0) {
-    return <div className="flex items-center justify-center h-40 text-slate-500 text-sm">No requests yet.</div>;
+    return <div className="flex items-center justify-center h-40 text-slate-500 text-sm">{tr("No requests yet.")}</div>;
   }
 
   return (
     <div className="p-4 select-none">
       <div className="flex items-center justify-between gap-4 text-xs text-slate-500 mb-3 px-2">
         <div className="flex items-center gap-4">
-          <span>{logs.length} reqs</span>
+          <span>{logs.length}{tr(" reqs")}</span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-green-400" />OK: {logs.filter((l) => l.success).length}
+            <span className="w-2 h-2 rounded-full bg-green-400" />{tr("OK: ")}{logs.filter((l) => l.success).length}
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-red-400" />Fail: {logs.filter((l) => !l.success).length}
+            <span className="w-2 h-2 rounded-full bg-red-400" />{tr("Fail: ")}{logs.filter((l) => !l.success).length}
           </span>
         </div>
         <div className="flex items-center gap-2 font-mono">
@@ -708,26 +704,26 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
             onClick={() => goToPage(Math.max(1, page - 1))}
             disabled={page <= 1}
             className="px-2 py-0.5 rounded border border-cyber-line/60 text-slate-300 hover:border-cyber-neon hover:text-cyber-neon transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >Previous</button>
-          <span className="text-slate-400">Page {page} / {pageCount}</span>
+          >{tr("Previous")}</button>
+          <span className="text-slate-400">{tr("Page ")}{page} / {pageCount}</span>
           <button
             type="button"
             onClick={() => goToPage(Math.min(pageCount, page + 1))}
             disabled={page >= pageCount}
             className="px-2 py-0.5 rounded border border-cyber-line/60 text-slate-300 hover:border-cyber-neon hover:text-cyber-neon transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >Next</button>
+          >{tr("Next")}</button>
         </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="text-slate-400 uppercase tracking-wider border-b border-cyber-line/50">
-              <th className="text-left px-2 py-2 w-16">Time</th>
-              <th className="text-left px-2 py-2 w-24">Backend</th>
-              <th className="text-left px-2 py-2 w-14">Status</th>
-              <th className="text-left px-2 py-2 w-14">Dur</th>
-              <th className="text-left px-2 py-2 w-18">Tokens</th>
-              <th className="text-left px-2 py-2">Response</th>
+              <th className="text-left px-2 py-2 w-16">{tr("Time")}</th>
+              <th className="text-left px-2 py-2 w-24">{tr("Backend")}</th>
+              <th className="text-left px-2 py-2 w-14">{tr("Status")}</th>
+              <th className="text-left px-2 py-2 w-14">{tr("Dur")}</th>
+              <th className="text-left px-2 py-2 w-18">{tr("Tokens")}</th>
+              <th className="text-left px-2 py-2">{tr("Response")}</th>
             </tr>
           </thead>
           <tbody>
@@ -749,13 +745,13 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                     <td className="px-2 py-2 text-slate-500 font-mono align-top">{e.timestamp}</td>
                     <td className="px-2 py-2 text-slate-300 font-medium truncate max-w-[100px] align-top">{e.backend}</td>
                     <td className="px-2 py-2 align-top">
-                      <span className={e.success ? 'text-green-400' : 'text-red-400'}>{e.status || 'ERR'}</span>
+                      <span className={e.success ? 'text-green-400' : 'text-red-400'}>{e.status || tr("ERR")}</span>
                     </td>
                     <td className="px-2 py-2 text-slate-500 font-mono align-top">{e.durationMs}ms</td>
                     <td className="px-2 py-2 text-slate-500 font-mono align-top text-right">
                       {e.totalTokens > 0 ? (
-                        <span title={`Prompt: ${e.promptTokens} / Comp: ${e.completionTokens}`}>
-                          {e.totalTokens.toLocaleString()}
+                        <span title={tr("Prompt: {v0} / Comp: {v1}", { v0: String(e.promptTokens), v1: String(e.completionTokens) })}>
+                          {e.totalTokens.toLocaleString(getIntlLocale())}
                         </span>
                       ) : '-'}
                     </td>
@@ -770,23 +766,23 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                               <span>#{e.id}</span>
                               <span>{e.timestamp}</span>
                               <span className={e.success ? 'text-green-400' : 'text-red-400'}>
-                                {e.status || 'ERR'} &middot; {e.durationMs}ms
+                                {e.status || tr("ERR")} &middot; {e.durationMs}ms
                               </span>
-                              <span>Model: {e.model}</span>
+                              <span>{tr("Model: ")}{e.model}</span>
                               {e.totalTokens > 0 && (
-                                <span>Tokens: {e.totalTokens.toLocaleString()} (P:{e.promptTokens} C:{e.completionTokens})</span>
+                                <span>{tr("Tokens: ")}{e.totalTokens.toLocaleString(getIntlLocale())}{tr(" (P:")}{e.promptTokens}{tr(" C:")}{e.completionTokens})</span>
                               )}
                             </div>
                             <button
                               type="button"
                               onClick={(event) => { event.stopPropagation(); handleRowToggle(e.id, 'button'); }}
                               className="text-slate-500 hover:text-slate-300 text-xs"
-                            >Close</button>
+                            >{tr("Close")}</button>
                           </div>
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div>
                               <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Request</span>
+                                <span className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">{tr("Request")}</span>
                                 <button
                                   type="button"
                                   onClick={(event) => { event.stopPropagation(); void handleCopy(requestKey, requestText(e)); }}
@@ -795,7 +791,7 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                                       ? copyState.status === 'copied' ? 'border-green-500/60 text-green-400' : 'border-red-500/60 text-red-400'
                                       : 'border-cyber-line/60 text-slate-400 hover:border-cyber-neon hover:text-cyber-neon'
                                   }`}
-                                >{copyButtonLabel(requestKey)}</button>
+                                >{tr(copyButtonLabel(requestKey))}</button>
                               </div>
                               <pre
                                 className="text-[11px] text-slate-300 bg-black/30 rounded p-3 overflow-auto max-h-64 whitespace-pre-wrap font-mono select-text"
@@ -804,7 +800,7 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                             </div>
                             <div>
                               <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] uppercase tracking-wider text-green-400 font-semibold">Response</span>
+                                <span className="text-[10px] uppercase tracking-wider text-green-400 font-semibold">{tr("Response")}</span>
                                 <button
                                   type="button"
                                   onClick={(event) => { event.stopPropagation(); void handleCopy(responseKey, responseText(e)); }}
@@ -813,14 +809,14 @@ function LogsTab({ logs }: { logs: ProxyLogEntry[] }) {
                                       ? copyState.status === 'copied' ? 'border-green-500/60 text-green-400' : 'border-red-500/60 text-red-400'
                                       : 'border-cyber-line/60 text-slate-400 hover:border-cyber-neon hover:text-cyber-neon'
                                   }`}
-                                >{copyButtonLabel(responseKey)}</button>
+                                >{tr(copyButtonLabel(responseKey))}</button>
                               </div>
                               {e.normalizedResponseJson ? (
                                 <div className="space-y-1 max-h-[32rem] overflow-y-auto scrollbar-thin select-text" onClick={(e) => e.stopPropagation()}>
                                   {renderSections(e)}
                                   <details className="mt-2">
-                                    <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 select-none">Raw {e.responseTruncated && <span className="text-amber-400">(256 KiB truncated)</span>}</summary>
-                                    <pre className="text-[11px] text-slate-400 bg-black/20 rounded p-2.5 mt-1 overflow-auto max-h-48 whitespace-pre-wrap font-mono select-text" onClick={(e) => e.stopPropagation()}>{e.responseJson || '(empty)'}</pre>
+                                    <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 select-none">{tr("Raw ")}{e.responseTruncated && <span className="text-amber-400">{tr("(256 KiB truncated)")}</span>}</summary>
+                                    <pre className="text-[11px] text-slate-400 bg-black/20 rounded p-2.5 mt-1 overflow-auto max-h-48 whitespace-pre-wrap font-mono select-text" onClick={(e) => e.stopPropagation()}>{e.responseJson || tr("(empty)")}</pre>
                                   </details>
                                 </div>
                               ) : (

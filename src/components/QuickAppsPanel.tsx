@@ -1,5 +1,7 @@
+import { tFeedback as trFeedback, t as tr, useLocale } from '../i18n';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { confirm, open } from '@tauri-apps/plugin-dialog';
+import { open } from '@tauri-apps/plugin-dialog';
+import { confirm } from '../lib/dialogs';
 import {
     deleteQuickapp,
     launchQuickapp,
@@ -87,7 +89,7 @@ function QuickAppTile({ app, selected, onLaunch, onEdit, onDelete, size = 'md' }
             onClick={onClick}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
-            title={`${app.command}${app.args?.length ? ' ' + app.args.join(' ') : ''}\nSingle-click to launch\nHover for options`}
+            title={tr("{v0}{v1}\nSingle-click to launch\nHover for options", { v0: String(app.command), v1: String(app.args?.length ? ' ' + app.args.join(' ') : '') })}
             className={`group relative flex flex-col items-center ${containerClass} rounded-xl border transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyber-accent ${
                 selected
                     ? 'bg-cyber-accent/20 border-cyber-accent shadow-lg shadow-cyber-accent/20 scale-105'
@@ -124,7 +126,7 @@ function QuickAppTile({ app, selected, onLaunch, onEdit, onDelete, size = 'md' }
                         type="button"
                         onClick={onEditClick}
                         className="p-0.5 rounded bg-cyber-base/80 border border-cyber-line/60 text-cyber-muted hover:text-cyber-accent hover:border-cyber-accent/50 transition-colors"
-                        title="Edit"
+                        title={tr("Edit")}
                     >
                         <EditIcon />
                     </button>
@@ -132,7 +134,7 @@ function QuickAppTile({ app, selected, onLaunch, onEdit, onDelete, size = 'md' }
                         type="button"
                         onClick={onDeleteClick}
                         className="p-0.5 rounded bg-cyber-base/80 border border-cyber-line/60 text-cyber-muted hover:text-cyber-warn hover:border-cyber-warn/50 transition-colors"
-                        title="Delete"
+                        title={tr("Delete")}
                     >
                         <TrashIcon />
                     </button>
@@ -187,10 +189,10 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
             const picked = await open({
                 directory: false,
                 multiple: false,
-                title: 'Select executable',
+                title: tr("Select executable"),
                 filters: [
-                    { name: 'Executables', extensions: ['exe', 'bat', 'cmd', 'lnk', 'ps1'] },
-                    { name: 'All files', extensions: ['*'] },
+                    { name: tr('Executables'), extensions: ['exe', 'bat', 'cmd', 'lnk', 'ps1'] },
+                    { name: tr('All files'), extensions: ['*'] },
                 ],
             });
             if (typeof picked === 'string') {
@@ -212,8 +214,8 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
             const picked = await open({
                 directory: false,
                 multiple: false,
-                title: 'Select icon file (optional)',
-                filters: [{ name: 'Icons', extensions: ['png', 'ico', 'jpg', 'jpeg'] }],
+                title: tr("Select icon file (optional)"),
+                filters: [{ name: tr('Icons'), extensions: ['png', 'ico', 'jpg', 'jpeg'] }],
             });
             if (typeof picked === 'string') setIconPath(picked);
         } catch (err) {
@@ -226,7 +228,7 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
             const picked = await open({
                 directory: true,
                 multiple: false,
-                title: 'Select working directory',
+                title: tr("Select working directory"),
             });
             if (typeof picked === 'string') setWorkingDir(picked);
         } catch (err) {
@@ -274,10 +276,10 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
             <div className="flex items-center justify-between px-5 py-3 border-b border-cyber-line/40 bg-cyber-base/30 shrink-0">
                 <div>
                     <h3 className="text-sm font-bold text-cyber-accent uppercase tracking-wider">
-                        {initial ? '✎ Edit App' : '+ New App'}
+                        {initial ? tr("✎ Edit App") : tr("+ New App")}
                     </h3>
                     <p className="text-[10px] text-cyber-muted mt-0.5">
-                        {initial ? `Editing: ${initial.name}` : 'Fill in the details below'}
+                        {initial ? tr("Editing: {v0}", { v0: String(initial.name) }) : tr("Fill in the details below")}
                     </p>
                 </div>
                 {initial?.iconDataUrl && !initial.iconMissing && (
@@ -290,7 +292,7 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
                 <form id="quickapp-form" onSubmit={handleSubmit} className="flex flex-col gap-4 p-5 pb-4">
                     {/* Name */}
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">Name <span className="text-cyber-warn">*</span></span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">{tr("Name ")}<span className="text-cyber-warn">*</span></span>
                         <input
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -301,7 +303,7 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
 
                     {/* Command */}
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">Command / Path <span className="text-cyber-warn">*</span></span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">{tr("Command / Path ")}<span className="text-cyber-warn">*</span></span>
                         <div className="flex gap-2">
                             <input
                                 value={command}
@@ -313,18 +315,14 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
                                 type="button"
                                 onClick={handlePickCommand}
                                 className="px-3 py-2 rounded-lg bg-cyber-accent/20 hover:bg-cyber-accent/40 text-cyber-accent text-[11px] border border-cyber-accent/40 font-semibold transition-all hover:border-cyber-accent/70 shrink-0"
-                            >
-                                Browse
-                            </button>
+                            >{tr("Browse")}</button>
                         </div>
-                        <p className="text-[10px] text-cyber-muted/70 leading-relaxed">
-                            Supports .exe, .bat, .cmd, .lnk (shortcuts), .ps1
-                        </p>
+                        <p className="text-[10px] text-cyber-muted/70 leading-relaxed">{tr("Supports .exe, .bat, .cmd, .lnk (shortcuts), .ps1")}</p>
                     </label>
 
                     {/* Group */}
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">Group (optional)</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">{tr("Group (optional)")}</span>
                         {!useCustomGroup ? (
                             <div className="flex gap-2">
                                 <select
@@ -332,7 +330,7 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
                                     onChange={(e) => setGroup(e.target.value)}
                                     className="flex-1 px-3 py-2 rounded-lg bg-cyber-base/60 border border-cyber-line/60 text-cyber-text text-[12px] focus:outline-none focus:ring-2 focus:ring-cyber-accent/50 focus:border-cyber-accent/80 transition-all"
                                 >
-                                    <option value="">— No group —</option>
+                                    <option value="">{tr("— No group —")}</option>
                                     {existingGroups.map((g) => (
                                         <option key={g} value={g}>{g}</option>
                                     ))}
@@ -341,16 +339,14 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
                                     type="button"
                                     onClick={() => setUseCustomGroup(true)}
                                     className="px-3 py-2 rounded-lg bg-cyber-surface/40 hover:bg-cyber-surface/80 text-cyber-muted text-[10px] border border-cyber-line/50 transition-all shrink-0"
-                                >
-                                    + New
-                                </button>
+                                >{tr("+ New")}</button>
                             </div>
                         ) : (
                             <div className="flex gap-2">
                                 <input
                                     value={customGroup}
                                     onChange={(e) => setCustomGroup(e.target.value)}
-                                    placeholder="e.g. Development, Social, Utilities"
+                                    placeholder={tr("e.g. Development, Social, Utilities")}
                                     autoFocus
                                     className="flex-1 px-3 py-2 rounded-lg bg-cyber-base/60 border border-cyber-accent/50 text-cyber-text text-[12px] focus:outline-none focus:ring-2 focus:ring-cyber-accent/50 transition-all placeholder:text-cyber-muted/50"
                                 />
@@ -358,9 +354,7 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
                                     type="button"
                                     onClick={() => { setUseCustomGroup(false); setCustomGroup(''); }}
                                     className="px-3 py-2 rounded-lg bg-cyber-surface/40 hover:bg-cyber-surface/80 text-cyber-muted text-[10px] border border-cyber-line/50 transition-all shrink-0"
-                                >
-                                    ← Back
-                                </button>
+                                >{tr("← Back")}</button>
                             </div>
                         )}
                     </label>
@@ -373,67 +367,61 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
                     >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`h-3.5 w-3.5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                        Advanced options
-                    </button>
+                        </svg>{tr("Advanced options")}</button>
 
                     {showAdvanced && (
                         <div className="flex flex-col gap-4 pl-4 border-l-2 border-cyber-line/40">
                             {/* Arguments */}
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">Arguments</span>
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">{tr("Arguments")}</span>
                                 <input
                                     value={argsText}
                                     onChange={(e) => setArgsText(e.target.value)}
                                     placeholder="--new-window --profile-directory=Default"
                                     className="px-3 py-2 rounded-lg bg-cyber-base/60 border border-cyber-line/60 text-cyber-text text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-cyber-accent/50 focus:border-cyber-accent/80 transition-all placeholder:text-cyber-muted/50"
                                 />
-                                <p className="text-[10px] text-cyber-muted/70">Space-separated arguments</p>
+                                <p className="text-[10px] text-cyber-muted/70">{tr("Space-separated arguments")}</p>
                             </label>
 
                             {/* Working directory */}
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">Working Directory</span>
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">{tr("Working Directory")}</span>
                                 <div className="flex gap-2">
                                     <input
                                         value={workingDir}
                                         onChange={(e) => setWorkingDir(e.target.value)}
-                                        placeholder="Leave blank to use default"
+                                        placeholder={tr("Leave blank to use default")}
                                         className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-cyber-base/60 border border-cyber-line/60 text-cyber-text text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-cyber-accent/50 focus:border-cyber-accent/80 transition-all placeholder:text-cyber-muted/50"
                                     />
                                     <button
                                         type="button"
                                         onClick={handlePickWorkingDir}
                                         className="px-3 py-2 rounded-lg bg-cyber-accent/20 hover:bg-cyber-accent/40 text-cyber-accent text-[11px] border border-cyber-accent/40 font-semibold transition-all hover:border-cyber-accent/70 shrink-0"
-                                    >
-                                        Browse
-                                    </button>
+                                    >{tr("Browse")}</button>
                                 </div>
                             </label>
 
                             {/* Custom icon */}
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">Custom Icon</span>
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">{tr("Custom Icon")}</span>
                                 <div className="flex gap-2">
                                     <input
                                         value={iconPath}
                                         onChange={(e) => setIconPath(e.target.value)}
-                                        placeholder="Auto-extracted from executable"
+                                        placeholder={tr("Auto-extracted from executable")}
                                         className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-cyber-base/60 border border-cyber-line/60 text-cyber-text text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-cyber-accent/50 focus:border-cyber-accent/80 transition-all placeholder:text-cyber-muted/50"
                                     />
                                     <button
                                         type="button"
                                         onClick={handlePickIcon}
                                         className="px-3 py-2 rounded-lg bg-cyber-accent/20 hover:bg-cyber-accent/40 text-cyber-accent text-[11px] border border-cyber-accent/40 font-semibold transition-all hover:border-cyber-accent/70 shrink-0"
-                                    >
-                                        Browse
-                                    </button>
+                                    >{tr("Browse")}</button>
                                 </div>
                             </label>
 
                             {/* Sort order */}
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">Sort Order</span>
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-muted">{tr("Sort Order")}</span>
                                 <input
                                     type="number"
                                     value={order}
@@ -446,7 +434,7 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
 
                     {error && (
                         <div className="text-[11px] text-cyber-warn px-3 py-2 rounded-lg bg-cyber-warn/10 border border-cyber-warn/30">
-                            ⚠ {error}
+                            ⚠ {trFeedback(error ?? '')}
                         </div>
                     )}
                 </form>
@@ -458,9 +446,7 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
                     type="button"
                     onClick={onCancel}
                     className="px-4 py-2 rounded-lg text-[12px] text-cyber-muted hover:text-cyber-text border border-cyber-line/60 hover:border-cyber-line transition-all"
-                >
-                    ✕ Cancel
-                </button>
+                >{tr("✕ Cancel")}</button>
                 <button
                     type="submit"
                     form="quickapp-form"
@@ -469,11 +455,9 @@ function QuickAppForm({ initial, existingGroups, onCancel, onSubmit }: QuickAppF
                 >
                     {submitting ? (
                         <>
-                            <div className="w-3.5 h-3.5 border-2 border-cyber-base/40 border-t-cyber-base rounded-full animate-spin" />
-                            Saving…
-                        </>
+                            <div className="w-3.5 h-3.5 border-2 border-cyber-base/40 border-t-cyber-base rounded-full animate-spin" />{tr("Saving…")}</>
                     ) : (
-                        <>✓ {initial ? 'Save Changes' : 'Add App'}</>
+                        <>✓ {initial ? tr("Save Changes") : tr("Add App")}</>
                     )}
                 </button>
             </div>
@@ -498,6 +482,7 @@ const UNGROUPED_LABEL = 'Uncategorized';
 // ─── Main Panel ──────────────────────────────────────────────────────────────
 
 export function QuickAppsPanel() {
+  const locale = useLocale();
     const [apps, setApps] = useState<QuickApp[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -547,8 +532,8 @@ export function QuickAppsPanel() {
     }, []);
 
     const handleDelete = useCallback(async (app: QuickApp) => {
-        const yes = await confirm(`Remove "${app.name}" from Quick Apps?`, {
-            title: 'Remove Quick App',
+        const yes = await confirm(tr("Remove \"{v0}\" from Quick Apps?", { v0: String(app.name) }), {
+            title: tr("Remove Quick App"),
             kind: 'warning',
         });
         if (!yes) return;
@@ -658,9 +643,9 @@ export function QuickAppsPanel() {
                         <GroupIcon />
                     </div>
                     <div className="min-w-0">
-                        <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">Quick Apps</h2>
+                        <h2 className="font-display text-sm uppercase tracking-[0.2em] text-cyber-electric font-bold">{tr("Quick Apps")}</h2>
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                            {apps.length} {apps.length === 1 ? 'app' : 'apps'}
+                            {apps.length} {apps.length === 1 ? tr("app") : tr("apps")}
                             {activeGroup ? ` · ${activeGroup}` : ''}
                             {searchQuery ? ` · "${searchQuery}"` : ''}
                         </p>
@@ -688,20 +673,16 @@ export function QuickAppsPanel() {
                         type="button"
                         onClick={() => void handleReextract()}
                         disabled={loading}
-                        title="Re-extract all icons"
+                        title={tr("Re-extract all icons")}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] rounded-lg text-cyber-muted hover:text-cyber-text border border-cyber-line/60 hover:border-cyber-accent/50 disabled:opacity-50 transition-all bg-cyber-surface/30"
                     >
-                        <RefreshIcon />
-                        Icons
-                    </button>
+                        <RefreshIcon />{tr("Icons")}</button>
                     <button
                         type="button"
                         onClick={handleAdd}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-lg bg-cyber-accent text-cyber-base hover:bg-cyber-accent-hover font-bold transition-all shadow-md shadow-cyber-accent/20"
                     >
-                        <PlusIcon />
-                        Add App
-                    </button>
+                        <PlusIcon />{tr("Add App")}</button>
                 </div>
             </div>
 
@@ -714,7 +695,7 @@ export function QuickAppsPanel() {
                     </div>
                     <input
                         type="text"
-                        placeholder="Search apps…"
+                        placeholder={tr("Search apps…")}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-cyber-surface/40 border border-cyber-line/60 text-cyber-text text-[12px] focus:outline-none focus:ring-2 focus:ring-cyber-accent/40 focus:border-cyber-accent/60 transition-all placeholder:text-cyber-muted/60"
@@ -741,9 +722,7 @@ export function QuickAppsPanel() {
                                     ? 'bg-cyber-accent/20 border-cyber-accent/60 text-cyber-accent'
                                     : 'border-cyber-line/40 text-cyber-muted hover:border-cyber-accent/30 hover:text-cyber-text'
                             }`}
-                        >
-                            All
-                        </button>
+                        >{tr("All")}</button>
                         {groups.map(([groupName, groupApps]) => (
                             <button
                                 key={groupName}
@@ -755,7 +734,7 @@ export function QuickAppsPanel() {
                                         : 'border-cyber-line/40 text-cyber-muted hover:border-cyber-accent/30 hover:text-cyber-text'
                                 }`}
                             >
-                                {groupName}
+                                {groupApps.some((app) => app.group?.trim()) ? groupName : tr(UNGROUPED_LABEL)}
                                 <span className={`text-[9px] px-1 py-0.5 rounded-full ${
                                     activeGroup === groupName ? 'bg-cyber-accent/30' : 'bg-cyber-surface/60'
                                 }`}>
@@ -770,7 +749,7 @@ export function QuickAppsPanel() {
             {/* ── Error ── */}
             {error && (
                 <div className="shrink-0 mx-6 mt-3 px-4 py-2 text-[11px] text-cyber-warn bg-cyber-warn/10 border border-cyber-warn/30 rounded-lg">
-                    ⚠ {error}
+                    ⚠ {trFeedback(error ?? '')}
                 </div>
             )}
 
@@ -780,7 +759,7 @@ export function QuickAppsPanel() {
                     <div className="flex items-center justify-center h-full">
                         <div className="flex flex-col items-center gap-3 text-cyber-muted">
                             <div className="w-8 h-8 border-2 border-cyber-accent/40 border-t-cyber-accent rounded-full animate-spin" />
-                            <span className="text-[12px]">Loading apps…</span>
+                            <span className="text-[12px]">{tr("Loading apps…")}</span>
                         </div>
                     </div>
                 ) : apps.length === 0 ? (
@@ -790,7 +769,7 @@ export function QuickAppsPanel() {
                         <button
                             type="button"
                             onClick={handleAdd}
-                            title="Add new quick app"
+                            title={tr("Add new quick app")}
                             className="group flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dashed border-cyber-accent/40 hover:border-cyber-accent hover:bg-cyber-accent/5 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyber-accent shadow-lg shadow-cyber-accent/5 hover:shadow-cyber-accent/20"
                         >
                             <div className="w-16 h-16 rounded-xl bg-cyber-surface/30 flex items-center justify-center group-hover:bg-cyber-accent/15 transition-colors border border-cyber-line/30 group-hover:border-cyber-accent/40">
@@ -799,19 +778,17 @@ export function QuickAppsPanel() {
                                 </svg>
                             </div>
                             <div className="text-center">
-                                <p className="text-[14px] font-bold text-cyber-text group-hover:text-cyber-accent transition-colors">Add your first app</p>
-                                <p className="text-[11px] text-cyber-muted/70 mt-1">Click to add a quick launch shortcut</p>
+                                <p className="text-[14px] font-bold text-cyber-text group-hover:text-cyber-accent transition-colors">{tr("Add your first app")}</p>
+                                <p className="text-[11px] text-cyber-muted/70 mt-1">{tr("Click to add a quick launch shortcut")}</p>
                             </div>
                         </button>
-                        <p className="text-[10px] text-cyber-muted/50">Or click the <span className="text-cyber-accent font-semibold">+ Add App</span> button above</p>
+                        <p className="text-[10px] text-cyber-muted/50">{tr("Or click the ")}<span className="text-cyber-accent font-semibold">{tr("+ Add App")}</span>{tr(" button above")}</p>
                     </div>
                 ) : totalVisible === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-3 h-full text-cyber-muted">
                         <span className="text-2xl">🔍</span>
-                        <p className="text-[12px]">No apps match your search</p>
-                        <button type="button" onClick={() => { setSearchQuery(''); setActiveGroup(null); }} className="text-[11px] text-cyber-accent hover:underline">
-                            Clear filters
-                        </button>
+                        <p className="text-[12px]">{tr("No apps match your search")}</p>
+                        <button type="button" onClick={() => { setSearchQuery(''); setActiveGroup(null); }} className="text-[11px] text-cyber-accent hover:underline">{tr("Clear filters")}</button>
                     </div>
                 ) : (
                     /* Grouped grid */
@@ -824,7 +801,7 @@ export function QuickAppsPanel() {
                                         <div className="h-px flex-1 bg-gradient-to-r from-cyber-line/60 to-transparent" />
                                         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-cyber-surface/40 border border-cyber-line/40">
                                             <span className="text-[11px] font-bold uppercase tracking-wider text-cyber-muted">
-                                                {groupName}
+                                                {groupApps.some((app) => app.group?.trim()) ? groupName : tr(UNGROUPED_LABEL)}
                                             </span>
                                             <span className="text-[10px] text-cyber-muted/60 bg-cyber-base/60 px-1.5 py-0.5 rounded-full">
                                                 {groupApps.length}
@@ -860,7 +837,7 @@ export function QuickAppsPanel() {
                                         <button
                                             type="button"
                                             onClick={handleAdd}
-                                            title="Add new quick app"
+                                            title={tr("Add new quick app")}
                                             className="group flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-dashed border-cyber-line/30 hover:border-cyber-accent/50 hover:bg-cyber-accent/5 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyber-accent"
                                         >
                                             <div className={`${
@@ -874,9 +851,7 @@ export function QuickAppsPanel() {
                                             </div>
                                             <div className={`${
                                                 tileSize === 'sm' ? 'text-[9px]' : tileSize === 'lg' ? 'text-[12px]' : 'text-[10px]'
-                                            } text-cyber-muted/40 group-hover:text-cyber-accent transition-colors font-medium`}>
-                                                Add
-                                            </div>
+                                            } text-cyber-muted/40 group-hover:text-cyber-accent transition-colors font-medium`}>{tr("Add")}</div>
                                         </button>
                                     )}
                                 </div>

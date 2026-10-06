@@ -1,0 +1,7537 @@
+{
+  "Agent Sessions": [
+    "Agent Sessions",
+    "Phiên trợ lý",
+    "에이전트 세션"
+  ],
+  "sessions": [
+    "sessions",
+    "phiên",
+    "세션"
+  ],
+  "Xóa tất cả các điều kiện lọc": [
+    "Clear all filters",
+    "Xóa tất cả điều kiện lọc",
+    "모든 필터 지우기"
+  ],
+  "Xóa bộ lọc": [
+    "Clear filters",
+    "Xóa bộ lọc",
+    "필터 지우기"
+  ],
+  "Tải lại danh sách sessions": [
+    "Reload session list",
+    "Tải lại danh sách phiên",
+    "세션 목록 새로 고침"
+  ],
+  "Làm mới": [
+    "Refresh",
+    "Làm mới",
+    "새로 고침"
+  ],
+  "Tất cả (": [
+    "All (",
+    "Tất cả (",
+    "전체 ("
+  ],
+  "Toàn thời gian": [
+    "All time",
+    "Toàn thời gian",
+    "전체 기간"
+  ],
+  "Hôm nay": [
+    "Today",
+    "Hôm nay",
+    "오늘"
+  ],
+  "7 ngày": [
+    "7 days",
+    "7 ngày",
+    "7일"
+  ],
+  "30 ngày": [
+    "30 days",
+    "30 ngày",
+    "30일"
+  ],
+  "🔍 Tìm tiêu đề, thư mục, model, session ID...": [
+    "🔍 Search titles, folders, models, session IDs...",
+    "🔍 Tìm tiêu đề, thư mục, mô hình, ID phiên...",
+    "🔍 제목, 폴더, 모델, 세션 ID 검색..."
+  ],
+  "Đang lọc:": [
+    "Active filters:",
+    "Đang lọc:",
+    "적용된 필터:"
+  ],
+  "Agent:": [
+    "Agent:",
+    "Trợ lý:",
+    "에이전트:"
+  ],
+  "Model:": [
+    "Model:",
+    "Mô hình:",
+    "모델:"
+  ],
+  "Thư mục:": [
+    "Folder:",
+    "Thư mục:",
+    "폴더:"
+  ],
+  "Thời gian:": [
+    "Time:",
+    "Thời gian:",
+    "기간:"
+  ],
+  "Từ khóa: \"": [
+    "Keyword: \"",
+    "Từ khóa: \"",
+    "검색어: \""
+  ],
+  "✕ Xóa tất cả": [
+    "✕ Clear all",
+    "✕ Xóa tất cả",
+    "✕ 모두 지우기"
+  ],
+  "Đang tải danh sách session...": [
+    "Loading sessions...",
+    "Đang tải danh sách phiên...",
+    "세션 목록 불러오는 중..."
+  ],
+  "Không tìm thấy session nào phù hợp": [
+    "No matching sessions",
+    "Không tìm thấy phiên phù hợp",
+    "일치하는 세션이 없습니다"
+  ],
+  "Xóa bộ lọc để xem tất cả": [
+    "Clear filters to show all",
+    "Xóa bộ lọc để xem tất cả",
+    "필터를 지우면 모두 표시됩니다"
+  ],
+  "lượt": [
+    "turns",
+    "lượt",
+    "회"
+  ],
+  "Resume Session": [
+    "Resume Session",
+    "Tiếp tục phiên",
+    "세션 재개"
+  ],
+  "Sao chép lệnh resume": [
+    "Copy resume command",
+    "Sao chép lệnh tiếp tục phiên",
+    "세션 재개 명령 복사"
+  ],
+  "Đã copy": [
+    "Copied",
+    "Đã sao chép",
+    "복사됨"
+  ],
+  "Copy": [
+    "Copy",
+    "Sao chép",
+    "복사"
+  ],
+  "Session ID:": [
+    "Session ID:",
+    "ID phiên:",
+    "세션 ID:"
+  ],
+  "Working Dir:": [
+    "Working Dir:",
+    "Thư mục làm việc:",
+    "작업 폴더:"
+  ],
+  "Real Path:": [
+    "Real Path:",
+    "Đường dẫn thực:",
+    "실제 경로:"
+  ],
+  "✓ Đã copy path": [
+    "✓ Path copied",
+    "✓ Đã sao chép đường dẫn",
+    "✓ 경로 복사됨"
+  ],
+  "Copy Real Path": [
+    "Copy Real Path",
+    "Sao chép đường dẫn thực",
+    "실제 경로 복사"
+  ],
+  "✓ Đã copy context": [
+    "✓ Context copied",
+    "✓ Đã sao chép ngữ cảnh",
+    "✓ 컨텍스트 복사됨"
+  ],
+  "Copy Context": [
+    "Copy Context",
+    "Sao chép ngữ cảnh",
+    "컨텍스트 복사"
+  ],
+  "⚡ Chuyển sang:": [
+    "⚡ Transfer to:",
+    "⚡ Chuyển sang:",
+    "⚡ 전달 대상:"
+  ],
+  "Đang tải nội dung hội thoại...": [
+    "Loading conversation...",
+    "Đang tải hội thoại...",
+    "대화 불러오는 중..."
+  ],
+  "Không có tin nhắn chi tiết": [
+    "No detailed messages",
+    "Không có tin nhắn chi tiết",
+    "상세 메시지가 없습니다"
+  ],
+  "Session có thể chỉ chứa metadata hoặc logs bên ngoài": [
+    "This session may contain only metadata or external logs",
+    "Phiên có thể chỉ chứa siêu dữ liệu hoặc nhật ký bên ngoài",
+    "세션에 메타데이터나 외부 로그만 있을 수 있습니다"
+  ],
+  "👤 Người dùng (User)": [
+    "👤 User",
+    "👤 Người dùng",
+    "👤 사용자"
+  ],
+  "🤖 Trợ lý (AI)": [
+    "🤖 AI assistant",
+    "🤖 Trợ lý AI",
+    "🤖 AI 어시스턴트"
+  ],
+  "Chọn một session để xem chi tiết": [
+    "Select a session to view details",
+    "Chọn một phiên để xem chi tiết",
+    "세션을 선택하면 상세 내용을 볼 수 있습니다"
+  ],
+  "Double-click session để Resume ngay với lệnh chính xác của từng agent. Xem trước tin nhắn, sao chép đường dẫn file thực tế, xuất context hoặc chuyển tiếp sang Agent khác.": [
+    "Double-click a session to resume it with its agent's command. Preview messages, copy actual file paths, export context, or transfer to another agent.",
+    "Nhấp đúp vào phiên để tiếp tục bằng lệnh của từng trợ lý. Xem trước tin nhắn, sao chép đường dẫn thực, xuất ngữ cảnh hoặc chuyển sang trợ lý khác.",
+    "세션을 두 번 클릭하면 해당 에이전트의 명령으로 재개됩니다. 메시지 미리 보기, 실제 경로 복사, 컨텍스트 내보내기, 다른 에이전트로 전달을 사용할 수 있습니다."
+  ],
+  "AI Companion": [
+    "AI Companion",
+    "Trợ lý AI",
+    "AI 어시스턴트"
+  ],
+  "Tools enabled": [
+    "Tools enabled",
+    "Đã bật công cụ",
+    "도구 활성화됨"
+  ],
+  "Q&A only": [
+    "Q&A only",
+    "Chỉ hỏi đáp",
+    "질문과 답변만"
+  ],
+  "Config": [
+    "Config",
+    "Cấu hình",
+    "설정"
+  ],
+  "Disable": [
+    "Disable",
+    "Tắt",
+    "비활성화"
+  ],
+  "Enable": [
+    "Enable",
+    "Bật",
+    "활성화"
+  ],
+  "Tools": [
+    "Tools",
+    "Công cụ",
+    "도구"
+  ],
+  "Clear": [
+    "Clear",
+    "Xóa",
+    "지우기"
+  ],
+  "Enable App Actions?": [
+    "Enable App Actions?",
+    "Bật thao tác ứng dụng?",
+    "앱 작업을 활성화할까요?"
+  ],
+  "App Actions let the AI navigate views, check status, and manage configurations on your behalf. Read-only actions happen automatically. Creating, editing, or deleting anything requires your explicit approval each time.": [
+    "App Actions let the AI navigate views, check status, and manage configurations on your behalf. Read-only actions happen automatically. Creating, editing, or deleting anything requires your explicit approval each time.",
+    "Thao tác ứng dụng cho phép AI chuyển màn hình, kiểm tra trạng thái và quản lý cấu hình giúp bạn. Các thao tác chỉ đọc được thực hiện tự động. Mỗi lần tạo, sửa hoặc xóa đều cần bạn phê duyệt rõ ràng.",
+    "앱 작업을 사용하면 AI가 화면 이동, 상태 확인, 설정 관리를 수행할 수 있습니다. 읽기 전용 작업은 자동으로 실행됩니다. 생성, 수정, 삭제는 매번 사용자의 명시적인 승인이 필요합니다."
+  ],
+  "⚠ Credentials typed in chat are sent to the configured model provider before local redaction.": [
+    "⚠ Credentials typed in chat are sent to the configured model provider before local redaction.",
+    "⚠ Thông tin xác thực nhập trong trò chuyện được gửi đến nhà cung cấp mô hình trước khi được che tại máy.",
+    "⚠ 채팅에 입력한 인증 정보는 로컬에서 가려지기 전에 설정된 모델 제공업체로 전송됩니다."
+  ],
+  "Enable Actions": [
+    "Enable Actions",
+    "Bật thao tác",
+    "작업 활성화"
+  ],
+  "Cancel": [
+    "Cancel",
+    "Hủy",
+    "취소"
+  ],
+  "No messages yet.": [
+    "No messages yet.",
+    "Chưa có tin nhắn.",
+    "아직 메시지가 없습니다."
+  ],
+  "Ask about features, start sessions, or manage configs.": [
+    "Ask about features, start sessions, or manage configs.",
+    "Hỏi về tính năng, mở phiên hoặc quản lý cấu hình.",
+    "기능을 질문하거나 세션을 시작하고 설정을 관리하세요."
+  ],
+  "You": [
+    "You",
+    "Bạn",
+    "나"
+  ],
+  "Companion": [
+    "Companion",
+    "Trợ lý",
+    "어시스턴트"
+  ],
+  "Thinking": [
+    "Thinking",
+    "Đang suy nghĩ",
+    "생각하는 중"
+  ],
+  "Type a message...": [
+    "Type a message...",
+    "Nhập tin nhắn...",
+    "메시지 입력..."
+  ],
+  "Send": [
+    "Send",
+    "Gửi",
+    "보내기"
+  ],
+  "Enter to send · Shift+Enter for new line": [
+    "Enter to send · Shift+Enter for new line",
+    "Enter để gửi · Shift+Enter để xuống dòng",
+    "Enter로 전송 · Shift+Enter로 줄바꿈"
+  ],
+  "Toggle": [
+    "Toggle",
+    "Bật/tắt",
+    "전환"
+  ],
+  "Key": [
+    "Key",
+    "Khóa",
+    "키"
+  ],
+  "Value": [
+    "Value",
+    "Giá trị",
+    "값"
+  ],
+  "API Client": [
+    "API Client",
+    "Ứng dụng API",
+    "API 클라이언트"
+  ],
+  "Ctrl+Enter to send": [
+    "Ctrl+Enter to send",
+    "Ctrl+Enter để gửi",
+    "Ctrl+Enter로 전송"
+  ],
+  "Paste curl command here...": [
+    "Paste curl command here...",
+    "Dán lệnh curl vào đây...",
+    "curl 명령을 여기에 붙여넣으세요..."
+  ],
+  "Parse Curl": [
+    "Parse Curl",
+    "Phân tích cURL",
+    "cURL 분석"
+  ],
+  "Copy as cURL": [
+    "Copy as cURL",
+    "Sao chép dạng cURL",
+    "cURL로 복사"
+  ],
+  "Params": [
+    "Params",
+    "Tham số",
+    "매개변수"
+  ],
+  "Headers": [
+    "Headers",
+    "Header",
+    "헤더"
+  ],
+  "Body": [
+    "Body",
+    "Nội dung",
+    "본문"
+  ],
+  "Runner": [
+    "Runner",
+    "Chạy thử tải",
+    "부하 테스트"
+  ],
+  "Add": [
+    "Add",
+    "Thêm",
+    "추가"
+  ],
+  "Param": [
+    "Param",
+    "Tham số",
+    "매개변수"
+  ],
+  "Header": [
+    "Header",
+    "Tiêu đề",
+    "헤더"
+  ],
+  "Request Body": [
+    "Request Body",
+    "Nội dung yêu cầu",
+    "요청 본문"
+  ],
+  "Pretty": [
+    "Pretty",
+    "Định dạng",
+    "서식 정리"
+  ],
+  "Concurrency": [
+    "Concurrency",
+    "Số yêu cầu đồng thời",
+    "동시 요청 수"
+  ],
+  "Mode": [
+    "Mode",
+    "Chế độ",
+    "모드"
+  ],
+  "N requests": [
+    "N requests",
+    "N yêu cầu",
+    "N개 요청"
+  ],
+  "Duration": [
+    "Duration",
+    "Thời lượng",
+    "실행 시간"
+  ],
+  "Total Requests": [
+    "Total Requests",
+    "Tổng yêu cầu",
+    "총 요청 수"
+  ],
+  "Duration (sec)": [
+    "Duration (sec)",
+    "Thời lượng (giây)",
+    "실행 시간(초)"
+  ],
+  "Stop": [
+    "Stop",
+    "Dừng",
+    "중지"
+  ],
+  "Start": [
+    "Start",
+    "Mở",
+    "시작"
+  ],
+  "Progress": [
+    "Progress",
+    "Tiến độ",
+    "진행 상황"
+  ],
+  "sent": [
+    "sent",
+    "đã gửi",
+    "전송됨"
+  ],
+  "Requests/sec": [
+    "Requests/sec",
+    "Yêu cầu/giây",
+    "초당 요청 수"
+  ],
+  "Sent": [
+    "Sent",
+    "Đã gửi",
+    "전송됨"
+  ],
+  "2xx OK": [
+    "2xx OK",
+    "2xx thành công",
+    "2xx 성공"
+  ],
+  "Errors": [
+    "Errors",
+    "Lỗi",
+    "오류"
+  ],
+  "Latency (ms)": [
+    "Latency (ms)",
+    "Độ trễ (ms)",
+    "지연 시간(ms)"
+  ],
+  "Min": [
+    "Min",
+    "Thấp nhất",
+    "최소"
+  ],
+  "Avg": [
+    "Avg",
+    "Trung bình",
+    "평균"
+  ],
+  "Max": [
+    "Max",
+    "Cao nhất",
+    "최대"
+  ],
+  "Errors (max 20 shown)": [
+    "Errors (max 20 shown)",
+    "Lỗi (hiển thị tối đa 20)",
+    "오류(최대 20개 표시)"
+  ],
+  "Copied!": [
+    "Copied!",
+    "Đã sao chép!",
+    "복사되었습니다!"
+  ],
+  "Response Headers (": [
+    "Response Headers (",
+    "Header phản hồi (",
+    "응답 헤더 ("
+  ],
+  "Streaming... (click to abort)": [
+    "Streaming... (click to abort)",
+    "Đang truyền... (nhấp để hủy)",
+    "스트리밍 중... (클릭하여 중단)"
+  ],
+  "Sending request...": [
+    "Sending request...",
+    "Đang gửi yêu cầu...",
+    "요청 보내는 중..."
+  ],
+  "Saved.": [
+    "Saved.",
+    "Đã lưu.",
+    "저장되었습니다."
+  ],
+  "Save failed: {v0}": [
+    "Save failed: {v0}",
+    "Lưu thất bại: {v0}",
+    "저장 실패: {v0}"
+  ],
+  "Identity generated.": [
+    "Identity generated.",
+    "Đã tạo danh tính.",
+    "신원이 생성되었습니다."
+  ],
+  "Generate failed: {v0}": [
+    "Generate failed: {v0}",
+    "Tạo thất bại: {v0}",
+    "생성 실패: {v0}"
+  ],
+  "Paste a 64-char hex private key first.": [
+    "Paste a 64-char hex private key first.",
+    "Hãy dán khóa riêng gồm 64 ký tự hex trước.",
+    "먼저 64자리 16진수 개인 키를 붙여넣으세요."
+  ],
+  "Identity imported.": [
+    "Identity imported.",
+    "Đã nhập danh tính.",
+    "신원을 가져왔습니다."
+  ],
+  "Import failed: {v0}": [
+    "Import failed: {v0}",
+    "Nhập thất bại: {v0}",
+    "가져오기 실패: {v0}"
+  ],
+  "Identity cleared.": [
+    "Identity cleared.",
+    "Đã xóa danh tính.",
+    "신원이 삭제되었습니다."
+  ],
+  "Clear failed: {v0}": [
+    "Clear failed: {v0}",
+    "Xóa trắng thất bại: {v0}",
+    "비우기 실패: {v0}"
+  ],
+  "Buzz Relay": [
+    "Buzz Relay",
+    "Máy chủ chuyển tiếp Buzz",
+    "Buzz 릴레이"
+  ],
+  "Connection used by the Buzz workspace chat.": [
+    "Connection used by the Buzz workspace chat.",
+    "Kết nối dùng cho trò chuyện trong Buzz.",
+    "Buzz 작업 공간 채팅에 사용하는 연결입니다."
+  ],
+  "Relay URL": [
+    "Relay URL",
+    "URL máy chủ chuyển tiếp",
+    "릴레이 URL"
+  ],
+  "https:// or wss:// endpoint": [
+    "https:// or wss:// endpoint",
+    "Địa chỉ https:// hoặc wss://",
+    "https:// 또는 wss:// 주소"
+  ],
+  "Allow Insecure TLS": [
+    "Allow Insecure TLS",
+    "Cho phép TLS không an toàn",
+    "안전하지 않은 TLS 허용"
+  ],
+  "Allow self-signed or invalid certificates": [
+    "Allow self-signed or invalid certificates",
+    "Cho phép chứng chỉ tự ký hoặc không hợp lệ",
+    "자체 서명 또는 유효하지 않은 인증서 허용"
+  ],
+  "Connection Hop (Proxy)": [
+    "Connection Hop (Proxy)",
+    "Chặng kết nối (Proxy)",
+    "연결 경유(프록시)"
+  ],
+  "Route relay traffic through an SSH tunnel or HTTP proxy.": [
+    "Route relay traffic through an SSH tunnel or HTTP proxy.",
+    "Chuyển lưu lượng máy chủ chuyển tiếp qua đường hầm SSH hoặc proxy HTTP.",
+    "릴레이 트래픽을 SSH 터널 또는 HTTP 프록시로 전달합니다."
+  ],
+  "Direct (no hop)": [
+    "Direct (no hop)",
+    "Trực tiếp (không qua chặng)",
+    "직접 연결(경유 없음)"
+  ],
+  "SSH Tunnel": [
+    "SSH Tunnel",
+    "Đường hầm SSH",
+    "SSH 터널"
+  ],
+  "HTTP CONNECT Proxy": [
+    "HTTP CONNECT Proxy",
+    "Proxy HTTP CONNECT",
+    "HTTP CONNECT 프록시"
+  ],
+  "Port": [
+    "Port",
+    "Cổng",
+    "포트"
+  ],
+  "SSH username": [
+    "SSH username",
+    "Tên người dùng SSH",
+    "SSH 사용자 이름"
+  ],
+  "Auth mode": [
+    "Auth mode",
+    "Chế độ xác thực",
+    "인증 방식"
+  ],
+  "Password": [
+    "Password",
+    "Mật khẩu",
+    "비밀번호"
+  ],
+  "Private Key": [
+    "Private Key",
+    "Khóa riêng",
+    "개인 키"
+  ],
+  "C:\\\\path\\\\to\\\\id_ed25519 (passphrase below, optional)": [
+    "C:\\\\path\\\\to\\\\id_ed25519 (passphrase below, optional)",
+    "C:\\\\path\\\\to\\\\id_ed25519 (mật khẩu khóa tùy chọn ở dưới)",
+    "C:\\\\path\\\\to\\\\id_ed25519 (아래에 암호 입력, 선택 사항)"
+  ],
+  "CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH server and routes all relay traffic via it.": [
+    "CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH server and routes all relay traffic via it.",
+    "CLX mở một cổng SOCKS5 động cục bộ (127.0.0.1:31080) qua máy chủ SSH này và chuyển toàn bộ lưu lượng máy chủ chuyển tiếp qua đó.",
+    "CLX는 이 SSH 서버를 통해 로컬 동적 SOCKS5 리스너(127.0.0.1:31080)를 열고 모든 릴레이 트래픽을 전달합니다."
+  ],
+  "Relay requests are sent via HTTP CONNECT through this proxy host:port.": [
+    "Relay requests are sent via HTTP CONNECT through this proxy host:port.",
+    "Yêu cầu máy chủ chuyển tiếp được gửi bằng HTTP CONNECT qua địa chỉ máy chủ:cổng của proxy này.",
+    "릴레이 요청은 이 프록시의 호스트:포트를 통해 HTTP CONNECT로 전송됩니다."
+  ],
+  "Saving…": [
+    "Saving…",
+    "Đang lưu…",
+    "저장 중…"
+  ],
+  "Save Relay": [
+    "Save Relay",
+    "Lưu máy chủ chuyển tiếp",
+    "릴레이 저장"
+  ],
+  "Buzz Identity": [
+    "Buzz Identity",
+    "Danh tính Buzz",
+    "Buzz 신원"
+  ],
+  "Your Nostr private key (stored in Windows Credential Manager, never on disk).": [
+    "Your Nostr private key (stored in Windows Credential Manager, never on disk).",
+    "Khóa riêng Nostr của bạn (lưu trong Windows Credential Manager, không ghi ra tệp).",
+    "Nostr 개인 키입니다(Windows 자격 증명 관리자에 저장되며 파일로 저장되지 않습니다)."
+  ],
+  "IDENTITY OK": [
+    "IDENTITY OK",
+    "ĐÃ CÓ DANH TÍNH",
+    "신원 확인됨"
+  ],
+  "NO IDENTITY": [
+    "NO IDENTITY",
+    "CHƯA CÓ DANH TÍNH",
+    "신원 없음"
+  ],
+  "Generate": [
+    "Generate",
+    "Tạo",
+    "생성"
+  ],
+  "Import 64-hex private key": [
+    "Import 64-hex private key",
+    "Nhập khóa riêng gồm 64 ký tự hex",
+    "64자리 16진수 개인 키 가져오기"
+  ],
+  "Import": [
+    "Import",
+    "Nhập",
+    "가져오기"
+  ],
+  "NES Session Service": [
+    "NES Session Service",
+    "Dịch vụ phiên NES",
+    "NES 세션 서비스"
+  ],
+  "Base URL of the nes-session relay for multiplayer NES.": [
+    "Base URL of the nes-session relay for multiplayer NES.",
+    "URL gốc của máy chủ nes-session để chơi NES nhiều người.",
+    "NES 멀티플레이용 nes-session 릴레이의 기본 URL입니다."
+  ],
+  "Service URL": [
+    "Service URL",
+    "URL dịch vụ",
+    "서비스 URL"
+  ],
+  "e.g. http://127.0.0.1:8080": [
+    "e.g. http://127.0.0.1:8080",
+    "Ví dụ: http://127.0.0.1:8080",
+    "예: http://127.0.0.1:8080"
+  ],
+  "Route session-service traffic through an SSH tunnel or HTTP proxy.": [
+    "Route session-service traffic through an SSH tunnel or HTTP proxy.",
+    "Chuyển lưu lượng dịch vụ phiên qua đường hầm SSH hoặc proxy HTTP.",
+    "세션 서비스 트래픽을 SSH 터널 또는 HTTP 프록시로 전달합니다."
+  ],
+  "CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH server and routes all session-service traffic via it.": [
+    "CLX opens a local dynamic SOCKS5 listener (127.0.0.1:31080) through this SSH server and routes all session-service traffic via it.",
+    "CLX mở một cổng SOCKS5 động cục bộ (127.0.0.1:31080) qua máy chủ SSH này và chuyển toàn bộ lưu lượng dịch vụ phiên qua đó.",
+    "CLX는 이 SSH 서버를 통해 로컬 동적 SOCKS5 리스너(127.0.0.1:31080)를 열고 모든 세션 서비스 트래픽을 전달합니다."
+  ],
+  "Session-service requests are sent via HTTP CONNECT through this proxy host:port.": [
+    "Session-service requests are sent via HTTP CONNECT through this proxy host:port.",
+    "Yêu cầu dịch vụ phiên được gửi bằng HTTP CONNECT qua địa chỉ máy chủ:cổng của proxy này.",
+    "세션 서비스 요청은 이 프록시의 호스트:포트를 통해 HTTP CONNECT로 전송됩니다."
+  ],
+  "Save Service": [
+    "Save Service",
+    "Lưu dịch vụ",
+    "서비스 저장"
+  ],
+  "NES Controller Mapping": [
+    "NES Controller Mapping",
+    "Ánh xạ tay cầm NES",
+    "NES 컨트롤러 매핑"
+  ],
+  "Configure keyboard keys and Turbo Rapid-Fire buttons for NES emulation.": [
+    "Configure keyboard keys and Turbo Rapid-Fire buttons for NES emulation.",
+    "Cấu hình phím bàn phím và nút bắn nhanh Turbo cho giả lập NES.",
+    "NES 에뮬레이션의 키보드 키와 터보 연사 버튼을 설정합니다."
+  ],
+  "Button Mapping & Turbo Keys": [
+    "Button Mapping & Turbo Keys",
+    "Ánh xạ nút và phím Turbo",
+    "버튼 매핑 및 터보 키"
+  ],
+  "Customize D-Pad, A, B, Turbo A, Turbo B, Select, Start": [
+    "Customize D-Pad, A, B, Turbo A, Turbo B, Select, Start",
+    "Tùy chỉnh D-Pad, A, B, Turbo A, Turbo B, Select, Start",
+    "D-Pad, A, B, Turbo A, Turbo B, Select, Start 설정"
+  ],
+  "Configure Keys…": [
+    "Configure Keys…",
+    "Cấu hình phím…",
+    "키 설정…"
+  ],
+  "Background Execution & Badges": [
+    "Background Execution & Badges",
+    "Chạy nền và huy hiệu",
+    "백그라운드 실행 및 배지"
+  ],
+  "Control resource preservation and unread message notifications.": [
+    "Control resource preservation and unread message notifications.",
+    "Quản lý tài nguyên và thông báo tin nhắn chưa đọc.",
+    "리소스 유지 및 읽지 않은 메시지 알림을 관리합니다."
+  ],
+  "Keep NES game state when switching tabs": [
+    "Keep NES game state when switching tabs",
+    "Giữ trạng thái trò chơi NES khi chuyển thẻ",
+    "탭 전환 시 NES 게임 상태 유지"
+  ],
+  "Preserves ROM execution in memory so the game never resets unless explicitly exited.": [
+    "Preserves ROM execution in memory so the game never resets unless explicitly exited.",
+    "Giữ ROM chạy trong bộ nhớ để trò chơi chỉ đặt lại khi bạn chủ động thoát.",
+    "ROM 실행을 메모리에 유지하여 명시적으로 종료할 때만 게임이 초기화됩니다."
+  ],
+  "Keep Buzz live connection & show unread badges": [
+    "Keep Buzz live connection & show unread badges",
+    "Giữ kết nối Buzz và hiển thị huy hiệu chưa đọc",
+    "Buzz 연결 유지 및 읽지 않은 메시지 배지 표시"
+  ],
+  "Displays a red badge count on the Buzz sidebar icon when new messages arrive.": [
+    "Displays a red badge count on the Buzz sidebar icon when new messages arrive.",
+    "Hiển thị số tin chưa đọc màu đỏ trên biểu tượng Buzz khi có tin mới.",
+    "새 메시지가 도착하면 Buzz 사이드바 아이콘에 빨간 배지로 개수를 표시합니다."
+  ],
+  "Failed to load thread: {v0}": [
+    "Failed to load thread: {v0}",
+    "Không tải được luồng hội thoại: {v0}",
+    "스레드 불러오기 실패: {v0}"
+  ],
+  "Send failed: {v0}": [
+    "Send failed: {v0}",
+    "Gửi thất bại: {v0}",
+    "전송 실패: {v0}"
+  ],
+  "Display name cannot be empty.": [
+    "Display name cannot be empty.",
+    "Tên hiển thị không được để trống.",
+    "표시 이름을 입력하세요."
+  ],
+  "Save profile failed: {v0}": [
+    "Save profile failed: {v0}",
+    "Lưu hồ sơ thất bại: {v0}",
+    "프로필 저장 실패: {v0}"
+  ],
+  "Enter a user pubkey (64-hex) or pick from members.": [
+    "Enter a user pubkey (64-hex) or pick from members.",
+    "Nhập khóa công khai người dùng (64 ký tự hex) hoặc chọn từ thành viên.",
+    "사용자 공개 키(64자리 16진수)를 입력하거나 멤버 목록에서 선택하세요."
+  ],
+  "You cannot open a direct message with yourself.": [
+    "You cannot open a direct message with yourself.",
+    "Bạn không thể nhắn tin trực tiếp cho chính mình.",
+    "자신에게 직접 메시지를 보낼 수 없습니다."
+  ],
+  "Failed to open DM: no dm_id returned.": [
+    "Failed to open DM: no dm_id returned.",
+    "Không mở được tin nhắn trực tiếp: không có dm_id trả về.",
+    "DM 열기 실패: dm_id가 반환되지 않았습니다."
+  ],
+  "Open DM failed: {v0}": [
+    "Open DM failed: {v0}",
+    "Mở tin nhắn trực tiếp thất bại: {v0}",
+    "DM 열기 실패: {v0}"
+  ],
+  "Direct message": [
+    "Direct message",
+    "Tin nhắn trực tiếp",
+    "직접 메시지"
+  ],
+  "🐝 Buzz Workspace": [
+    "🐝 Buzz Workspace",
+    "🐝 Không gian Buzz",
+    "🐝 Buzz 작업 공간"
+  ],
+  "Profile": [
+    "Profile",
+    "Hồ sơ",
+    "프로필"
+  ],
+  "Error:": [
+    "Error:",
+    "Lỗi:",
+    "오류:"
+  ],
+  "Channels": [
+    "Channels",
+    "Kênh",
+    "채널"
+  ],
+  "Loading...": [
+    "Loading...",
+    "Đang tải...",
+    "불러오는 중..."
+  ],
+  "No channels": [
+    "No channels",
+    "Chưa có kênh",
+    "채널이 없습니다"
+  ],
+  "Direct Messages": [
+    "Direct Messages",
+    "Tin nhắn trực tiếp",
+    "직접 메시지"
+  ],
+  "New direct message": [
+    "New direct message",
+    "Tin nhắn trực tiếp mới",
+    "새 직접 메시지"
+  ],
+  "No direct messages. Click + to start.": [
+    "No direct messages. Click + to start.",
+    "Chưa có tin nhắn trực tiếp. Nhấp + để bắt đầu.",
+    "직접 메시지가 없습니다. +를 클릭하여 시작하세요."
+  ],
+  "Channel ID:": [
+    "Channel ID:",
+    "ID kênh:",
+    "채널 ID:"
+  ],
+  "Refresh": [
+    "Refresh",
+    "Làm mới",
+    "새로 고침"
+  ],
+  "Loading messages...": [
+    "Loading messages...",
+    "Đang tải tin nhắn...",
+    "메시지 불러오는 중..."
+  ],
+  "No messages in this stream.": [
+    "No messages in this stream.",
+    "Luồng này chưa có tin nhắn.",
+    "이 대화에 메시지가 없습니다."
+  ],
+  "Select a channel to view conversation": [
+    "Select a channel to view conversation",
+    "Chọn một kênh để xem hội thoại",
+    "채널을 선택하면 대화를 볼 수 있습니다"
+  ],
+  "Thread": [
+    "Thread",
+    "Luồng hội thoại",
+    "스레드"
+  ],
+  "Loading thread...": [
+    "Loading thread...",
+    "Đang tải luồng hội thoại...",
+    "스레드 불러오는 중..."
+  ],
+  "Reply in thread...": [
+    "Reply in thread...",
+    "Trả lời trong luồng...",
+    "스레드에 답장..."
+  ],
+  "Members": [
+    "Members",
+    "Thành viên",
+    "멤버"
+  ],
+  "Loading members...": [
+    "Loading members...",
+    "Đang tải thành viên...",
+    "멤버 불러오는 중..."
+  ],
+  "No members loaded.": [
+    "No members loaded.",
+    "Chưa tải thành viên.",
+    "불러온 멤버가 없습니다."
+  ],
+  "Managed Agents": [
+    "Managed Agents",
+    "Trợ lý được quản lý",
+    "관리되는 에이전트"
+  ],
+  "No agents configured.": [
+    "No agents configured.",
+    "Chưa cấu hình trợ lý.",
+    "설정된 에이전트가 없습니다."
+  ],
+  "Status:": [
+    "Status:",
+    "Trạng thái:",
+    "상태:"
+  ],
+  "Edit Profile": [
+    "Edit Profile",
+    "Sửa hồ sơ",
+    "프로필 수정"
+  ],
+  "Display name": [
+    "Display name",
+    "Tên hiển thị",
+    "표시 이름"
+  ],
+  "Your name": [
+    "Your name",
+    "Tên của bạn",
+    "내 이름"
+  ],
+  "About": [
+    "About",
+    "Giới thiệu",
+    "소개"
+  ],
+  "Short bio (optional)": [
+    "Short bio (optional)",
+    "Giới thiệu ngắn (tùy chọn)",
+    "짧은 소개(선택 사항)"
+  ],
+  "Avatar URL": [
+    "Avatar URL",
+    "URL ảnh đại diện",
+    "아바타 URL"
+  ],
+  "https://… (optional)": [
+    "https://… (optional)",
+    "https://… (tùy chọn)",
+    "https://… (선택 사항)"
+  ],
+  "Save": [
+    "Save",
+    "Lưu",
+    "저장"
+  ],
+  "New Direct Message": [
+    "New Direct Message",
+    "Tin nhắn trực tiếp mới",
+    "새 직접 메시지"
+  ],
+  "64-char hex pubkey": [
+    "64-char hex pubkey",
+    "Khóa công khai gồm 64 ký tự hex",
+    "64자리 16진수 공개 키"
+  ],
+  "Open DM": [
+    "Open DM",
+    "Mở tin nhắn trực tiếp",
+    "DM 열기"
+  ],
+  "User ID:": [
+    "User ID:",
+    "ID người dùng:",
+    "사용자 ID:"
+  ],
+  "↩ View thread": [
+    "↩ View thread",
+    "↩ Xem luồng",
+    "↩ 스레드 보기"
+  ],
+  "💬 Reply in thread": [
+    "💬 Reply in thread",
+    "💬 Trả lời trong luồng",
+    "💬 스레드에 답장"
+  ],
+  "Choose an icon": [
+    "Choose an icon",
+    "Chọn biểu tượng",
+    "아이콘 선택"
+  ],
+  "Close": [
+    "Close",
+    "Đóng",
+    "닫기"
+  ],
+  "Name": [
+    "Name",
+    "Tên",
+    "이름"
+  ],
+  "Command": [
+    "Command",
+    "Lệnh",
+    "명령"
+  ],
+  "Group (Optional)": [
+    "Group (Optional)",
+    "Nhóm (tùy chọn)",
+    "그룹(선택 사항)"
+  ],
+  "Default": [
+    "Default",
+    "Mặc định",
+    "기본값"
+  ],
+  "Default Working Directory (Optional)": [
+    "Default Working Directory (Optional)",
+    "Thư mục làm việc mặc định (tùy chọn)",
+    "기본 작업 폴더(선택 사항)"
+  ],
+  "Startup Args (one per line)": [
+    "Startup Args (one per line)",
+    "Tham số khởi động (mỗi dòng một tham số)",
+    "시작 인수(줄마다 하나)"
+  ],
+  "Enable RTK Token Compression": [
+    "Enable RTK Token Compression",
+    "Bật nén token RTK",
+    "RTK 토큰 압축 활성화"
+  ],
+  "(Auto wrap command with rtk)": [
+    "(Auto wrap command with rtk)",
+    "(Tự động chạy lệnh qua rtk)",
+    "(명령을 rtk로 자동 래핑)"
+  ],
+  "Name and command are required.": [
+    "Name and command are required.",
+    "Tên và lệnh là bắt buộc.",
+    "이름과 명령을 입력하세요."
+  ],
+  "Saving...": [
+    "Saving...",
+    "Đang lưu...",
+    "저장 중..."
+  ],
+  "API History": [
+    "API History",
+    "Lịch sử API",
+    "API 기록"
+  ],
+  "Search URL or method...": [
+    "Search URL or method...",
+    "Tìm URL hoặc phương thức...",
+    "URL 또는 메서드 검색..."
+  ],
+  "No requests yet.": [
+    "No requests yet.",
+    "Chưa có yêu cầu.",
+    "아직 요청이 없습니다."
+  ],
+  "Send a request from the API Client to see it here.": [
+    "Send a request from the API Client to see it here.",
+    "Gửi yêu cầu từ ứng dụng API để xem tại đây.",
+    "API 클라이언트에서 요청을 보내면 여기에 표시됩니다."
+  ],
+  "No results for \"": [
+    "No results for \"",
+    "Không có kết quả cho \"",
+    "다음 검색어의 결과가 없습니다: \""
+  ],
+  "body": [
+    "body",
+    "nội dung",
+    "본문"
+  ],
+  "Terminal Orchestor": [
+    "Terminal Orchestor",
+    "Điều phối terminal",
+    "터미널 오케스트레이터"
+  ],
+  "Buzz Workspace": [
+    "Buzz Workspace",
+    "Không gian Buzz",
+    "Buzz 작업 공간"
+  ],
+  "Entertainment": [
+    "Entertainment",
+    "Giải trí",
+    "엔터테인먼트"
+  ],
+  "Quick Apps (favorite apps launcher)": [
+    "Quick Apps (favorite apps launcher)",
+    "Ứng dụng nhanh (mở ứng dụng yêu thích)",
+    "빠른 앱(즐겨찾는 앱 실행)"
+  ],
+  "API Client (Postman-like)": [
+    "API Client (Postman-like)",
+    "Ứng dụng API (tương tự Postman)",
+    "API 클라이언트(Postman 방식)"
+  ],
+  "Dashboard": [
+    "Dashboard",
+    "Bảng theo dõi",
+    "대시보드"
+  ],
+  "Settings": [
+    "Settings",
+    "Cấu hình",
+    "설정"
+  ],
+  "Loading built-in local LLM model... (This may take a moment)": [
+    "Loading built-in local LLM model... (This may take a moment)",
+    "Đang tải mô hình LLM cục bộ... (Có thể mất một lúc)",
+    "내장 로컬 LLM 모델 불러오는 중... (잠시 걸릴 수 있습니다)"
+  ],
+  "Built-in local LLM model loaded successfully!": [
+    "Built-in local LLM model loaded successfully!",
+    "Đã tải mô hình LLM cục bộ!",
+    "내장 로컬 LLM 모델을 불러왔습니다!"
+  ],
+  "Failed to load model: {v0}": [
+    "Failed to load model: {v0}",
+    "Không tải được mô hình: {v0}",
+    "모델 불러오기 실패: {v0}"
+  ],
+  "Built-in local LLM model unloaded.": [
+    "Built-in local LLM model unloaded.",
+    "Đã gỡ mô hình LLM cục bộ khỏi bộ nhớ.",
+    "내장 로컬 LLM 모델을 메모리에서 해제했습니다."
+  ],
+  "Rewriting query for clarity...": [
+    "Rewriting query for clarity...",
+    "Đang viết lại yêu cầu cho rõ ràng...",
+    "요청을 더 명확하게 다듬는 중..."
+  ],
+  "Query rewritten!": [
+    "Query rewritten!",
+    "Đã viết lại yêu cầu!",
+    "요청을 다듬었습니다!"
+  ],
+  "Rewrite failed: {v0}": [
+    "Rewrite failed: {v0}",
+    "Viết lại thất bại: {v0}",
+    "다듬기 실패: {v0}"
+  ],
+  "Generating CLI command suggestion...": [
+    "Generating CLI command suggestion...",
+    "Đang đề xuất lệnh CLI...",
+    "CLI 명령 제안 생성 중..."
+  ],
+  "Command suggested!": [
+    "Command suggested!",
+    "Đã đề xuất lệnh!",
+    "명령을 제안했습니다!"
+  ],
+  "Failed: {v0}": [
+    "Failed: {v0}",
+    "Thất bại: {v0}",
+    "실패: {v0}"
+  ],
+  "Summarizing text...": [
+    "Summarizing text...",
+    "Đang tóm tắt văn bản...",
+    "텍스트 요약 중..."
+  ],
+  "Text summarized!": [
+    "Text summarized!",
+    "Đã tóm tắt văn bản!",
+    "텍스트를 요약했습니다!"
+  ],
+  "Generating title...": [
+    "Generating title...",
+    "Đang tạo tiêu đề...",
+    "제목 생성 중..."
+  ],
+  "Title generated!": [
+    "Title generated!",
+    "Đã tạo tiêu đề!",
+    "제목을 생성했습니다!"
+  ],
+  "LLM configuration saved successfully!": [
+    "LLM configuration saved successfully!",
+    "Đã lưu cấu hình LLM!",
+    "LLM 설정을 저장했습니다!"
+  ],
+  "Chat history cleared.": [
+    "Chat history cleared.",
+    "Đã xóa lịch sử trò chuyện.",
+    "채팅 기록을 지웠습니다."
+  ],
+  "AI Companion is processing your request...": [
+    "AI Companion is processing your request...",
+    "Trợ lý AI đang xử lý yêu cầu...",
+    "AI 어시스턴트가 요청을 처리하는 중..."
+  ],
+  "Cloud LLM failed. Falling back to local built-in LLM...": [
+    "Cloud LLM failed. Falling back to local built-in LLM...",
+    "LLM đám mây thất bại. Đang chuyển sang LLM cục bộ...",
+    "클라우드 LLM 실패. 내장 로컬 LLM으로 전환하는 중..."
+  ],
+  "LLM Error: {v0}": [
+    "LLM Error: {v0}",
+    "Lỗi LLM: {v0}",
+    "LLM 오류: {v0}"
+  ],
+  "{v0} deleted: {v1}": [
+    "{v0} deleted: {v1}",
+    "Đã xóa {v0}: {v1}",
+    "{v0} 삭제됨: {v1}"
+  ],
+  "Delete failed: {v0}": [
+    "Delete failed: {v0}",
+    "Xóa thất bại: {v0}",
+    "삭제 실패: {v0}"
+  ],
+  "(empty)": [
+    "(empty)",
+    "(trống)",
+    "(비어 있음)"
+  ],
+  "CLIs, Operator, Configs & Explorer": [
+    "CLIs, Operator, Configs & Explorer",
+    "CLI, điều khiển, cấu hình và tệp",
+    "CLI, 제어, 설정 및 탐색기"
+  ],
+  "Recent": [
+    "Recent",
+    "Gần đây",
+    "최근"
+  ],
+  "💻 CLIs": [
+    "💻 CLIs",
+    "💻 CLI",
+    "💻 CLI"
+  ],
+  "☁️ VM": [
+    "☁️ VM",
+    "☁️ Máy ảo",
+    "☁️ 가상 머신"
+  ],
+  "⚡ Configs": [
+    "⚡ Configs",
+    "⚡ Cấu hình",
+    "⚡ 설정"
+  ],
+  "📁 Explorer": [
+    "📁 Explorer",
+    "📁 Tệp",
+    "📁 탐색기"
+  ],
+  "CLI Connections": [
+    "CLI Connections",
+    "Kết nối CLI",
+    "CLI 연결"
+  ],
+  "Add CLI": [
+    "Add CLI",
+    "Thêm CLI",
+    "CLI 추가"
+  ],
+  "Search CLI name, command or group...": [
+    "Search CLI name, command or group...",
+    "Tìm tên CLI, lệnh hoặc nhóm...",
+    "CLI 이름, 명령 또는 그룹 검색..."
+  ],
+  "No CLIs Found": [
+    "No CLIs Found",
+    "Không tìm thấy CLI",
+    "CLI를 찾을 수 없습니다"
+  ],
+  "Try adjusting your search query.": [
+    "Try adjusting your search query.",
+    "Hãy thử điều chỉnh từ khóa tìm kiếm.",
+    "검색어를 변경해 보세요."
+  ],
+  "Add your first CLI connection above to start.": [
+    "Add your first CLI connection above to start.",
+    "Thêm kết nối CLI đầu tiên ở trên để bắt đầu.",
+    "위에서 첫 CLI 연결을 추가하여 시작하세요."
+  ],
+  "Start Session": [
+    "Start Session",
+    "Mở phiên",
+    "세션 시작"
+  ],
+  "Edit CLI": [
+    "Edit CLI",
+    "Sửa CLI",
+    "CLI 수정"
+  ],
+  "Delete CLI": [
+    "Delete CLI",
+    "Xóa CLI",
+    "CLI 삭제"
+  ],
+  "VM Connections": [
+    "VM Connections",
+    "Kết nối máy ảo",
+    "가상 머신 연결"
+  ],
+  "Add VM": [
+    "Add VM",
+    "Thêm máy ảo",
+    "가상 머신 추가"
+  ],
+  "Search VM, host, user or group...": [
+    "Search VM, host, user or group...",
+    "Tìm máy ảo, máy chủ, người dùng hoặc nhóm...",
+    "가상 머신, 호스트, 사용자 또는 그룹 검색..."
+  ],
+  "No Connections Found": [
+    "No Connections Found",
+    "Không tìm thấy kết nối",
+    "연결을 찾을 수 없습니다"
+  ],
+  "Add your first VM connection above to start.": [
+    "Add your first VM connection above to start.",
+    "Thêm kết nối máy ảo đầu tiên ở trên để bắt đầu.",
+    "위에서 첫 가상 머신 연결을 추가하여 시작하세요."
+  ],
+  "KEY": [
+    "KEY",
+    "KHÓA",
+    "키"
+  ],
+  "Edit": [
+    "Edit",
+    "Sửa",
+    "수정"
+  ],
+  "Delete": [
+    "Delete",
+    "Xóa",
+    "삭제"
+  ],
+  "Quick Config Files": [
+    "Quick Config Files",
+    "Tệp cấu hình nhanh",
+    "빠른 설정 파일"
+  ],
+  "+ Add Config": [
+    "+ Add Config",
+    "+ Thêm cấu hình",
+    "+ 설정 추가"
+  ],
+  "Search config name, path, description or group...": [
+    "Search config name, path, description or group...",
+    "Tìm tên, đường dẫn, mô tả hoặc nhóm cấu hình...",
+    "설정 이름, 경로, 설명 또는 그룹 검색..."
+  ],
+  "No Config Files Found": [
+    "No Config Files Found",
+    "Không tìm thấy tệp cấu hình",
+    "설정 파일을 찾을 수 없습니다"
+  ],
+  "Add your first config file above to start.": [
+    "Add your first config file above to start.",
+    "Thêm tệp cấu hình đầu tiên ở trên để bắt đầu.",
+    "위에서 첫 설정 파일을 추가하여 시작하세요."
+  ],
+  "Double-click or ⚡ to edit content": [
+    "Double-click or ⚡ to edit content",
+    "Nhấp đúp hoặc ⚡ để sửa nội dung",
+    "두 번 클릭하거나 ⚡로 내용 수정"
+  ],
+  "Fast Access: Open file in editor immediately for quick editing": [
+    "Fast Access: Open file in editor immediately for quick editing",
+    "Truy cập nhanh: mở tệp ngay trong trình soạn thảo",
+    "빠른 접근: 편집기에서 파일 바로 열기"
+  ],
+  "⚡ Open": [
+    "⚡ Open",
+    "⚡ Mở",
+    "⚡ 열기"
+  ],
+  "Edit Entry Info": [
+    "Edit Entry Info",
+    "Sửa thông tin mục",
+    "항목 정보 수정"
+  ],
+  "Delete Config Entry": [
+    "Delete Config Entry",
+    "Xóa mục cấu hình",
+    "설정 항목 삭제"
+  ],
+  "Local Workspace": [
+    "Local Workspace",
+    "Không gian làm việc cục bộ",
+    "로컬 작업 공간"
+  ],
+  "Copy workspace path": [
+    "Copy workspace path",
+    "Sao chép đường dẫn không gian làm việc",
+    "작업 공간 경로 복사"
+  ],
+  "Workspace Files": [
+    "Workspace Files",
+    "Tệp trong không gian làm việc",
+    "작업 공간 파일"
+  ],
+  "Git Diff (Changes)": [
+    "Git Diff (Changes)",
+    "Thay đổi Git",
+    "Git 변경 사항"
+  ],
+  "No changed files in workspace.": [
+    "No changed files in workspace.",
+    "Không có tệp thay đổi trong không gian làm việc.",
+    "작업 공간에 변경된 파일이 없습니다."
+  ],
+  "Changes to be committed": [
+    "Changes to be committed",
+    "Thay đổi sẵn sàng commit",
+    "커밋할 변경 사항"
+  ],
+  "Changes not staged for commit": [
+    "Changes not staged for commit",
+    "Thay đổi chưa được đưa vào vùng chờ",
+    "스테이징되지 않은 변경 사항"
+  ],
+  "No Folder Opened": [
+    "No Folder Opened",
+    "Chưa mở thư mục",
+    "열린 폴더가 없습니다"
+  ],
+  "Start an interactive session or select a project directory to explore files.": [
+    "Start an interactive session or select a project directory to explore files.",
+    "Mở một phiên tương tác hoặc chọn thư mục dự án để duyệt tệp.",
+    "대화형 세션을 시작하거나 프로젝트 폴더를 선택하여 파일을 탐색하세요."
+  ],
+  "Select Folder": [
+    "Select Folder",
+    "Chọn thư mục",
+    "폴더 선택"
+  ],
+  "Search Files": [
+    "Search Files",
+    "Tìm tệp",
+    "파일 검색"
+  ],
+  "Type name to find files...": [
+    "Type name to find files...",
+    "Nhập tên để tìm tệp...",
+    "파일 이름 검색..."
+  ],
+  "Scanning workspace files...": [
+    "Scanning workspace files...",
+    "Đang quét tệp trong không gian làm việc...",
+    "작업 공간 파일 검색 중..."
+  ],
+  "No files match your search query.": [
+    "No files match your search query.",
+    "Không có tệp phù hợp với từ khóa.",
+    "검색어와 일치하는 파일이 없습니다."
+  ],
+  "✨ Optimize Prompt": [
+    "✨ Optimize Prompt",
+    "✨ Tối ưu lời nhắc",
+    "✨ 프롬프트 개선"
+  ],
+  "💻 Fix/Suggest Command": [
+    "💻 Fix/Suggest Command",
+    "💻 Sửa/đề xuất lệnh",
+    "💻 명령 수정/제안"
+  ],
+  "📋 Copy Path": [
+    "📋 Copy Path",
+    "📋 Sao chép đường dẫn",
+    "📋 경로 복사"
+  ],
+  "📂 Reveal in Explorer": [
+    "📂 Reveal in Explorer",
+    "📂 Hiển thị trong trình quản lý tệp",
+    "📂 파일 탐색기에서 표시"
+  ],
+  "⬇️ Download to Local": [
+    "⬇️ Download to Local",
+    "⬇️ Tải về máy",
+    "⬇️ 로컬로 다운로드"
+  ],
+  "Delete Confirmation": [
+    "Delete Confirmation",
+    "Xác nhận xóa",
+    "삭제 확인"
+  ],
+  "This permanently deletes the folder and all of its contents:": [
+    "This permanently deletes the folder and all of its contents:",
+    "Thao tác này xóa vĩnh viễn thư mục và toàn bộ nội dung:",
+    "이 폴더와 모든 내용이 영구적으로 삭제됩니다:"
+  ],
+  "This permanently deletes the file:": [
+    "This permanently deletes the file:",
+    "Thao tác này xóa vĩnh viễn tệp:",
+    "이 파일이 영구적으로 삭제됩니다:"
+  ],
+  "Deleting...": [
+    "Deleting...",
+    "Đang xóa...",
+    "삭제 중..."
+  ],
+  "💻 AI Command Suggester": [
+    "💻 AI Command Suggester",
+    "💻 AI đề xuất lệnh",
+    "💻 AI 명령 제안"
+  ],
+  "✨ AI Prompt Optimizer": [
+    "✨ AI Prompt Optimizer",
+    "✨ AI tối ưu lời nhắc",
+    "✨ AI 프롬프트 개선"
+  ],
+  "Original Message": [
+    "Original Message",
+    "Nội dung gốc",
+    "원본 메시지"
+  ],
+  "Optimized Result": [
+    "Optimized Result",
+    "Kết quả tối ưu",
+    "개선된 결과"
+  ],
+  "Running local inference...": [
+    "Running local inference...",
+    "Đang chạy suy luận cục bộ...",
+    "로컬 추론 실행 중..."
+  ],
+  "✔️ Apply (Replace Input)": [
+    "✔️ Apply (Replace Input)",
+    "✔️ Áp dụng (thay nội dung nhập)",
+    "✔️ 적용(입력 내용 교체)"
+  ],
+  "Select Working Directory for {v0}": [
+    "Select Working Directory for {v0}",
+    "Chọn thư mục làm việc cho {v0}",
+    "{v0}의 작업 폴더 선택"
+  ],
+  "Select a working directory to begin.": [
+    "Select a working directory to begin.",
+    "Chọn thư mục làm việc để bắt đầu.",
+    "작업 폴더를 선택하여 시작하세요."
+  ],
+  "🕒 Recent Thư Mục Làm Việc": [
+    "🕒 Recent working directories",
+    "🕒 Thư mục làm việc gần đây",
+    "🕒 최근 작업 폴더"
+  ],
+  "Choose New Folder": [
+    "Choose New Folder",
+    "Chọn thư mục mới",
+    "새 폴더 선택"
+  ],
+  "Start:": [
+    "Start:",
+    "Mở:",
+    "시작:"
+  ],
+  "Quick Shell (right panel)": [
+    "Quick Shell (right panel)",
+    "Shell nhanh (khung bên phải)",
+    "빠른 셸(오른쪽 패널)"
+  ],
+  "Open a shell session": [
+    "Open a shell session",
+    "Mở phiên shell",
+    "셸 세션 열기"
+  ],
+  "Quick Shell (bottom panel)": [
+    "Quick Shell (bottom panel)",
+    "Shell nhanh (khung phía dưới)",
+    "빠른 셸(하단 패널)"
+  ],
+  "New CLI Tool...": [
+    "New CLI Tool...",
+    "Công cụ CLI mới...",
+    "새 CLI 도구..."
+  ],
+  "Register a new CLI tool": [
+    "Register a new CLI tool",
+    "Đăng ký công cụ CLI mới",
+    "새 CLI 도구 등록"
+  ],
+  "⚡ Search & Edit Config Files": [
+    "⚡ Search & Edit Config Files",
+    "⚡ Tìm và sửa tệp cấu hình",
+    "⚡ 설정 파일 검색 및 수정"
+  ],
+  "Quickly open YAML, JSON, TOML, ENV configs": [
+    "Quickly open YAML, JSON, TOML, ENV configs",
+    "Mở nhanh cấu hình YAML, JSON, TOML, ENV",
+    "YAML, JSON, TOML, ENV 설정 빠르게 열기"
+  ],
+  "New SSH Connection...": [
+    "New SSH Connection...",
+    "Kết nối SSH mới...",
+    "새 SSH 연결..."
+  ],
+  "Add a remote server": [
+    "Add a remote server",
+    "Thêm máy chủ từ xa",
+    "원격 서버 추가"
+  ],
+  "View: AI Companion": [
+    "View: AI Companion",
+    "Màn hình: Trợ lý AI",
+    "화면: AI 어시스턴트"
+  ],
+  "Open AI Companion chat": [
+    "Open AI Companion chat",
+    "Mở trò chuyện với trợ lý AI",
+    "AI 어시스턴트 채팅 열기"
+  ],
+  "View: Terminal": [
+    "View: Terminal",
+    "Màn hình: Terminal",
+    "화면: 터미널"
+  ],
+  "Switch to terminal view": [
+    "Switch to terminal view",
+    "Chuyển sang terminal",
+    "터미널 화면으로 전환"
+  ],
+  "View: Quick Apps": [
+    "View: Quick Apps",
+    "Màn hình: Ứng dụng nhanh",
+    "화면: 빠른 앱"
+  ],
+  "Switch to quick apps panel": [
+    "Switch to quick apps panel",
+    "Chuyển sang ứng dụng nhanh",
+    "빠른 앱 패널로 전환"
+  ],
+  "View: API Client": [
+    "View: API Client",
+    "Màn hình: Ứng dụng API",
+    "화면: API 클라이언트"
+  ],
+  "Switch to API client panel": [
+    "Switch to API client panel",
+    "Chuyển sang ứng dụng API",
+    "API 클라이언트 패널로 전환"
+  ],
+  "View: Agent Sessions": [
+    "View: Agent Sessions",
+    "Màn hình: Phiên trợ lý",
+    "화면: 에이전트 세션"
+  ],
+  "Browse agent conversation history": [
+    "Browse agent conversation history",
+    "Duyệt lịch sử hội thoại của trợ lý",
+    "에이전트 대화 기록 탐색"
+  ],
+  "View: Entertainment": [
+    "View: Entertainment",
+    "Màn hình: Giải trí",
+    "화면: 엔터테인먼트"
+  ],
+  "Switch to Entertainment & Games workspace": [
+    "Switch to Entertainment & Games workspace",
+    "Chuyển sang không gian giải trí và trò chơi",
+    "엔터테인먼트 및 게임 작업 공간으로 전환"
+  ],
+  "View: CliProxyAI": [
+    "View: CliProxyAI",
+    "Màn hình: CliProxyAI",
+    "화면: CliProxyAI"
+  ],
+  "Switch to proxy panel": [
+    "Switch to proxy panel",
+    "Chuyển sang khung proxy",
+    "프록시 패널로 전환"
+  ],
+  "View: System Logs": [
+    "View: System Logs",
+    "Màn hình: Nhật ký hệ thống",
+    "화면: 시스템 로그"
+  ],
+  "Switch to system logs panel": [
+    "Switch to system logs panel",
+    "Chuyển sang nhật ký hệ thống",
+    "시스템 로그 패널로 전환"
+  ],
+  "View: Remote SSH": [
+    "View: Remote SSH",
+    "Màn hình: SSH từ xa",
+    "화면: 원격 SSH"
+  ],
+  "Switch to remote SSH panel": [
+    "Switch to remote SSH panel",
+    "Chuyển sang SSH từ xa",
+    "원격 SSH 패널로 전환"
+  ],
+  "Settings: CliProxyAI": [
+    "Settings: CliProxyAI",
+    "Cấu hình: CliProxyAI",
+    "설정: CliProxyAI"
+  ],
+  "Configure upstream AI backends": [
+    "Configure upstream AI backends",
+    "Cấu hình máy chủ AI đầu nguồn",
+    "업스트림 AI 백엔드 설정"
+  ],
+  "Settings: Appearance": [
+    "Settings: Appearance",
+    "Cấu hình: Giao diện",
+    "설정: 외관"
+  ],
+  "Configure application theme and styling": [
+    "Configure application theme and styling",
+    "Cấu hình chủ đề và kiểu giao diện",
+    "앱 테마 및 스타일 설정"
+  ],
+  "Settings: Mythical Pet": [
+    "Settings: Mythical Pet",
+    "Cấu hình: Thú cưng",
+    "설정: 신화 속 펫"
+  ],
+  "Enable/disable and select mythical pets": [
+    "Enable/disable and select mythical pets",
+    "Bật/tắt và chọn thú cưng",
+    "펫 활성화 및 선택"
+  ],
+  "Settings: AI Companion": [
+    "Settings: AI Companion",
+    "Cấu hình: Trợ lý AI",
+    "설정: AI 어시스턴트"
+  ],
+  "Configure OpenAI-compatible endpoint settings": [
+    "Configure OpenAI-compatible endpoint settings",
+    "Cấu hình địa chỉ tương thích OpenAI",
+    "OpenAI 호환 엔드포인트 설정"
+  ],
+  "Settings: Local LLM": [
+    "Settings: Local LLM",
+    "Cấu hình: LLM cục bộ",
+    "설정: 로컬 LLM"
+  ],
+  "Manage offline GGUF inference fallbacks": [
+    "Manage offline GGUF inference fallbacks",
+    "Quản lý suy luận GGUF ngoại tuyến dự phòng",
+    "오프라인 GGUF 추론 대체 설정 관리"
+  ],
+  "Settings: Sidebar Navigation": [
+    "Settings: Sidebar Navigation",
+    "Cấu hình: Thanh điều hướng",
+    "설정: 사이드바 탐색"
+  ],
+  "Reorder sidebar activity icons": [
+    "Reorder sidebar activity icons",
+    "Sắp xếp biểu tượng thanh điều hướng",
+    "사이드바 아이콘 순서 변경"
+  ],
+  "Theme:": [
+    "Theme:",
+    "Chủ đề:",
+    "테마:"
+  ],
+  "Switch to": [
+    "Switch to",
+    "Chuyển sang",
+    "전환:"
+  ],
+  "theme": [
+    "theme",
+    "chủ đề",
+    "테마"
+  ],
+  "Type a command or search...": [
+    "Type a command or search...",
+    "Nhập lệnh hoặc tìm kiếm...",
+    "명령 입력 또는 검색..."
+  ],
+  "No matching commands": [
+    "No matching commands",
+    "Không có lệnh phù hợp",
+    "일치하는 명령이 없습니다"
+  ],
+  "arrow keys navigate": [
+    "arrow keys navigate",
+    "phím mũi tên để di chuyển",
+    "방향키로 이동"
+  ],
+  "enter select": [
+    "enter select",
+    "Enter để chọn",
+    "Enter로 선택"
+  ],
+  "esc close": [
+    "esc close",
+    "Esc để đóng",
+    "Esc로 닫기"
+  ],
+  "Local :{v0}": [
+    "Local :{v0}",
+    "Cục bộ :{v0}",
+    "로컬 :{v0}"
+  ],
+  "Remove monitor “{v0}” for {v1}:{v2}?": [
+    "Remove monitor “{v0}” for {v1}:{v2}?",
+    "Xóa theo dõi “{v0}” cho {v1}:{v2}?",
+    "{v1}:{v2}의 “{v0}” 모니터를 삭제할까요?"
+  ],
+  "Remove monitor": [
+    "Remove monitor",
+    "Xóa theo dõi",
+    "모니터 삭제"
+  ],
+  "{v0} PID {v1} on {v2}:{v3}? The backend will reject any PID whose start identity changed.": [
+    "{v0} PID {v1} on {v2}:{v3}? The backend will reject any PID whose start identity changed.",
+    "{v0} PID {v1} tại {v2}:{v3}? Máy chủ sẽ từ chối PID có định danh khởi động đã thay đổi.",
+    "{v2}:{v3}의 PID {v1}에 {v0} 작업을 수행할까요? 시작 식별자가 변경된 PID는 백엔드에서 거부됩니다."
+  ],
+  "Force kill listener": [
+    "Force kill listener",
+    "Buộc dừng tiến trình lắng nghe",
+    "리스너 강제 종료"
+  ],
+  "Stop listener": [
+    "Stop listener",
+    "Dừng tiến trình lắng nghe",
+    "리스너 중지"
+  ],
+  "UI-owned · full service tree": [
+    "UI-owned · full service tree",
+    "RAM giao diện · toàn cây dịch vụ",
+    "UI 메모리 · 전체 서비스 트리"
+  ],
+  "processes ·": [
+    "processes ·",
+    "tiến trình ·",
+    "프로세스 ·"
+  ],
+  "WebViews · lag p95": [
+    "WebViews · lag p95",
+    "WebView · độ trễ p95",
+    "WebView · p95 지연"
+  ],
+  "· long {v0} ms": [
+    "· long {v0} ms",
+    "· tác vụ dài {v0} ms",
+    "· 긴 작업 {v0} ms"
+  ],
+  "loading…": [
+    "loading…",
+    "đang tải…",
+    "불러오는 중…"
+  ],
+  "System Logs": [
+    "System Logs",
+    "Nhật ký hệ thống",
+    "시스템 로그"
+  ],
+  "entries": [
+    "entries",
+    "mục",
+    "항목"
+  ],
+  "OFF": [
+    "OFF",
+    "TẮT",
+    "꺼짐"
+  ],
+  "Click to expand → full log viewer with level filter": [
+    "Click to expand → full log viewer with level filter",
+    "Nhấp để mở rộng → xem nhật ký đầy đủ và lọc cấp độ",
+    "클릭하여 확장 → 전체 로그 및 수준 필터"
+  ],
+  "System Logs off": [
+    "System Logs off",
+    "Đã tắt nhật ký hệ thống",
+    "시스템 로그 꺼짐"
+  ],
+  "Turn ON": [
+    "Turn ON",
+    "Bật",
+    "켜기"
+  ],
+  "Port Monitor": [
+    "Port Monitor",
+    "Theo dõi cổng",
+    "포트 모니터"
+  ],
+  "tracked": [
+    "tracked",
+    "đang theo dõi",
+    "추적 중"
+  ],
+  "+ Monitor": [
+    "+ Monitor",
+    "+ Theo dõi",
+    "+ 모니터"
+  ],
+  "No services tracked": [
+    "No services tracked",
+    "Chưa theo dõi dịch vụ",
+    "추적 중인 서비스가 없습니다"
+  ],
+  "Add local or SSH monitor": [
+    "Add local or SSH monitor",
+    "Thêm theo dõi cục bộ hoặc SSH",
+    "로컬 또는 SSH 모니터 추가"
+  ],
+  "UNVERIFIED": [
+    "UNVERIFIED",
+    "CHƯA XÁC MINH",
+    "확인되지 않음"
+  ],
+  "s": [
+    "s",
+    "giây",
+    "초"
+  ],
+  "Logs": [
+    "Logs",
+    "Nhật ký",
+    "로그"
+  ],
+  "TCP listener found · process metadata unavailable": [
+    "TCP listener found · process metadata unavailable",
+    "Đã tìm thấy TCP lắng nghe · không có thông tin tiến trình",
+    "TCP 리스너 발견 · 프로세스 메타데이터 없음"
+  ],
+  "TCP port is not listening": [
+    "TCP port is not listening",
+    "Cổng TCP không lắng nghe",
+    "TCP 포트가 수신 중이 아닙니다"
+  ],
+  "Waiting for probe…": [
+    "Waiting for probe…",
+    "Đang chờ kiểm tra…",
+    "점검 대기 중…"
+  ],
+  "Force": [
+    "Force",
+    "Buộc dừng",
+    "강제 종료"
+  ],
+  "Force all confirmed PIDs": [
+    "Force all confirmed PIDs",
+    "Buộc dừng mọi PID đã xác nhận",
+    "확인된 모든 PID 강제 종료"
+  ],
+  "Stop all confirmed PIDs": [
+    "Stop all confirmed PIDs",
+    "Dừng mọi PID đã xác nhận",
+    "확인된 모든 PID 중지"
+  ],
+  "Live logs": [
+    "Live logs",
+    "Nhật ký trực tiếp",
+    "실시간 로그"
+  ],
+  "Remove": [
+    "Remove",
+    "Gỡ",
+    "제거"
+  ],
+  "Port Monitor off": [
+    "Port Monitor off",
+    "Đã tắt theo dõi cổng",
+    "포트 모니터 꺼짐"
+  ],
+  "LLM Proxy": [
+    "LLM Proxy",
+    "Proxy LLM",
+    "LLM 프록시"
+  ],
+  "backends": [
+    "backends",
+    "máy chủ",
+    "백엔드"
+  ],
+  "STOP": [
+    "STOP",
+    "DỪNG",
+    "중지"
+  ],
+  "START": [
+    "START",
+    "CHẠY",
+    "시작"
+  ],
+  "running": [
+    "running",
+    "đang chạy",
+    "실행 중"
+  ],
+  "stopped": [
+    "stopped",
+    "đã dừng",
+    "중지됨"
+  ],
+  "req": [
+    "req",
+    "yêu cầu",
+    "요청"
+  ],
+  "Q:": [
+    "Q:",
+    "Hỏi:",
+    "질문:"
+  ],
+  "A:": [
+    "A:",
+    "Đáp:",
+    "답변:"
+  ],
+  "No proxy requests yet": [
+    "No proxy requests yet",
+    "Chưa có yêu cầu proxy",
+    "아직 프록시 요청이 없습니다"
+  ],
+  "Click to expand → full proxy log": [
+    "Click to expand → full proxy log",
+    "Nhấp để mở rộng → nhật ký proxy đầy đủ",
+    "클릭하여 확장 → 전체 프록시 로그"
+  ],
+  "LLM Proxy off": [
+    "LLM Proxy off",
+    "Đã tắt proxy LLM",
+    "LLM 프록시 꺼짐"
+  ],
+  "Target Monitor": [
+    "Target Monitor",
+    "Theo dõi đích",
+    "대상 모니터"
+  ],
+  "conns": [
+    "conns",
+    "kết nối",
+    "연결"
+  ],
+  "IP or domain (e.g. 8.8.8.8, github.com)": [
+    "IP or domain (e.g. 8.8.8.8, github.com)",
+    "IP hoặc tên miền (ví dụ: 8.8.8.8, github.com)",
+    "IP 또는 도메인(예: 8.8.8.8, github.com)"
+  ],
+  "Track": [
+    "Track",
+    "Theo dõi",
+    "추적"
+  ],
+  "Enter a target IP/domain": [
+    "Enter a target IP/domain",
+    "Nhập IP hoặc tên miền đích",
+    "대상 IP 또는 도메인을 입력하세요"
+  ],
+  "No active connections to": [
+    "No active connections to",
+    "Không có kết nối hoạt động đến",
+    "활성 연결 대상 없음:"
+  ],
+  "Target Monitor off": [
+    "Target Monitor off",
+    "Đã tắt theo dõi đích",
+    "대상 모니터 꺼짐"
+  ],
+  "Connection Log": [
+    "Connection Log",
+    "Nhật ký kết nối",
+    "연결 로그"
+  ],
+  "No active connections": [
+    "No active connections",
+    "Không có kết nối hoạt động",
+    "활성 연결이 없습니다"
+  ],
+  "Click to expand → aggregate stats + full list": [
+    "Click to expand → aggregate stats + full list",
+    "Nhấp để mở rộng → thống kê tổng hợp và danh sách đầy đủ",
+    "클릭하여 확장 → 통계 및 전체 목록"
+  ],
+  "Connection Log off": [
+    "Connection Log off",
+    "Đã tắt nhật ký kết nối",
+    "연결 로그 꺼짐"
+  ],
+  "Elevation required": [
+    "Elevation required",
+    "Cần quyền quản trị",
+    "권한 상승 필요"
+  ],
+  "Enter the sudo password for": [
+    "Enter the sudo password for",
+    "Nhập mật khẩu sudo cho",
+    "다음 대상의 sudo 비밀번호 입력:"
+  ],
+  ". It is sent only to this action and is never stored.": [
+    ". It is sent only to this action and is never stored.",
+    ". Mật khẩu chỉ gửi cho thao tác này và không được lưu.",
+    ". 비밀번호는 이 작업에만 전송되며 저장되지 않습니다."
+  ],
+  "sudo password": [
+    "sudo password",
+    "Mật khẩu sudo",
+    "sudo 비밀번호"
+  ],
+  "Working…": [
+    "Working…",
+    "Đang thực hiện…",
+    "작업 중…"
+  ],
+  "Retry with sudo": [
+    "Retry with sudo",
+    "Thử lại với sudo",
+    "sudo로 다시 시도"
+  ],
+  "System Logs — Full Viewer": [
+    "System Logs — Full Viewer",
+    "Nhật ký hệ thống — Xem đầy đủ",
+    "시스템 로그 — 전체 보기"
+  ],
+  "LLM Proxy — Full Log": [
+    "LLM Proxy — Full Log",
+    "Proxy LLM — Nhật ký đầy đủ",
+    "LLM 프록시 — 전체 로그"
+  ],
+  "Port :": [
+    "Port :",
+    "Cổng :",
+    "포트 :"
+  ],
+  "total requests": [
+    "total requests",
+    "tổng yêu cầu",
+    "총 요청"
+  ],
+  "Request": [
+    "Request",
+    "Yêu cầu",
+    "요청"
+  ],
+  "Response": [
+    "Response",
+    "Phản hồi",
+    "응답"
+  ],
+  "Connection Log — Aggregate Stats + Full List": [
+    "Connection Log — Aggregate Stats + Full List",
+    "Nhật ký kết nối — Thống kê và danh sách đầy đủ",
+    "연결 로그 — 통계 및 전체 목록"
+  ],
+  "1m": [
+    "1m",
+    "1 phút",
+    "1분"
+  ],
+  "5m": [
+    "5m",
+    "5 phút",
+    "5분"
+  ],
+  "10m": [
+    "10m",
+    "10 phút",
+    "10분"
+  ],
+  "Last": [
+    "Last",
+    "Gần nhất",
+    "최근"
+  ],
+  "Established": [
+    "Established",
+    "Đã thiết lập",
+    "연결됨"
+  ],
+  "Listening": [
+    "Listening",
+    "Đang lắng nghe",
+    "수신 중"
+  ],
+  "Total": [
+    "Total",
+    "Tổng",
+    "합계"
+  ],
+  "Unique remotes": [
+    "Unique remotes",
+    "Đích từ xa duy nhất",
+    "고유 원격 대상"
+  ],
+  "Top remotes": [
+    "Top remotes",
+    "Đích từ xa nhiều nhất",
+    "주요 원격 대상"
+  ],
+  "All connections (sorted by frequency)": [
+    "All connections (sorted by frequency)",
+    "Mọi kết nối (sắp xếp theo tần suất)",
+    "모든 연결(빈도순)"
+  ],
+  "Entertainment Hub": [
+    "Entertainment Hub",
+    "Trung tâm giải trí",
+    "엔터테인먼트 허브"
+  ],
+  "Rogue Node (AI Outpost)": [
+    "Rogue Node (AI Outpost)",
+    "Rogue Node (Tiền đồn AI)",
+    "Rogue Node(AI 전초기지)"
+  ],
+  "HOT": [
+    "HOT",
+    "NỔI BẬT",
+    "인기"
+  ],
+  "NES Retro Multiplayer": [
+    "NES Retro Multiplayer",
+    "NES cổ điển nhiều người",
+    "NES 레트로 멀티플레이"
+  ],
+  "Online Services Ready": [
+    "Online Services Ready",
+    "Dịch vụ trực tuyến sẵn sàng",
+    "온라인 서비스 준비 완료"
+  ],
+  "Invalid Headers JSON format.": [
+    "Invalid Headers JSON format.",
+    "JSON header không đúng định dạng.",
+    "헤더 JSON 형식이 올바르지 않습니다."
+  ],
+  "LLM Configuration": [
+    "LLM Configuration",
+    "Cấu hình LLM",
+    "LLM 설정"
+  ],
+  "API Base URL (OpenAI Compatible)": [
+    "API Base URL (OpenAI Compatible)",
+    "URL gốc API (tương thích OpenAI)",
+    "API 기본 URL(OpenAI 호환)"
+  ],
+  "e.g. https://api.openai.com/v1": [
+    "e.g. https://api.openai.com/v1",
+    "Ví dụ: https://api.openai.com/v1",
+    "예: https://api.openai.com/v1"
+  ],
+  "Model Name": [
+    "Model Name",
+    "Tên mô hình",
+    "모델 이름"
+  ],
+  "e.g. gpt-4o-mini": [
+    "e.g. gpt-4o-mini",
+    "Ví dụ: gpt-4o-mini",
+    "예: gpt-4o-mini"
+  ],
+  "API Key": [
+    "API Key",
+    "Khóa API",
+    "API 키"
+  ],
+  "Secret API Key": [
+    "Secret API Key",
+    "Khóa API bí mật",
+    "비밀 API 키"
+  ],
+  "Reasoning Effort": [
+    "Reasoning Effort",
+    "Mức suy luận",
+    "추론 수준"
+  ],
+  "Default (None)": [
+    "Default (None)",
+    "Mặc định (không chọn)",
+    "기본값(없음)"
+  ],
+  "low": [
+    "low",
+    "thấp",
+    "낮음"
+  ],
+  "medium": [
+    "medium",
+    "trung bình",
+    "보통"
+  ],
+  "high": [
+    "high",
+    "cao",
+    "높음"
+  ],
+  "xhigh": [
+    "xhigh",
+    "rất cao",
+    "매우 높음"
+  ],
+  "max": [
+    "max",
+    "tối đa",
+    "최대"
+  ],
+  "Custom Headers (JSON Object)": [
+    "Custom Headers (JSON Object)",
+    "Header tùy chỉnh (đối tượng JSON)",
+    "사용자 지정 헤더(JSON 객체)"
+  ],
+  "e.g. { \"User-Agent\": \"Custom-Agent-Value\" }": [
+    "e.g. { \"User-Agent\": \"Custom-Agent-Value\" }",
+    "Ví dụ: { \"User-Agent\": \"Custom-Agent-Value\" }",
+    "예: { \"User-Agent\": \"Custom-Agent-Value\" }"
+  ],
+  "System Prompt": [
+    "System Prompt",
+    "Lời nhắc hệ thống",
+    "시스템 프롬프트"
+  ],
+  "System prompt to guide the AI assistant...": [
+    "System prompt to guide the AI assistant...",
+    "Lời nhắc hệ thống hướng dẫn trợ lý AI...",
+    "AI 어시스턴트를 안내할 시스템 프롬프트..."
+  ],
+  "Enable Stream Mode (Set to false if server doesn't support SSE)": [
+    "Enable Stream Mode (Set to false if server doesn't support SSE)",
+    "Bật truyền từng phần (tắt nếu máy chủ không hỗ trợ SSE)",
+    "스트리밍 모드 활성화(서버가 SSE를 지원하지 않으면 끄세요)"
+  ],
+  "Save Configuration": [
+    "Save Configuration",
+    "Lưu cấu hình",
+    "설정 저장"
+  ],
+  "· saved in vault": [
+    "· saved in vault",
+    "· lưu trong kho bảo mật",
+    "· 보안 저장소에 저장됨"
+  ],
+  "Host": [
+    "Host",
+    "Chủ phòng",
+    "호스트"
+  ],
+  "SSH port": [
+    "SSH port",
+    "Cổng SSH",
+    "SSH 포트"
+  ],
+  "User": [
+    "User",
+    "Người dùng",
+    "사용자"
+  ],
+  "Authentication": [
+    "Authentication",
+    "Xác thực",
+    "인증"
+  ],
+  "Private key": [
+    "Private key",
+    "Khóa riêng",
+    "개인 키"
+  ],
+  "Private key path": [
+    "Private key path",
+    "Đường dẫn khóa riêng",
+    "개인 키 경로"
+  ],
+  "Browse": [
+    "Browse",
+    "Duyệt",
+    "찾아보기"
+  ],
+  "Log source": [
+    "Log source",
+    "Nguồn nhật ký",
+    "로그 소스"
+  ],
+  "Automatic discovery": [
+    "Automatic discovery",
+    "Tự động tìm",
+    "자동 탐색"
+  ],
+  "File path": [
+    "File path",
+    "Đường dẫn tệp",
+    "파일 경로"
+  ],
+  "systemd unit": [
+    "systemd unit",
+    "Đơn vị systemd",
+    "systemd 유닛"
+  ],
+  "Windows Event Log": [
+    "Windows Event Log",
+    "Nhật ký sự kiện Windows",
+    "Windows 이벤트 로그"
+  ],
+  "Expert custom follow command": [
+    "Expert custom follow command",
+    "Lệnh theo dõi tùy chỉnh nâng cao",
+    "고급 사용자 지정 추적 명령"
+  ],
+  "Absolute log path": [
+    "Absolute log path",
+    "Đường dẫn nhật ký tuyệt đối",
+    "로그 절대 경로"
+  ],
+  "Container name or ID": [
+    "Container name or ID",
+    "Tên hoặc ID vùng chứa",
+    "컨테이너 이름 또는 ID"
+  ],
+  "Application": [
+    "Application",
+    "Ứng dụng",
+    "응용 프로그램"
+  ],
+  "Provider (optional)": [
+    "Provider (optional)",
+    "Nhà cung cấp (tùy chọn)",
+    "공급자(선택 사항)"
+  ],
+  "Command must print initial history and continue following": [
+    "Command must print initial history and continue following",
+    "Lệnh phải in lịch sử ban đầu rồi tiếp tục theo dõi",
+    "명령은 초기 기록을 출력한 뒤 계속 추적해야 합니다"
+  ],
+  "Expert mode executes this command verbatim only when the log drawer is opened.": [
+    "Expert mode executes this command verbatim only when the log drawer is opened.",
+    "Chế độ nâng cao chạy nguyên lệnh này khi bạn mở khung nhật ký.",
+    "고급 모드는 로그 창을 열 때만 이 명령을 그대로 실행합니다."
+  ],
+  "Edit monitor": [
+    "Edit monitor",
+    "Sửa theo dõi",
+    "모니터 수정"
+  ],
+  "Add monitor": [
+    "Add monitor",
+    "Thêm theo dõi",
+    "모니터 추가"
+  ],
+  "TCP · local, direct SSH, or one jump host": [
+    "TCP · local, direct SSH, or one jump host",
+    "TCP · cục bộ, SSH trực tiếp hoặc qua một máy trung gian",
+    "TCP · 로컬, 직접 SSH 또는 점프 호스트 한 개"
+  ],
+  "API staging": [
+    "API staging",
+    "API thử nghiệm",
+    "스테이징 API"
+  ],
+  "TCP port": [
+    "TCP port",
+    "Cổng TCP",
+    "TCP 포트"
+  ],
+  "Local machine": [
+    "Local machine",
+    "Máy cục bộ",
+    "로컬 컴퓨터"
+  ],
+  "SSH target": [
+    "SSH target",
+    "Đích SSH",
+    "SSH 대상"
+  ],
+  "SSH host-key verification is OFF for this feature. Target and jump routes are unverified.": [
+    "SSH host-key verification is OFF for this feature. Target and jump routes are unverified.",
+    "Tính năng này TẮT xác minh khóa máy chủ SSH. Tuyến đích và máy trung gian chưa được xác minh.",
+    "이 기능의 SSH 호스트 키 검증이 꺼져 있습니다. 대상 및 점프 경로가 검증되지 않았습니다."
+  ],
+  "Target OS": [
+    "Target OS",
+    "Hệ điều hành đích",
+    "대상 운영체제"
+  ],
+  "Auto detect": [
+    "Auto detect",
+    "Tự động nhận diện",
+    "자동 감지"
+  ],
+  "Final target": [
+    "Final target",
+    "Đích cuối",
+    "최종 대상"
+  ],
+  "Connect through one jump host": [
+    "Connect through one jump host",
+    "Kết nối qua một máy trung gian",
+    "점프 호스트 한 개로 연결"
+  ],
+  "Jump host": [
+    "Jump host",
+    "Máy trung gian",
+    "점프 호스트"
+  ],
+  "Testing…": [
+    "Testing…",
+    "Đang kiểm tra…",
+    "테스트 중…"
+  ],
+  "Test connection": [
+    "Test connection",
+    "Kiểm tra kết nối",
+    "연결 테스트"
+  ],
+  "Save monitor": [
+    "Save monitor",
+    "Lưu theo dõi",
+    "모니터 저장"
+  ],
+  "No listener PID is available for log discovery.": [
+    "No listener PID is available for log discovery.",
+    "Không có PID lắng nghe để tìm nhật ký.",
+    "로그 탐색에 사용할 리스너 PID가 없습니다."
+  ],
+  "No reliable log source was found. Configure a manual source on this monitor.": [
+    "No reliable log source was found. Configure a manual source on this monitor.",
+    "Không tìm thấy nguồn nhật ký tin cậy. Hãy cấu hình nguồn thủ công cho mục theo dõi này.",
+    "신뢰할 수 있는 로그 소스를 찾지 못했습니다. 이 모니터에 수동 소스를 설정하세요."
+  ],
+  "selecting source": [
+    "selecting source",
+    "đang chọn nguồn",
+    "소스 선택 중"
+  ],
+  "SSH unverified": [
+    "SSH unverified",
+    "SSH chưa xác minh",
+    "SSH 미검증"
+  ],
+  "Search current buffer": [
+    "Search current buffer",
+    "Tìm trong bộ đệm hiện tại",
+    "현재 버퍼 검색"
+  ],
+  "Resume{v0}": [
+    "Resume{v0}",
+    "Tiếp tục{v0}",
+    "재개{v0}"
+  ],
+  "Pause": [
+    "Pause",
+    "Tạm dừng",
+    "일시 정지"
+  ],
+  "Copy all": [
+    "Copy all",
+    "Sao chép tất cả",
+    "모두 복사"
+  ],
+  "Discovering log sources…": [
+    "Discovering log sources…",
+    "Đang tìm nguồn nhật ký…",
+    "로그 소스 검색 중…"
+  ],
+  "Select a log source": [
+    "Select a log source",
+    "Chọn nguồn nhật ký",
+    "로그 소스 선택"
+  ],
+  "Retry": [
+    "Retry",
+    "Thử lại",
+    "다시 시도"
+  ],
+  "Waiting for log output…": [
+    "Waiting for log output…",
+    "Đang chờ nhật ký…",
+    "로그 출력 대기 중…"
+  ],
+  "lines · rendering": [
+    "lines · rendering",
+    "dòng · đang hiển thị",
+    "줄 · 표시 중"
+  ],
+  "Memory-only · 2 MiB cap": [
+    "Memory-only · 2 MiB cap",
+    "Chỉ trong bộ nhớ · giới hạn 2 MiB",
+    "메모리에만 보관 · 최대 2 MiB"
+  ],
+  "D-Pad Up": [
+    "D-Pad Up",
+    "D-Pad lên",
+    "D-Pad 위"
+  ],
+  "Move character up": [
+    "Move character up",
+    "Di chuyển nhân vật lên",
+    "캐릭터 위로 이동"
+  ],
+  "D-Pad Down": [
+    "D-Pad Down",
+    "D-Pad xuống",
+    "D-Pad 아래"
+  ],
+  "Move character down": [
+    "Move character down",
+    "Di chuyển nhân vật xuống",
+    "캐릭터 아래로 이동"
+  ],
+  "D-Pad Left": [
+    "D-Pad Left",
+    "D-Pad trái",
+    "D-Pad 왼쪽"
+  ],
+  "Move character left": [
+    "Move character left",
+    "Di chuyển nhân vật sang trái",
+    "캐릭터 왼쪽으로 이동"
+  ],
+  "D-Pad Right": [
+    "D-Pad Right",
+    "D-Pad phải",
+    "D-Pad 오른쪽"
+  ],
+  "Move character right": [
+    "Move character right",
+    "Di chuyển nhân vật sang phải",
+    "캐릭터 오른쪽으로 이동"
+  ],
+  "Button A": [
+    "Button A",
+    "Nút A",
+    "A 버튼"
+  ],
+  "Jump / Primary action": [
+    "Jump / Primary action",
+    "Nhảy / hành động chính",
+    "점프 / 기본 동작"
+  ],
+  "Button B": [
+    "Button B",
+    "Nút B",
+    "B 버튼"
+  ],
+  "Attack / Secondary action": [
+    "Attack / Secondary action",
+    "Tấn công / hành động phụ",
+    "공격 / 보조 동작"
+  ],
+  "Turbo A (Rapid Fire)": [
+    "Turbo A (Rapid Fire)",
+    "Turbo A (bấm liên tục)",
+    "Turbo A(연사)"
+  ],
+  "Auto-repeat Button A ~30Hz": [
+    "Auto-repeat Button A ~30Hz",
+    "Tự động lặp nút A khoảng 30 Hz",
+    "A 버튼 자동 반복 약 30Hz"
+  ],
+  "Turbo B (Rapid Fire)": [
+    "Turbo B (Rapid Fire)",
+    "Turbo B (bấm liên tục)",
+    "Turbo B(연사)"
+  ],
+  "Auto-repeat Button B ~30Hz": [
+    "Auto-repeat Button B ~30Hz",
+    "Tự động lặp nút B khoảng 30 Hz",
+    "B 버튼 자동 반복 약 30Hz"
+  ],
+  "Select": [
+    "Select",
+    "Chọn",
+    "선택"
+  ],
+  "Choose menu option": [
+    "Choose menu option",
+    "Chọn mục trong menu",
+    "메뉴 항목 선택"
+  ],
+  "Pause / Start game": [
+    "Pause / Start game",
+    "Tạm dừng / bắt đầu trò chơi",
+    "게임 일시 정지 / 시작"
+  ],
+  "Button X (SNES)": [
+    "Button X (SNES)",
+    "Nút X (SNES)",
+    "X 버튼(SNES)"
+  ],
+  "SNES face button X": [
+    "SNES face button X",
+    "Nút X của SNES",
+    "SNES X 버튼"
+  ],
+  "Button Y (SNES)": [
+    "Button Y (SNES)",
+    "Nút Y (SNES)",
+    "Y 버튼(SNES)"
+  ],
+  "SNES face button Y": [
+    "SNES face button Y",
+    "Nút Y của SNES",
+    "SNES Y 버튼"
+  ],
+  "L Shoulder (SNES)": [
+    "L Shoulder (SNES)",
+    "Nút vai L (SNES)",
+    "L 숄더 버튼(SNES)"
+  ],
+  "SNES left shoulder": [
+    "SNES left shoulder",
+    "Nút vai trái SNES",
+    "SNES 왼쪽 숄더 버튼"
+  ],
+  "R Shoulder (SNES)": [
+    "R Shoulder (SNES)",
+    "Nút vai R (SNES)",
+    "R 숄더 버튼(SNES)"
+  ],
+  "SNES right shoulder": [
+    "SNES right shoulder",
+    "Nút vai phải SNES",
+    "SNES 오른쪽 숄더 버튼"
+  ],
+  "NES Controller Key Mapping (": [
+    "NES Controller Key Mapping (",
+    "Ánh xạ phím tay cầm NES (",
+    "NES 컨트롤러 키 매핑 ("
+  ],
+  "Click on a button row to bind a keyboard key. Press": [
+    "Click on a button row to bind a keyboard key. Press",
+    "Nhấp vào hàng nút để gán phím bàn phím. Nhấn",
+    "버튼 행을 클릭하여 키보드 키를 지정하세요. 키 지정 취소:"
+  ],
+  "to cancel binding. Standard Gamepads (Xbox / PlayStation / SNES USB) are also mapped automatically.": [
+    "to cancel binding. Standard Gamepads (Xbox / PlayStation / SNES USB) are also mapped automatically.",
+    "để hủy gán phím. Tay cầm chuẩn (Xbox / PlayStation / SNES USB) cũng được ánh xạ tự động.",
+    ". 표준 게임패드(Xbox / PlayStation / SNES USB)도 자동으로 매핑됩니다."
+  ],
+  "TURBO": [
+    "TURBO",
+    "BẤM LIÊN TỤC",
+    "터보"
+  ],
+  "Space": [
+    "Space",
+    "Phím cách",
+    "스페이스"
+  ],
+  "Remove key": [
+    "Remove key",
+    "Gỡ phím",
+    "키 제거"
+  ],
+  "Unbound": [
+    "Unbound",
+    "Chưa gán",
+    "미지정"
+  ],
+  "Press key…": [
+    "Press key…",
+    "Nhấn phím…",
+    "키를 누르세요…"
+  ],
+  "+ Bind": [
+    "+ Bind",
+    "+ Gán phím",
+    "+ 키 지정"
+  ],
+  "Reset Default": [
+    "Reset Default",
+    "Khôi phục mặc định",
+    "기본값 복원"
+  ],
+  "Save Key Mapping": [
+    "Save Key Mapping",
+    "Lưu ánh xạ phím",
+    "키 매핑 저장"
+  ],
+  "AI Bot:": [
+    "AI Bot:",
+    "Bot AI:",
+    "AI 봇:"
+  ],
+  "ON": [
+    "ON",
+    "BẬT",
+    "켜짐"
+  ],
+  "Cấu hình URL Laya Service & Game Profile": [
+    "Configure Laya service URL and game profile",
+    "Cấu hình URL dịch vụ Laya và hồ sơ trò chơi",
+    "Laya 서비스 URL 및 게임 프로필 설정"
+  ],
+  "Cấu hình Laya Bot": [
+    "Laya bot settings",
+    "Cấu hình bot Laya",
+    "Laya 봇 설정"
+  ],
+  "Online": [
+    "Online",
+    "Trực tuyến",
+    "온라인"
+  ],
+  "Offline": [
+    "Offline",
+    "Ngoại tuyến",
+    "오프라인"
+  ],
+  "Vai trò điều khiển (Target Slot)": [
+    "Controlled player slot",
+    "Vị trí người chơi bot điều khiển",
+    "봇 제어 플레이어 슬롯"
+  ],
+  "Bot tự chơi Player 1": [
+    "Bot controls Player 1",
+    "Bot tự chơi người chơi 1",
+    "봇이 플레이어 1 자동 제어"
+  ],
+  "🎮 P1 Auto": [
+    "🎮 P1 Auto",
+    "🎮 P1 tự động",
+    "🎮 P1 자동"
+  ],
+  "Boss chơi P1, Bot tự lái P2 làm đồng đội": [
+    "You play P1; the bot controls P2 as your teammate",
+    "Bạn chơi P1, bot chơi P2 làm đồng đội",
+    "사용자는 P1, 봇은 P2로 협력 플레이"
+  ],
+  "👥 P2 Co-op": [
+    "👥 P2 Co-op",
+    "👥 P2 hợp tác",
+    "👥 P2 협동"
+  ],
+  "Bot tự lái CẢ HAI xe (Player 1 + Player 2)": [
+    "Bot controls both players (P1 + P2)",
+    "Bot điều khiển cả hai người chơi (P1 và P2)",
+    "봇이 두 플레이어(P1과 P2) 모두 제어"
+  ],
+  "⚡ Cả P1+P2": [
+    "⚡ Both P1+P2",
+    "⚡ Cả P1 và P2",
+    "⚡ P1+P2 모두"
+  ],
+  "Bot tự chơi P1. Nếu Boss bấm phím, hướng phím của Boss sẽ tự động ghi đè.": [
+    "The bot controls P1. Your keyboard input automatically takes priority.",
+    "Bot tự chơi P1. Phím bạn nhấn sẽ tự động được ưu tiên.",
+    "봇이 P1을 제어합니다. 사용자의 키 입력이 자동으로 우선 적용됩니다."
+  ],
+  "Boss tự do điều khiển P1, Bot tự động lái P2 (hỗ trợ Contra, Jackal, Xe tăng...).": [
+    "You control P1; the bot controls P2 (Contra, Jackal, tank games, and more).",
+    "Bạn điều khiển P1, bot tự chơi P2 (hỗ trợ Contra, Jackal, Xe tăng...).",
+    "사용자가 P1을 제어하고 봇은 P2를 자동 제어합니다(Contra, Jackal, 탱크 게임 등)."
+  ],
+  "Bot tự động điều khiển CẢ HAI người chơi (P1 & P2) cùng phối hợp tác chiến!": [
+    "The bot controls both players in coordinated play!",
+    "Bot tự động điều khiển cả hai người chơi phối hợp tác chiến!",
+    "봇이 두 플레이어를 함께 제어합니다!"
+  ],
+  "Game Profile (Tự động nhận diện ROM)": [
+    "Game profile (automatic ROM detection)",
+    "Hồ sơ trò chơi (tự động nhận diện ROM)",
+    "게임 프로필(ROM 자동 감지)"
+  ],
+  "Laya Service URL": [
+    "Laya Service URL",
+    "URL dịch vụ Laya",
+    "Laya 서비스 URL"
+  ],
+  "Mở Realtime Logs Dashboard (/logs)": [
+    "Open realtime logs dashboard (/logs)",
+    "Mở bảng nhật ký trực tiếp (/logs)",
+    "실시간 로그 대시보드 열기(/logs)"
+  ],
+  "Đang test...": [
+    "Testing...",
+    "Đang kiểm tra...",
+    "테스트 중..."
+  ],
+  "Lưu & Kiểm tra": [
+    "Save & Test",
+    "Lưu và kiểm tra",
+    "저장 및 테스트"
+  ],
+  "Đóng": [
+    "Close",
+    "Đóng",
+    "닫기"
+  ],
+  "⚠ Save failed — the emulator is not ready. Try again in a moment.": [
+    "⚠ Save failed — the emulator is not ready. Try again in a moment.",
+    "⚠ Lưu thất bại — trình giả lập chưa sẵn sàng. Hãy thử lại sau một lát.",
+    "⚠ 저장 실패 — 에뮬레이터가 준비되지 않았습니다. 잠시 후 다시 시도하세요."
+  ],
+  "⚠ Save failed: {v0}": [
+    "⚠ Save failed: {v0}",
+    "⚠ Lưu thất bại: {v0}",
+    "⚠ 저장 실패: {v0}"
+  ],
+  "⚠ No save state found in this slot.": [
+    "⚠ No save state found in this slot.",
+    "⚠ Không có trạng thái lưu trong vị trí này.",
+    "⚠ 이 슬롯에 저장된 상태가 없습니다."
+  ],
+  "⚠ Load failed — the save file is corrupted or unreadable.": [
+    "⚠ Load failed — the save file is corrupted or unreadable.",
+    "⚠ Tải thất bại — tệp lưu bị hỏng hoặc không đọc được.",
+    "⚠ 불러오기 실패 — 저장 파일이 손상되었거나 읽을 수 없습니다."
+  ],
+  "⚠ Load failed: {v0}": [
+    "⚠ Load failed: {v0}",
+    "⚠ Tải thất bại: {v0}",
+    "⚠ 불러오기 실패: {v0}"
+  ],
+  "unknown": [
+    "unknown",
+    "không rõ",
+    "알 수 없음"
+  ],
+  "ok": [
+    "ok",
+    "thành công",
+    "성공"
+  ],
+  "error": [
+    "error",
+    "lỗi",
+    "오류"
+  ],
+  "connecting": [
+    "connecting",
+    "đang kết nối",
+    "연결 중"
+  ],
+  "Failed to load ROM: {v0}": [
+    "Failed to load ROM: {v0}",
+    "Không tải được ROM: {v0}",
+    "ROM 불러오기 실패: {v0}"
+  ],
+  "Booting SNES core…": [
+    "Booting SNES core…",
+    "Đang khởi động bộ giả lập SNES…",
+    "SNES 코어 시작 중…"
+  ],
+  "failed": [
+    "failed",
+    "thất bại",
+    "실패"
+  ],
+  "🎮 NES Multiplayer": [
+    "🎮 NES Multiplayer",
+    "🎮 NES nhiều người",
+    "🎮 NES 멀티플레이"
+  ],
+  "← Home": [
+    "← Home",
+    "← Trang chính",
+    "← 홈"
+  ],
+  "Configure Controller Key Mapping": [
+    "Configure Controller Key Mapping",
+    "Cấu hình ánh xạ phím tay cầm",
+    "컨트롤러 키 매핑 설정"
+  ],
+  "⌨️ Controls": [
+    "⌨️ Controls",
+    "⌨️ Điều khiển",
+    "⌨️ 조작 설정"
+  ],
+  "Windows x64 · input-only WSS": [
+    "Windows x64 · input-only WSS",
+    "Windows x64 · WSS chỉ gửi thao tác điều khiển",
+    "Windows x64 · 입력 전용 WSS"
+  ],
+  "Session Service": [
+    "Session Service",
+    "Dịch vụ phiên",
+    "세션 서비스"
+  ],
+  "OK": [
+    "OK",
+    "Thành công",
+    "정상"
+  ],
+  "Error": [
+    "Error",
+    "Lỗi",
+    "오류"
+  ],
+  "Not tested": [
+    "Not tested",
+    "Chưa kiểm tra",
+    "테스트 안 함"
+  ],
+  "No service URL configured. Set it in Host Setup.": [
+    "No service URL configured. Set it in Host Setup.",
+    "Chưa cấu hình URL dịch vụ. Hãy đặt trong phần thiết lập chủ phòng.",
+    "서비스 URL이 설정되지 않았습니다. 호스트 설정에서 입력하세요."
+  ],
+  "Test server": [
+    "Test server",
+    "Kiểm tra máy chủ",
+    "서버 테스트"
+  ],
+  "Host a Game": [
+    "Host a Game",
+    "Tạo phòng chơi",
+    "게임 호스팅"
+  ],
+  "Both players load the same ROM locally; only controller input is sent through the room service.": [
+    "Both players load the same ROM locally; only controller input is sent through the room service.",
+    "Cả hai người chơi tải cùng ROM tại máy; chỉ thao tác tay cầm được gửi qua dịch vụ phòng.",
+    "두 플레이어가 같은 ROM을 로컬에서 불러옵니다. 컨트롤러 입력만 방 서비스로 전송됩니다."
+  ],
+  "Host Game": [
+    "Host Game",
+    "Tạo phòng",
+    "게임 호스팅"
+  ],
+  "Live Rooms": [
+    "Live Rooms",
+    "Phòng đang mở",
+    "열린 방"
+  ],
+  "Open rooms can be claimed by exactly one Player 2.": [
+    "Open rooms can be claimed by exactly one Player 2.",
+    "Mỗi phòng mở chỉ cho một người tham gia ở vị trí P2.",
+    "열린 방에는 플레이어 2 한 명만 참가할 수 있습니다."
+  ],
+  "Refreshing…": [
+    "Refreshing…",
+    "Đang làm mới…",
+    "새로 고치는 중…"
+  ],
+  "No live rooms yet. Start one and wait for Player 2.": [
+    "No live rooms yet. Start one and wait for Player 2.",
+    "Chưa có phòng. Hãy tạo phòng và chờ người chơi 2.",
+    "열린 방이 없습니다. 방을 생성하고 플레이어 2를 기다리세요."
+  ],
+  "Waiting for Player 2": [
+    "Waiting for Player 2",
+    "Đang chờ người chơi 2",
+    "플레이어 2 대기 중"
+  ],
+  "… · Room": [
+    "… · Room",
+    "… · Phòng",
+    "… · 방"
+  ],
+  "Join as P2": [
+    "Join as P2",
+    "Tham gia làm P2",
+    "P2로 참가"
+  ],
+  "Full": [
+    "Full",
+    "Đã đầy",
+    "정원 초과"
+  ],
+  "1 · Service URL": [
+    "1 · Service URL",
+    "1 · URL dịch vụ",
+    "1 · 서비스 URL"
+  ],
+  "Public URLs must be HTTPS/WSS. Plain HTTP is allowed only for localhost development.": [
+    "Public URLs must be HTTPS/WSS. Plain HTTP is allowed only for localhost development.",
+    "URL công khai phải dùng HTTPS/WSS. HTTP chỉ dùng khi phát triển trên máy cục bộ.",
+    "공개 URL은 HTTPS/WSS를 사용해야 합니다. 일반 HTTP는 로컬 개발에서만 허용됩니다."
+  ],
+  "2 · Local ROM": [
+    "2 · Local ROM",
+    "2 · ROM cục bộ",
+    "2 · 로컬 ROM"
+  ],
+  "Choose ROM (.nes / .sfc / .smc)…": [
+    "Choose ROM (.nes / .sfc / .smc)…",
+    "Chọn ROM (.nes / .sfc / .smc)…",
+    "ROM 선택(.nes / .sfc / .smc)…"
+  ],
+  "The ROM stays on this machine. It is never uploaded or shared. NES (.nes) and SNES (.sfc/.smc/.fig/.swc) files ≤ 16 MiB are accepted.": [
+    "The ROM stays on this machine. It is never uploaded or shared. NES (.nes) and SNES (.sfc/.smc/.fig/.swc) files ≤ 16 MiB are accepted.",
+    "ROM luôn ở trên máy này, không được tải lên hay chia sẻ. Hỗ trợ tệp NES (.nes) và SNES (.sfc/.smc/.fig/.swc) tối đa 16 MiB.",
+    "ROM은 이 컴퓨터에만 보관되며 업로드하거나 공유하지 않습니다. 최대 16 MiB의 NES(.nes)와 SNES(.sfc/.smc/.fig/.swc) 파일을 지원합니다."
+  ],
+  "3 · Choose Play Mode": [
+    "3 · Choose Play Mode",
+    "3 · Chọn chế độ chơi",
+    "3 · 플레이 모드 선택"
+  ],
+  "Play Solo": [
+    "Play Solo",
+    "Chơi một mình",
+    "혼자 플레이"
+  ],
+  "Waiting for Player 2…": [
+    "Waiting for Player 2…",
+    "Đang chờ người chơi 2…",
+    "플레이어 2 대기 중…"
+  ],
+  "Host Public Room": [
+    "Host Public Room",
+    "Mở phòng công khai",
+    "공개 방 생성"
+  ],
+  "Solo never contacts the room service. Public hosting adds the room to Live Rooms and waits for Player 2.": [
+    "Solo never contacts the room service. Public hosting adds the room to Live Rooms and waits for Player 2.",
+    "Chơi một mình không kết nối dịch vụ phòng. Phòng công khai được thêm vào danh sách phòng mở và chờ người chơi 2.",
+    "혼자 플레이는 방 서비스에 연결하지 않습니다. 공개 방을 생성하면 열린 방 목록에 등록되고 플레이어 2를 기다립니다."
+  ],
+  "😀 Reactions": [
+    "😀 Reactions",
+    "😀 Biểu cảm",
+    "😀 반응"
+  ],
+  "Resume": [
+    "Resume",
+    "Tiếp tục",
+    "재개"
+  ],
+  "Play": [
+    "Play",
+    "Chơi",
+    "플레이"
+  ],
+  "Reset": [
+    "Reset",
+    "Đặt lại",
+    "초기화"
+  ],
+  "Stop emulation and unload ROM": [
+    "Stop emulation and unload ROM",
+    "Dừng giả lập và gỡ ROM",
+    "에뮬레이션 중지 및 ROM 해제"
+  ],
+  "⏹️ Exit Game": [
+    "⏹️ Exit Game",
+    "⏹️ Thoát trò chơi",
+    "⏹️ 게임 종료"
+  ],
+  "Slot:": [
+    "Slot:",
+    "Vị trí lưu:",
+    "슬롯:"
+  ],
+  "Slot 1": [
+    "Slot 1",
+    "Vị trí 1",
+    "슬롯 1"
+  ],
+  "Slot 2": [
+    "Slot 2",
+    "Vị trí 2",
+    "슬롯 2"
+  ],
+  "Slot 3": [
+    "Slot 3",
+    "Vị trí 3",
+    "슬롯 3"
+  ],
+  "Auto Save": [
+    "Auto Save",
+    "Lưu tự động",
+    "자동 저장"
+  ],
+  "Save snapshot to current slot": [
+    "Save snapshot to current slot",
+    "Lưu trạng thái vào vị trí hiện tại",
+    "현재 슬롯에 상태 저장"
+  ],
+  "💾 Save": [
+    "💾 Save",
+    "💾 Lưu",
+    "💾 저장"
+  ],
+  "Load snapshot from current slot": [
+    "Load snapshot from current slot",
+    "Tải trạng thái từ vị trí hiện tại",
+    "현재 슬롯에서 상태 불러오기"
+  ],
+  "📂 Load": [
+    "📂 Load",
+    "📂 Tải",
+    "📂 불러오기"
+  ],
+  "Res:": [
+    "Res:",
+    "Độ phân giải:",
+    "해상도:"
+  ],
+  "Auto Crisp (Pixel-Perfect)": [
+    "Auto Crisp (Pixel-Perfect)",
+    "Tự động sắc nét (đúng từng điểm ảnh)",
+    "자동 선명도(픽셀 정렬)"
+  ],
+  "Fit (Native Aspect)": [
+    "Fit (Native Aspect)",
+    "Vừa khung (tỉ lệ gốc)",
+    "화면 맞춤(원본 비율)"
+  ],
+  "Solo": [
+    "Solo",
+    "Một mình",
+    "혼자 플레이"
+  ],
+  "ROM matched · input sync": [
+    "ROM matched · input sync",
+    "ROM khớp · đồng bộ thao tác",
+    "ROM 일치 · 입력 동기화"
+  ],
+  "Player 1: local ROM · waiting for Player 2 ROM hash": [
+    "Player 1: local ROM · waiting for Player 2 ROM hash",
+    "Người chơi 1: ROM cục bộ · chờ mã băm ROM của người chơi 2",
+    "플레이어 1: 로컬 ROM · 플레이어 2의 ROM 해시 대기 중"
+  ],
+  "Player 1: Keyboard + Gamepad · local solo session": [
+    "Player 1: Keyboard + Gamepad · local solo session",
+    "Người chơi 1: bàn phím và tay cầm · phiên chơi cục bộ một mình",
+    "플레이어 1: 키보드 및 게임패드 · 로컬 싱글 플레이"
+  ],
+  "Native 256x240 Framebuffer · 44.1kHz Hi-Fi Audio": [
+    "Native 256x240 Framebuffer · 44.1kHz Hi-Fi Audio",
+    "Khung hình gốc 256×240 · âm thanh Hi-Fi 44,1 kHz",
+    "기본 256×240 프레임버퍼 · 44.1kHz Hi-Fi 오디오"
+  ],
+  "Join as Player 2": [
+    "Join as Player 2",
+    "Tham gia làm người chơi 2",
+    "플레이어 2로 참가"
+  ],
+  "Room": [
+    "Room",
+    "Phòng",
+    "방"
+  ],
+  "Host ROM:": [
+    "Host ROM:",
+    "ROM của chủ phòng:",
+    "호스트 ROM:"
+  ],
+  "Choose your own local copy of the ROM.": [
+    "Choose your own local copy of the ROM.",
+    "Chọn bản ROM riêng trên máy của bạn.",
+    "컴퓨터에 있는 ROM 사본을 선택하세요."
+  ],
+  "Only the SHA-256 is compared privately. ROM bytes never leave this machine.": [
+    "Only the SHA-256 is compared privately. ROM bytes never leave this machine.",
+    "Chỉ so sánh riêng mã SHA-256. Dữ liệu ROM không rời khỏi máy này.",
+    "SHA-256만 비공개로 비교합니다. ROM 데이터는 이 컴퓨터를 벗어나지 않습니다."
+  ],
+  "Verify ROM & Join": [
+    "Verify ROM & Join",
+    "Xác minh ROM và tham gia",
+    "ROM 확인 및 참가"
+  ],
+  "Player 2": [
+    "Player 2",
+    "Người chơi 2",
+    "플레이어 2"
+  ],
+  "⌨️ P2 Controls": [
+    "⌨️ P2 Controls",
+    "⌨️ Điều khiển P2",
+    "⌨️ P2 조작 설정"
+  ],
+  "Leave Room": [
+    "Leave Room",
+    "Rời phòng",
+    "방 나가기"
+  ],
+  "Local ROM": [
+    "Local ROM",
+    "ROM cục bộ",
+    "로컬 ROM"
+  ],
+  "· only P2 input and state hashes leave this machine.": [
+    "· only P2 input and state hashes leave this machine.",
+    "· chỉ thao tác P2 và mã băm trạng thái được gửi khỏi máy.",
+    "· P2 입력과 상태 해시만 이 컴퓨터 밖으로 전송됩니다."
+  ],
+  "Loading notepad...": [
+    "Loading notepad...",
+    "Đang tải sổ ghi chú...",
+    "메모장 불러오는 중..."
+  ],
+  "Could not load Notepad.": [
+    "Could not load Notepad.",
+    "Không tải được sổ ghi chú.",
+    "메모장을 불러올 수 없습니다."
+  ],
+  "Notepad": [
+    "Notepad",
+    "Sổ ghi chú",
+    "메모장"
+  ],
+  "Saved": [
+    "Saved",
+    "Đã lưu",
+    "저장됨"
+  ],
+  "Unsaved": [
+    "Unsaved",
+    "Chưa lưu",
+    "저장 안 됨"
+  ],
+  "Auto-detect language": [
+    "Auto-detect language",
+    "Tự nhận diện ngôn ngữ",
+    "언어 자동 감지"
+  ],
+  "Detect": [
+    "Detect",
+    "Nhận diện",
+    "감지"
+  ],
+  "Preview": [
+    "Preview",
+    "Xem trước",
+    "미리 보기"
+  ],
+  "Notepad tabs": [
+    "Notepad tabs",
+    "Thẻ ghi chú",
+    "메모장 탭"
+  ],
+  "New note tab": [
+    "New note tab",
+    "Thẻ ghi chú mới",
+    "새 메모 탭"
+  ],
+  "Start typing...": [
+    "Start typing...",
+    "Bắt đầu nhập...",
+    "입력을 시작하세요..."
+  ],
+  "lines ·": [
+    "lines ·",
+    "dòng ·",
+    "줄 ·"
+  ],
+  "chars": [
+    "chars",
+    "ký tự",
+    "문자"
+  ],
+  "tabs": [
+    "tabs",
+    "thẻ",
+    "탭"
+  ],
+  "Double-click tab to rename · Ctrl+Enter Preview · Tab Indent · Esc Close": [
+    "Double-click tab to rename · Ctrl+Enter Preview · Tab Indent · Esc Close",
+    "Nhấp đúp thẻ để đổi tên · Ctrl+Enter xem trước · Tab thụt dòng · Esc đóng",
+    "탭 두 번 클릭으로 이름 변경 · Ctrl+Enter 미리 보기 · Tab 들여쓰기 · Esc 닫기"
+  ],
+  "Close note tab?": [
+    "Close note tab?",
+    "Đóng thẻ ghi chú?",
+    "메모 탭을 닫을까요?"
+  ],
+  "” contains content. Closing it permanently removes that tab from Notepad.": [
+    "” contains content. Closing it permanently removes that tab from Notepad.",
+    "” có nội dung. Đóng thẻ sẽ xóa vĩnh viễn thẻ này khỏi sổ ghi chú.",
+    "”에 내용이 있습니다. 닫으면 이 탭이 메모장에서 영구적으로 삭제됩니다."
+  ],
+  "Close tab": [
+    "Close tab",
+    "Đóng thẻ",
+    "탭 닫기"
+  ],
+  "Outbound hop": [
+    "Outbound hop",
+    "Chặng kết nối đầu ra",
+    "아웃바운드 경유"
+  ],
+  "Connection": [
+    "Connection",
+    "Kết nối",
+    "연결"
+  ],
+  "Direct": [
+    "Direct",
+    "Trực tiếp",
+    "직접 연결"
+  ],
+  "HTTP proxy": [
+    "HTTP proxy",
+    "Proxy HTTP",
+    "HTTP 프록시"
+  ],
+  "HTTPS proxy (TLS to proxy)": [
+    "HTTPS proxy (TLS to proxy)",
+    "Proxy HTTPS (TLS đến proxy)",
+    "HTTPS 프록시(프록시까지 TLS)"
+  ],
+  "SOCKS4 (no authentication)": [
+    "SOCKS4 (no authentication)",
+    "SOCKS4 (không xác thực)",
+    "SOCKS4(인증 없음)"
+  ],
+  "SOCKS5 (remote DNS)": [
+    "SOCKS5 (remote DNS)",
+    "SOCKS5 (DNS từ xa)",
+    "SOCKS5(원격 DNS)"
+  ],
+  "SSH tunnel": [
+    "SSH tunnel",
+    "Đường hầm SSH",
+    "SSH 터널"
+  ],
+  "Username": [
+    "Username",
+    "Tên người dùng",
+    "사용자 이름"
+  ],
+  "(optional)": [
+    "(optional)",
+    "(tùy chọn)",
+    "(선택 사항)"
+  ],
+  "SSH authentication": [
+    "SSH authentication",
+    "Xác thực SSH",
+    "SSH 인증"
+  ],
+  "Server fingerprint (SHA256)": [
+    "Server fingerprint (SHA256)",
+    "Dấu vân tay máy chủ (SHA256)",
+    "서버 지문(SHA256)"
+  ],
+  "Get the server fingerprint from your administrator.": [
+    "Get the server fingerprint from your administrator.",
+    "Lấy dấu vân tay máy chủ từ quản trị viên.",
+    "관리자에게 서버 지문을 받으세요."
+  ],
+  "Key passphrase (optional)": [
+    "Key passphrase (optional)",
+    "Mật khẩu khóa (tùy chọn)",
+    "키 암호(선택 사항)"
+  ],
+  "Hop credentials are stored in the local proxy configuration alongside backend API keys.": [
+    "Hop credentials are stored in the local proxy configuration alongside backend API keys.",
+    "Thông tin xác thực chặng được lưu trong cấu hình proxy cục bộ cùng khóa API máy chủ.",
+    "경유 인증 정보는 백엔드 API 키와 함께 로컬 프록시 설정에 저장됩니다."
+  ],
+  "API proxy configurations": [
+    "API proxy configurations",
+    "Cấu hình proxy API",
+    "API 프록시 설정"
+  ],
+  "Status": [
+    "Status",
+    "Trạng thái",
+    "상태"
+  ],
+  "Running": [
+    "Running",
+    "Đang chạy",
+    "실행 중"
+  ],
+  "Stopped": [
+    "Stopped",
+    "Đã dừng",
+    "중지됨"
+  ],
+  "Server Settings": [
+    "Server Settings",
+    "Cấu hình máy chủ",
+    "서버 설정"
+  ],
+  "Request Logs": [
+    "Request Logs",
+    "Nhật ký yêu cầu",
+    "요청 로그"
+  ],
+  "ERR": [
+    "ERR",
+    "LỖI",
+    "오류"
+  ],
+  "CliProxyAI Backend Configuration": [
+    "CliProxyAI Backend Configuration",
+    "Cấu hình máy chủ CliProxyAI",
+    "CliProxyAI 백엔드 설정"
+  ],
+  "Manage upstream AI backend servers and monitor logs": [
+    "Manage upstream AI backend servers and monitor logs",
+    "Quản lý máy chủ AI đầu nguồn và theo dõi nhật ký",
+    "업스트림 AI 백엔드 서버 및 로그 관리"
+  ],
+  "Port:": [
+    "Port:",
+    "Cổng:",
+    "포트:"
+  ],
+  "Active Backends:": [
+    "Active Backends:",
+    "Máy chủ hoạt động:",
+    "활성 백엔드:"
+  ],
+  "Total Requests:": [
+    "Total Requests:",
+    "Tổng yêu cầu:",
+    "총 요청:"
+  ],
+  "Dismiss": [
+    "Dismiss",
+    "Đóng",
+    "닫기"
+  ],
+  "Backend Configurations": [
+    "Backend Configurations",
+    "Cấu hình máy chủ",
+    "백엔드 설정"
+  ],
+  "Detailed Logs & Inspector": [
+    "Detailed Logs & Inspector",
+    "Nhật ký chi tiết và kiểm tra",
+    "상세 로그 및 검사"
+  ],
+  "Upstream Backend Servers (": [
+    "Upstream Backend Servers (",
+    "Máy chủ đầu nguồn (",
+    "업스트림 백엔드 서버 ("
+  ],
+  "Add Backend": [
+    "Add Backend",
+    "Thêm máy chủ",
+    "백엔드 추가"
+  ],
+  "Edit Upstream Server": [
+    "Edit Upstream Server",
+    "Sửa máy chủ đầu nguồn",
+    "업스트림 서버 수정"
+  ],
+  "New Upstream Server": [
+    "New Upstream Server",
+    "Máy chủ đầu nguồn mới",
+    "새 업스트림 서버"
+  ],
+  "Name (e.g. OpenAI)": [
+    "Name (e.g. OpenAI)",
+    "Tên (ví dụ: OpenAI)",
+    "이름(예: OpenAI)"
+  ],
+  "Endpoint URL (e.g. https://api.openai.com/v1)": [
+    "Endpoint URL (e.g. https://api.openai.com/v1)",
+    "URL dịch vụ (ví dụ: https://api.openai.com/v1)",
+    "엔드포인트 URL(예: https://api.openai.com/v1)"
+  ],
+  "Model identifier (e.g. gpt-4o)": [
+    "Model identifier (e.g. gpt-4o)",
+    "Định danh mô hình (ví dụ: gpt-4o)",
+    "모델 식별자(예: gpt-4o)"
+  ],
+  "User-Agent (optional, e.g. CliProxyAI/1.0)": [
+    "User-Agent (optional, e.g. CliProxyAI/1.0)",
+    "User-Agent (tùy chọn, ví dụ: CliProxyAI/1.0)",
+    "User-Agent(선택 사항, 예: CliProxyAI/1.0)"
+  ],
+  "Reasoning Effort: Default (None)": [
+    "Reasoning Effort: Default (None)",
+    "Mức suy luận: Mặc định (không chọn)",
+    "추론 수준: 기본값(없음)"
+  ],
+  "Reasoning Effort: low": [
+    "Reasoning Effort: low",
+    "Mức suy luận: thấp",
+    "추론 수준: 낮음"
+  ],
+  "Reasoning Effort: medium": [
+    "Reasoning Effort: medium",
+    "Mức suy luận: trung bình",
+    "추론 수준: 보통"
+  ],
+  "Reasoning Effort: high": [
+    "Reasoning Effort: high",
+    "Mức suy luận: cao",
+    "추론 수준: 높음"
+  ],
+  "Reasoning Effort: xhigh": [
+    "Reasoning Effort: xhigh",
+    "Mức suy luận: rất cao",
+    "추론 수준: 매우 높음"
+  ],
+  "Reasoning Effort: max": [
+    "Reasoning Effort: max",
+    "Mức suy luận: tối đa",
+    "추론 수준: 최대"
+  ],
+  "(Cắt 60–90% token output command)": [
+    "(Reduces command output tokens by 60–90%)",
+    "(Giảm 60–90% token đầu ra lệnh)",
+    "(명령 출력 토큰 60–90% 절감)"
+  ],
+  "Enable Ponytail Anti-Bloat": [
+    "Enable Ponytail Anti-Bloat",
+    "Bật Ponytail chống dài dòng",
+    "Ponytail 간결화 활성화"
+  ],
+  "(Lazy Senior Dev System Prompt Injector)": [
+    "(Lazy Senior Dev System Prompt Injector)",
+    "(Chèn lời nhắc hệ thống lập trình viên kinh nghiệm)",
+    "(시니어 개발자 시스템 프롬프트 삽입)"
+  ],
+  "Update": [
+    "Update",
+    "Cập nhật",
+    "업데이트"
+  ],
+  "Save Backend": [
+    "Save Backend",
+    "Lưu máy chủ",
+    "백엔드 저장"
+  ],
+  "No backend servers configured. Requests will return error.": [
+    "No backend servers configured. Requests will return error.",
+    "Chưa cấu hình máy chủ. Các yêu cầu sẽ trả về lỗi.",
+    "설정된 백엔드 서버가 없습니다. 요청 시 오류가 반환됩니다."
+  ],
+  "RTK Token Compression Enabled": [
+    "RTK Token Compression Enabled",
+    "Đã bật nén token RTK",
+    "RTK 토큰 압축 활성화됨"
+  ],
+  "Ponytail Anti-Bloat Enabled": [
+    "Ponytail Anti-Bloat Enabled",
+    "Đã bật Ponytail chống dài dòng",
+    "Ponytail 간결화 활성화됨"
+  ],
+  "Hop:": [
+    "Hop:",
+    "Chặng:",
+    "경유:"
+  ],
+  "Prompt:": [
+    "Prompt:",
+    "Đầu vào:",
+    "입력:"
+  ],
+  "Completion:": [
+    "Completion:",
+    "Đầu ra:",
+    "출력:"
+  ],
+  "Total:": [
+    "Total:",
+    "Tổng:",
+    "합계:"
+  ],
+  "Requests:": [
+    "Requests:",
+    "Yêu cầu:",
+    "요청:"
+  ],
+  "Success requests without reported usage": [
+    "Success requests without reported usage",
+    "Yêu cầu thành công không báo cáo mức sử dụng",
+    "사용량이 보고되지 않은 성공 요청"
+  ],
+  "Unreported:": [
+    "Unreported:",
+    "Chưa báo cáo:",
+    "미보고:"
+  ],
+  "Reset:": [
+    "Reset:",
+    "Đặt lại:",
+    "초기화:"
+  ],
+  "* Totals are incomplete: unreported requests found.": [
+    "* Totals are incomplete: unreported requests found.",
+    "* Tổng chưa đầy đủ: có yêu cầu không báo cáo mức sử dụng.",
+    "* 합계가 불완전합니다: 사용량이 보고되지 않은 요청이 있습니다."
+  ],
+  "Move up": [
+    "Move up",
+    "Di chuyển lên",
+    "위로 이동"
+  ],
+  "Move down": [
+    "Move down",
+    "Di chuyển xuống",
+    "아래로 이동"
+  ],
+  "Max Retries:": [
+    "Max Retries:",
+    "Số lần thử lại tối đa:",
+    "최대 재시도:"
+  ],
+  "Duplicate Backend": [
+    "Duplicate Backend",
+    "Nhân bản máy chủ",
+    "백엔드 복제"
+  ],
+  "Reset Usage": [
+    "Reset Usage",
+    "Đặt lại mức sử dụng",
+    "사용량 초기화"
+  ],
+  "Usage Example": [
+    "Usage Example",
+    "Ví dụ sử dụng",
+    "사용 예시"
+  ],
+  "API Proxy Server": [
+    "API Proxy Server",
+    "Máy chủ proxy API",
+    "API 프록시 서버"
+  ],
+  "All API requests sent to port": [
+    "All API requests sent to port",
+    "Mọi yêu cầu API gửi đến cổng",
+    "다음 포트로 전송된 모든 API 요청:"
+  ],
+  "will be load-balanced and proxy-passed to the active backends.": [
+    "will be load-balanced and proxy-passed to the active backends.",
+    "sẽ được cân bằng tải và chuyển tiếp đến các máy chủ đang hoạt động.",
+    "활성 백엔드로 부하 분산 및 프록시 전달됩니다."
+  ],
+  "Confirm Reset Usage": [
+    "Confirm Reset Usage",
+    "Xác nhận đặt lại mức sử dụng",
+    "사용량 초기화 확인"
+  ],
+  "Are you sure you want to reset the accumulated token usage for this backend to zero? This action cannot be undone.": [
+    "Are you sure you want to reset the accumulated token usage for this backend to zero? This action cannot be undone.",
+    "Bạn muốn đặt tổng token đã dùng của máy chủ này về 0? Thao tác này không thể hoàn tác.",
+    "이 백엔드의 누적 토큰 사용량을 0으로 초기화할까요? 이 작업은 되돌릴 수 없습니다."
+  ],
+  "reqs": [
+    "reqs",
+    "yêu cầu",
+    "요청"
+  ],
+  "OK:": [
+    "OK:",
+    "Thành công:",
+    "성공:"
+  ],
+  "Fail:": [
+    "Fail:",
+    "Thất bại:",
+    "실패:"
+  ],
+  "Previous": [
+    "Previous",
+    "Trước",
+    "이전"
+  ],
+  "Page": [
+    "Page",
+    "Trang",
+    "페이지"
+  ],
+  "Next": [
+    "Next",
+    "Sau",
+    "다음"
+  ],
+  "Time": [
+    "Time",
+    "Thời gian",
+    "시간"
+  ],
+  "Backend": [
+    "Backend",
+    "Máy chủ",
+    "백엔드"
+  ],
+  "Dur": [
+    "Dur",
+    "Thời lượng",
+    "소요 시간"
+  ],
+  "Tokens": [
+    "Tokens",
+    "Token",
+    "토큰"
+  ],
+  "Tokens:": [
+    "Tokens:",
+    "Token:",
+    "토큰:"
+  ],
+  "(P:": [
+    "(P:",
+    "(Đầu vào:",
+    "(입력:"
+  ],
+  "C:": [
+    "C:",
+    "Đầu ra:",
+    "출력:"
+  ],
+  "Raw": [
+    "Raw",
+    "Nguyên bản",
+    "원본"
+  ],
+  "(256 KiB truncated)": [
+    "(256 KiB truncated)",
+    "(đã cắt ở 256 KiB)",
+    "(256 KiB에서 잘림)"
+  ],
+  "Select executable": [
+    "Select executable",
+    "Chọn tệp thực thi",
+    "실행 파일 선택"
+  ],
+  "Select icon file (optional)": [
+    "Select icon file (optional)",
+    "Chọn tệp biểu tượng (tùy chọn)",
+    "아이콘 파일 선택(선택 사항)"
+  ],
+  "Select working directory": [
+    "Select working directory",
+    "Chọn thư mục làm việc",
+    "작업 폴더 선택"
+  ],
+  "Name is required": [
+    "Name is required",
+    "Tên là bắt buộc",
+    "이름을 입력하세요"
+  ],
+  "Command is required": [
+    "Command is required",
+    "Lệnh là bắt buộc",
+    "명령을 입력하세요"
+  ],
+  "✎ Edit App": [
+    "✎ Edit App",
+    "✎ Sửa ứng dụng",
+    "✎ 앱 수정"
+  ],
+  "+ New App": [
+    "+ New App",
+    "+ Ứng dụng mới",
+    "+ 새 앱"
+  ],
+  "Editing: {v0}": [
+    "Editing: {v0}",
+    "Đang sửa: {v0}",
+    "수정 중: {v0}"
+  ],
+  "Fill in the details below": [
+    "Fill in the details below",
+    "Điền thông tin bên dưới",
+    "아래에 정보를 입력하세요"
+  ],
+  "Command / Path": [
+    "Command / Path",
+    "Lệnh / đường dẫn",
+    "명령 / 경로"
+  ],
+  "Supports .exe, .bat, .cmd, .lnk (shortcuts), .ps1": [
+    "Supports .exe, .bat, .cmd, .lnk (shortcuts), .ps1",
+    "Hỗ trợ .exe, .bat, .cmd, .lnk (lối tắt), .ps1",
+    ".exe, .bat, .cmd, .lnk(바로 가기), .ps1 지원"
+  ],
+  "Group (optional)": [
+    "Group (optional)",
+    "Nhóm (tùy chọn)",
+    "그룹(선택 사항)"
+  ],
+  "— No group —": [
+    "— No group —",
+    "— Không có nhóm —",
+    "— 그룹 없음 —"
+  ],
+  "+ New": [
+    "+ New",
+    "+ Mới",
+    "+ 새 항목"
+  ],
+  "e.g. Development, Social, Utilities": [
+    "e.g. Development, Social, Utilities",
+    "Ví dụ: Phát triển, Mạng xã hội, Tiện ích",
+    "예: 개발, 소셜, 유틸리티"
+  ],
+  "← Back": [
+    "← Back",
+    "← Quay lại",
+    "← 뒤로"
+  ],
+  "Advanced options": [
+    "Advanced options",
+    "Tùy chọn nâng cao",
+    "고급 옵션"
+  ],
+  "Arguments": [
+    "Arguments",
+    "Tham số",
+    "인수"
+  ],
+  "Space-separated arguments": [
+    "Space-separated arguments",
+    "Các tham số cách nhau bằng dấu cách",
+    "공백으로 구분된 인수"
+  ],
+  "Working Directory": [
+    "Working Directory",
+    "Thư mục làm việc",
+    "작업 폴더"
+  ],
+  "Leave blank to use default": [
+    "Leave blank to use default",
+    "Để trống để dùng mặc định",
+    "기본값을 사용하려면 비워 두세요"
+  ],
+  "Custom Icon": [
+    "Custom Icon",
+    "Biểu tượng tùy chỉnh",
+    "사용자 지정 아이콘"
+  ],
+  "Auto-extracted from executable": [
+    "Auto-extracted from executable",
+    "Tự trích từ tệp thực thi",
+    "실행 파일에서 자동 추출"
+  ],
+  "Sort Order": [
+    "Sort Order",
+    "Thứ tự sắp xếp",
+    "정렬 순서"
+  ],
+  "✕ Cancel": [
+    "✕ Cancel",
+    "✕ Hủy",
+    "✕ 취소"
+  ],
+  "Save Changes": [
+    "Save Changes",
+    "Lưu thay đổi",
+    "변경 사항 저장"
+  ],
+  "Add App": [
+    "Add App",
+    "Thêm ứng dụng",
+    "앱 추가"
+  ],
+  "Failed to launch {v0}: {v1}": [
+    "Failed to launch {v0}: {v1}",
+    "Không mở được {v0}: {v1}",
+    "{v0} 실행 실패: {v1}"
+  ],
+  "Remove \"{v0}\" from Quick Apps?": [
+    "Remove \"{v0}\" from Quick Apps?",
+    "Gỡ \"{v0}\" khỏi ứng dụng nhanh?",
+    "빠른 앱에서 \"{v0}\"을 제거할까요?"
+  ],
+  "Remove Quick App": [
+    "Remove Quick App",
+    "Gỡ ứng dụng nhanh",
+    "빠른 앱 제거"
+  ],
+  "Quick Apps": [
+    "Quick Apps",
+    "Ứng dụng nhanh",
+    "빠른 앱"
+  ],
+  "app": [
+    "app",
+    "ứng dụng",
+    "앱"
+  ],
+  "apps": [
+    "apps",
+    "ứng dụng",
+    "앱"
+  ],
+  "sm": [
+    "sm",
+    "nhỏ",
+    "작게"
+  ],
+  "md": [
+    "md",
+    "vừa",
+    "보통"
+  ],
+  "lg": [
+    "lg",
+    "lớn",
+    "크게"
+  ],
+  "Re-extract all icons": [
+    "Re-extract all icons",
+    "Trích lại mọi biểu tượng",
+    "모든 아이콘 다시 추출"
+  ],
+  "Icons": [
+    "Icons",
+    "Biểu tượng",
+    "아이콘"
+  ],
+  "Search apps…": [
+    "Search apps…",
+    "Tìm ứng dụng…",
+    "앱 검색…"
+  ],
+  "All": [
+    "All",
+    "Tất cả",
+    "전체"
+  ],
+  "Loading apps…": [
+    "Loading apps…",
+    "Đang tải ứng dụng…",
+    "앱 불러오는 중…"
+  ],
+  "Add new quick app": [
+    "Add new quick app",
+    "Thêm ứng dụng nhanh mới",
+    "새 빠른 앱 추가"
+  ],
+  "Add your first app": [
+    "Add your first app",
+    "Thêm ứng dụng đầu tiên",
+    "첫 앱 추가"
+  ],
+  "Click to add a quick launch shortcut": [
+    "Click to add a quick launch shortcut",
+    "Nhấp để thêm lối tắt mở nhanh",
+    "클릭하여 빠른 실행 바로 가기 추가"
+  ],
+  "Or click the": [
+    "Or click the",
+    "Hoặc nhấp nút",
+    "또는 위의"
+  ],
+  "+ Add App": [
+    "+ Add App",
+    "+ Thêm ứng dụng",
+    "+ 앱 추가"
+  ],
+  "button above": [
+    "button above",
+    "ở trên",
+    "버튼을 클릭하세요"
+  ],
+  "No apps match your search": [
+    "No apps match your search",
+    "Không có ứng dụng phù hợp",
+    "검색어와 일치하는 앱이 없습니다"
+  ],
+  "Clear filters": [
+    "Clear filters",
+    "Xóa bộ lọc",
+    "필터 지우기"
+  ],
+  "Recent CLI & folders · newest first": [
+    "Recent CLI & folders · newest first",
+    "CLI và thư mục gần đây · mới nhất trước",
+    "최근 CLI 및 폴더 · 최신순"
+  ],
+  "No recent terminals yet. Start a CLI in a folder to see it here.": [
+    "No recent terminals yet. Start a CLI in a folder to see it here.",
+    "Chưa có terminal gần đây. Mở CLI trong một thư mục để thấy tại đây.",
+    "최근 터미널이 없습니다. 폴더에서 CLI를 시작하면 여기에 표시됩니다."
+  ],
+  "· Opening...": [
+    "· Opening...",
+    "· Đang mở...",
+    "· 여는 중..."
+  ],
+  "CLI unavailable": [
+    "CLI unavailable",
+    "CLI không khả dụng",
+    "CLI를 사용할 수 없습니다"
+  ],
+  "⚠ Connection failed": [
+    "⚠ Connection failed",
+    "⚠ Kết nối thất bại",
+    "⚠ 연결 실패"
+  ],
+  "Collecting data...": [
+    "Collecting data...",
+    "Đang thu thập dữ liệu...",
+    "데이터 수집 중..."
+  ],
+  "Disk": [
+    "Disk",
+    "Ổ đĩa",
+    "디스크"
+  ],
+  "Load:": [
+    "Load:",
+    "Tải:",
+    "부하:"
+  ],
+  "· Up:": [
+    "· Up:",
+    "· Hoạt động:",
+    "· 가동 시간:"
+  ],
+  "Remote Access": [
+    "Remote Access",
+    "Truy cập từ xa",
+    "원격 접근"
+  ],
+  "🟢 Active": [
+    "🟢 Active",
+    "🟢 Hoạt động",
+    "🟢 활성"
+  ],
+  "🔴 Inactive": [
+    "🔴 Inactive",
+    "🔴 Không hoạt động",
+    "🔴 비활성"
+  ],
+  "SSH Server": [
+    "SSH Server",
+    "Máy chủ SSH",
+    "SSH 서버"
+  ],
+  "Processing...": [
+    "Processing...",
+    "Đang xử lý...",
+    "처리 중..."
+  ],
+  "Stop Server": [
+    "Stop Server",
+    "Dừng máy chủ",
+    "서버 중지"
+  ],
+  "Start Server": [
+    "Start Server",
+    "Khởi động máy chủ",
+    "서버 시작"
+  ],
+  "Server Port": [
+    "Server Port",
+    "Cổng máy chủ",
+    "서버 포트"
+  ],
+  "Server Authentication": [
+    "Server Authentication",
+    "Xác thực máy chủ",
+    "서버 인증"
+  ],
+  "e.g. admin": [
+    "e.g. admin",
+    "Ví dụ: admin",
+    "예: admin"
+  ],
+  "Password Auth": [
+    "Password Auth",
+    "Xác thực mật khẩu",
+    "비밀번호 인증"
+  ],
+  "Leave empty to disable password login": [
+    "Leave empty to disable password login",
+    "Để trống để tắt đăng nhập bằng mật khẩu",
+    "비밀번호 로그인을 끄려면 비워 두세요"
+  ],
+  "Disable Password Auth": [
+    "Disable Password Auth",
+    "Tắt xác thực mật khẩu",
+    "비밀번호 인증 비활성화"
+  ],
+  "Authorized Public Keys (": [
+    "Authorized Public Keys (",
+    "Khóa công khai được phép (",
+    "허용된 공개 키 ("
+  ],
+  "Paste ssh-rsa/ssh-ed25519 public key": [
+    "Paste ssh-rsa/ssh-ed25519 public key",
+    "Dán khóa công khai ssh-rsa/ssh-ed25519",
+    "ssh-rsa/ssh-ed25519 공개 키 붙여넣기"
+  ],
+  "💡 Note: Restart the SSH Server to apply authentication changes.": [
+    "💡 Note: Restart the SSH Server to apply authentication changes.",
+    "💡 Khởi động lại máy chủ SSH để áp dụng thay đổi xác thực.",
+    "💡 인증 변경 사항을 적용하려면 SSH 서버를 다시 시작하세요."
+  ],
+  "Connection Instruction": [
+    "Connection Instruction",
+    "Hướng dẫn kết nối",
+    "연결 안내"
+  ],
+  "Other machines on your network can connect directly to your CLX sessions.": [
+    "Other machines on your network can connect directly to your CLX sessions.",
+    "Máy khác trong mạng có thể kết nối trực tiếp đến các phiên CLX của bạn.",
+    "네트워크의 다른 컴퓨터가 CLX 세션에 직접 연결할 수 있습니다."
+  ],
+  "Command:": [
+    "Command:",
+    "Lệnh:",
+    "명령:"
+  ],
+  "Copied connection command to clipboard!": [
+    "Copied connection command to clipboard!",
+    "Đã sao chép lệnh kết nối!",
+    "연결 명령을 클립보드에 복사했습니다!"
+  ],
+  "Copy command": [
+    "Copy command",
+    "Sao chép lệnh",
+    "명령 복사"
+  ],
+  "🔐 Active Credentials:": [
+    "🔐 Active Credentials:",
+    "🔐 Thông tin xác thực đang dùng:",
+    "🔐 현재 인증 정보:"
+  ],
+  "• Username:": [
+    "• Username:",
+    "• Tên người dùng:",
+    "• 사용자 이름:"
+  ],
+  "• Password:": [
+    "• Password:",
+    "• Mật khẩu:",
+    "• 비밀번호:"
+  ],
+  "• Password authentication is disabled": [
+    "• Password authentication is disabled",
+    "• Đã tắt xác thực mật khẩu",
+    "• 비밀번호 인증이 비활성화됨"
+  ],
+  "• Public Key Authentication is active (": [
+    "• Public Key Authentication is active (",
+    "• Đã bật xác thực khóa công khai (",
+    "• 공개 키 인증 활성화 ("
+  ],
+  "key(s))": [
+    "key(s))",
+    "khóa)",
+    "개 키)"
+  ],
+  "Collaborative REPL Shell": [
+    "Collaborative REPL Shell",
+    "Shell REPL cộng tác",
+    "협업 REPL 셸"
+  ],
+  "Connected users enter a custom shell displaying all active sessions. Pressing": [
+    "Connected users enter a custom shell displaying all active sessions. Pressing",
+    "Người dùng kết nối sẽ vào shell tùy chỉnh hiển thị các phiên đang hoạt động. Nhấn",
+    "연결된 사용자는 활성 세션이 표시되는 사용자 지정 셸로 들어갑니다. 다음 키를 누르면"
+  ],
+  "or": [
+    "or",
+    "hoặc",
+    "또는"
+  ],
+  "detaches from a session.": [
+    "detaches from a session.",
+    "để tách khỏi phiên.",
+    "세션에서 분리됩니다."
+  ],
+  "Server Logs": [
+    "Server Logs",
+    "Nhật ký máy chủ",
+    "서버 로그"
+  ],
+  "No logs yet.": [
+    "No logs yet.",
+    "Chưa có nhật ký.",
+    "아직 로그가 없습니다."
+  ],
+  "VICTORY // CORE SECURED": [
+    "VICTORY // CORE SECURED",
+    "CHIẾN THẮNG // BẢO VỆ LÕI THÀNH CÔNG",
+    "승리 // 코어 확보"
+  ],
+  "DEFEAT // STATION BREACHED": [
+    "DEFEAT // STATION BREACHED",
+    "THẤT BẠI // TRẠM BỊ XÂM NHẬP",
+    "패배 // 기지 침입"
+  ],
+  "Identified Infiltrators": [
+    "Identified Infiltrators",
+    "Kẻ xâm nhập đã xác định",
+    "확인된 침입자"
+  ],
+  "RETURN TO LOBBY": [
+    "RETURN TO LOBBY",
+    "VỀ PHÒNG CHỜ",
+    "로비로 돌아가기"
+  ],
+  "Quantum Cyan": [
+    "Quantum Cyan",
+    "Lam lượng tử",
+    "퀀텀 시안"
+  ],
+  "Rogue Crimson": [
+    "Rogue Crimson",
+    "Đỏ phản loạn",
+    "로그 크림슨"
+  ],
+  "Matrix Emerald": [
+    "Matrix Emerald",
+    "Lục ma trận",
+    "매트릭스 에메랄드"
+  ],
+  "Plasma Amber": [
+    "Plasma Amber",
+    "Hổ phách plasma",
+    "플라즈마 앰버"
+  ],
+  "Void Violet": [
+    "Void Violet",
+    "Tím hư không",
+    "보이드 바이올렛"
+  ],
+  "Cyber Neon": [
+    "Cyber Neon",
+    "Neon công nghệ",
+    "사이버 네온"
+  ],
+  "Cobalt Shield": [
+    "Cobalt Shield",
+    "Lam cobalt",
+    "코발트 실드"
+  ],
+  "Titanium Grey": [
+    "Titanium Grey",
+    "Xám titan",
+    "티타늄 그레이"
+  ],
+  "Rogue Node // Quantum Outpost": [
+    "Rogue Node // Quantum Outpost",
+    "Rogue Node // Tiền đồn lượng tử",
+    "Rogue Node // 퀀텀 전초기지"
+  ],
+  "LOBBY": [
+    "LOBBY",
+    "PHÒNG CHỜ",
+    "로비"
+  ],
+  "Room Code:": [
+    "Room Code:",
+    "Mã phòng:",
+    "방 코드:"
+  ],
+  "(Encrypted by Nostr NIP-98)": [
+    "(Encrypted by Nostr NIP-98)",
+    "(Mã hóa bằng Nostr NIP-98)",
+    "(Nostr NIP-98로 암호화)"
+  ],
+  "Invite Copied!": [
+    "Invite Copied!",
+    "Đã sao chép lời mời!",
+    "초대를 복사했습니다!"
+  ],
+  "Copy Buzz Invite": [
+    "Copy Buzz Invite",
+    "Sao chép lời mời Buzz",
+    "Buzz 초대 복사"
+  ],
+  "START MISSION": [
+    "START MISSION",
+    "BẮT ĐẦU NHIỆM VỤ",
+    "임무 시작"
+  ],
+  "Android Operator Config": [
+    "Android Operator Config",
+    "Cấu hình người điều khiển",
+    "안드로이드 오퍼레이터 설정"
+  ],
+  "⚔️ Rogue Agent": [
+    "⚔️ Rogue Agent",
+    "⚔️ Đặc vụ phản loạn",
+    "⚔️ 로그 에이전트"
+  ],
+  "🔧 System Engineer": [
+    "🔧 System Engineer",
+    "🔧 Kỹ sư hệ thống",
+    "🔧 시스템 엔지니어"
+  ],
+  "Callsign / Identity Name": [
+    "Callsign / Identity Name",
+    "Tên hiệu / danh tính",
+    "호출명 / 신원 이름"
+  ],
+  "Chassis Color Matrix": [
+    "Chassis Color Matrix",
+    "Ma trận màu khung máy",
+    "기체 색상 매트릭스"
+  ],
+  "Test Role Override": [
+    "Test Role Override",
+    "Chọn vai trò thử nghiệm",
+    "테스트 역할 지정"
+  ],
+  "🔧 Engineer": [
+    "🔧 Engineer",
+    "🔧 Kỹ sư",
+    "🔧 엔지니어"
+  ],
+  "⚔️ Rogue": [
+    "⚔️ Rogue",
+    "⚔️ Phản loạn",
+    "⚔️ 로그"
+  ],
+  "Connected Crew (": [
+    "Connected Crew (",
+    "Thành viên kết nối (",
+    "연결된 승무원 ("
+  ],
+  "● Mesh Synchronized": [
+    "● Mesh Synchronized",
+    "● Mạng đã đồng bộ",
+    "● 메시 동기화됨"
+  ],
+  "YOU": [
+    "YOU",
+    "BẠN",
+    "나"
+  ],
+  "READY TO LAUNCH": [
+    "READY TO LAUNCH",
+    "SẴN SÀNG KHỞI HÀNH",
+    "출발 준비 완료"
+  ],
+  "Controls:": [
+    "Controls:",
+    "Điều khiển:",
+    "조작:"
+  ],
+  "ARROWS": [
+    "ARROWS",
+    "PHÍM MŨI TÊN",
+    "방향키"
+  ],
+  "to move ·": [
+    "to move ·",
+    "để di chuyển ·",
+    "이동 ·"
+  ],
+  "Tasks & Vents ·": [
+    "Tasks & Vents ·",
+    "Nhiệm vụ và ống thông gió ·",
+    "작업 및 환기구 ·"
+  ],
+  "Kill ·": [
+    "Kill ·",
+    "Hạ gục ·",
+    "제거 ·"
+  ],
+  "Report/Meeting": [
+    "Report/Meeting",
+    "Báo cáo/họp",
+    "신고/회의"
+  ],
+  "KERNEL LOCKDOWN // DIAGNOSTIC MEETING": [
+    "KERNEL LOCKDOWN // DIAGNOSTIC MEETING",
+    "KHÓA NHÂN HỆ THỐNG // HỌP KIỂM TRA",
+    "커널 봉쇄 // 진단 회의"
+  ],
+  "🔒 Discussion Phase: Review subroutines": [
+    "🔒 Discussion Phase: Review subroutines",
+    "🔒 Thảo luận: kiểm tra tiến trình",
+    "🔒 토론: 서브루틴 검토"
+  ],
+  "🗳️ Voting Phase: Cast deallocation vote": [
+    "🗳️ Voting Phase: Cast deallocation vote",
+    "🗳️ Bỏ phiếu: chọn tiến trình loại bỏ",
+    "🗳️ 투표: 제거 대상 선택"
+  ],
+  "COUNTDOWN:": [
+    "COUNTDOWN:",
+    "ĐẾM NGƯỢC:",
+    "카운트다운:"
+  ],
+  "SUBROUTINE ACTIVE": [
+    "SUBROUTINE ACTIVE",
+    "TIẾN TRÌNH HOẠT ĐỘNG",
+    "서브루틴 활성"
+  ],
+  "TERMINATED": [
+    "TERMINATED",
+    "ĐÃ KẾT THÚC",
+    "종료됨"
+  ],
+  "VOTE": [
+    "VOTE",
+    "BỎ PHIẾU",
+    "투표"
+  ],
+  "⏭️ Skip Diagnostic Vote": [
+    "⏭️ Skip Diagnostic Vote",
+    "⏭️ Bỏ qua phiếu kiểm tra",
+    "⏭️ 진단 투표 건너뛰기"
+  ],
+  "Vote Recorded by Kernel": [
+    "Vote Recorded by Kernel",
+    "Nhân hệ thống đã ghi nhận phiếu",
+    "커널이 투표를 기록했습니다"
+  ],
+  "Emergency Comms": [
+    "Emergency Comms",
+    "Liên lạc khẩn cấp",
+    "비상 통신"
+  ],
+  "[ECHO]": [
+    "[ECHO]",
+    "[VANG]",
+    "[메아리]"
+  ],
+  "Rogue Node game canvas": [
+    "Rogue Node game canvas",
+    "Khung trò chơi Rogue Node",
+    "Rogue Node 게임 캔버스"
+  ],
+  "STATION CALIBRATION": [
+    "STATION CALIBRATION",
+    "HIỆU CHỈNH TRẠM",
+    "기지 보정"
+  ],
+  "SYSTEM ENGINEER": [
+    "SYSTEM ENGINEER",
+    "KỸ SƯ HỆ THỐNG",
+    "시스템 엔지니어"
+  ],
+  "ROGUE AGENT": [
+    "ROGUE AGENT",
+    "ĐẶC VỤ PHẢN LOẠN",
+    "로그 에이전트"
+  ],
+  "145 u/s · fixed step": [
+    "145 u/s · fixed step",
+    "145 đơn vị/giây · bước cố định",
+    "145 단위/초 · 고정 스텝"
+  ],
+  "CALIBRATE [E]": [
+    "CALIBRATE [E]",
+    "HIỆU CHỈNH [E]",
+    "보정 [E]"
+  ],
+  "DISABLE [Q]": [
+    "DISABLE [Q]",
+    "VÔ HIỆU [Q]",
+    "무력화 [Q]"
+  ],
+  "· {v0}s": [
+    "· {v0}s",
+    "· {v0} giây",
+    "· {v0}초"
+  ],
+  "CALL REVIEW [R]": [
+    "CALL REVIEW [R]",
+    "HỌP KIỂM TRA [R]",
+    "검토 소집 [R]"
+  ],
+  "WASD / ARROWS · E ACTION · R REVIEW": [
+    "WASD / ARROWS · E ACTION · R REVIEW",
+    "WASD / MŨI TÊN · E TƯƠNG TÁC · R KIỂM TRA",
+    "WASD / 방향키 · E 상호작용 · R 검토"
+  ],
+  "· ECHO MODE": [
+    "· ECHO MODE",
+    "· CHẾ ĐỘ VANG",
+    "· 메아리 모드"
+  ],
+  "ENTERTAINMENT // LOCAL SIMULATION": [
+    "ENTERTAINMENT // LOCAL SIMULATION",
+    "GIẢI TRÍ // MÔ PHỎNG CỤC BỘ",
+    "엔터테인먼트 // 로컬 시뮬레이션"
+  ],
+  "An original local deduction mission. Repair the station, identify the rogue process, and move with intent—not twitch speed.": [
+    "An original local deduction mission. Repair the station, identify the rogue process, and move with intent—not twitch speed.",
+    "Nhiệm vụ suy luận cục bộ với thiết kế nguyên bản. Sửa chữa trạm, xác định tiến trình phản loạn và di chuyển có chủ đích thay vì chạy đua phản xạ.",
+    "독창적인 로컬 추리 임무입니다. 기지를 수리하고 로그 프로세스를 찾아 반사 신경보다 의도적인 움직임으로 진행하세요."
+  ],
+  "Original Rogue Node operator sprites": [
+    "Original Rogue Node operator sprites",
+    "Hình nhân vật Rogue Node nguyên bản",
+    "독창적인 Rogue Node 오퍼레이터 스프라이트"
+  ],
+  "LOCAL BOTS": [
+    "LOCAL BOTS",
+    "BOT CỤC BỘ",
+    "로컬 봇"
+  ],
+  "FIXED 60Hz": [
+    "FIXED 60Hz",
+    "CỐ ĐỊNH 60 Hz",
+    "고정 60Hz"
+  ],
+  "NO NETWORK": [
+    "NO NETWORK",
+    "KHÔNG KẾT NỐI MẠNG",
+    "네트워크 없음"
+  ],
+  "OPERATOR ID": [
+    "OPERATOR ID",
+    "ID NGƯỜI ĐIỀU KHIỂN",
+    "오퍼레이터 ID"
+  ],
+  "PROCESS ALIGNMENT": [
+    "PROCESS ALIGNMENT",
+    "PHE TIẾN TRÌNH",
+    "프로세스 진영"
+  ],
+  "ENGINEER": [
+    "ENGINEER",
+    "KỸ SƯ",
+    "엔지니어"
+  ],
+  "Complete all tasks.": [
+    "Complete all tasks.",
+    "Hoàn thành mọi nhiệm vụ.",
+    "모든 작업을 완료하세요."
+  ],
+  "ROGUE": [
+    "ROGUE",
+    "PHẢN LOẠN",
+    "로그"
+  ],
+  "Outnumber the crew.": [
+    "Outnumber the crew.",
+    "Chiếm ưu thế số lượng trước nhóm.",
+    "승무원보다 수적으로 우세해지세요."
+  ],
+  "SIGNAL COLOR": [
+    "SIGNAL COLOR",
+    "MÀU TÍN HIỆU",
+    "신호 색상"
+  ],
+  "START LOCAL MISSION": [
+    "START LOCAL MISSION",
+    "BẮT ĐẦU NHIỆM VỤ CỤC BỘ",
+    "로컬 임무 시작"
+  ],
+  "Original sprite art · local sandbox · no online room": [
+    "Original sprite art · local sandbox · no online room",
+    "Hình ảnh nguyên bản · môi trường cục bộ · không có phòng trực tuyến",
+    "독창적인 스프라이트 · 로컬 샌드박스 · 온라인 방 없음"
+  ],
+  "STATION REVIEW": [
+    "STATION REVIEW",
+    "KIỂM TRA TRẠM",
+    "기지 검토"
+  ],
+  "CAST A PROCESS VOTE": [
+    "CAST A PROCESS VOTE",
+    "BỎ PHIẾU TIẾN TRÌNH",
+    "프로세스 투표"
+  ],
+  "Choose a live process, or skip. The session returns to the station when the timer expires.": [
+    "Choose a live process, or skip. The session returns to the station when the timer expires.",
+    "Chọn tiến trình đang hoạt động hoặc bỏ qua. Phiên quay về trạm khi hết thời gian.",
+    "활성 프로세스를 선택하거나 건너뛰세요. 타이머가 끝나면 기지로 돌아갑니다."
+  ],
+  "CONFIRM VOTE": [
+    "CONFIRM VOTE",
+    "XÁC NHẬN PHIẾU",
+    "투표 확인"
+  ],
+  "SKIP": [
+    "SKIP",
+    "BỎ QUA",
+    "건너뛰기"
+  ],
+  "MISSION COMPLETE": [
+    "MISSION COMPLETE",
+    "HOÀN THÀNH NHIỆM VỤ",
+    "임무 완료"
+  ],
+  "STATION SECURED": [
+    "STATION SECURED",
+    "TRẠM ĐƯỢC BẢO VỆ",
+    "기지 확보"
+  ],
+  "STATION BREACHED": [
+    "STATION BREACHED",
+    "TRẠM BỊ XÂM NHẬP",
+    "기지 침입"
+  ],
+  "- Quantum Subsystem": [
+    "- Quantum Subsystem",
+    "- Phân hệ lượng tử",
+    "- 퀀텀 하위 시스템"
+  ],
+  "Connect matching optical fiber frequencies:": [
+    "Connect matching optical fiber frequencies:",
+    "Nối các sợi quang có tần số tương ứng:",
+    "일치하는 광섬유 주파수를 연결하세요:"
+  ],
+  "STATUS:": [
+    "STATUS:",
+    "TRẠNG THÁI:",
+    "상태:"
+  ],
+  "success": [
+    "success",
+    "thành công",
+    "성공"
+  ],
+  "Drag authorization card across the scanner": [
+    "Drag authorization card across the scanner",
+    "Kéo thẻ xác thực qua máy quét",
+    "인증 카드를 스캐너 위로 드래그하세요"
+  ],
+  "Synchronizing Quantum Memory Sector...": [
+    "Synchronizing Quantum Memory Sector...",
+    "Đang đồng bộ vùng nhớ lượng tử...",
+    "퀀텀 메모리 영역 동기화 중..."
+  ],
+  "Verify Quantum Hash": [
+    "Verify Quantum Hash",
+    "Xác minh mã băm lượng tử",
+    "퀀텀 해시 확인"
+  ],
+  "Appearance": [
+    "Appearance",
+    "Giao diện",
+    "외관"
+  ],
+  "Theme and visuals configuration": [
+    "Theme and visuals configuration",
+    "Cấu hình chủ đề và hiển thị",
+    "테마 및 화면 설정"
+  ],
+  "Mythical Pet": [
+    "Mythical Pet",
+    "Thú cưng",
+    "신화 속 펫"
+  ],
+  "Interact with your desktop companions": [
+    "Interact with your desktop companions",
+    "Tương tác với bạn đồng hành trên màn hình",
+    "데스크톱 동반자와 상호작용"
+  ],
+  "Configure cloud LLM endpoints and settings": [
+    "Configure cloud LLM endpoints and settings",
+    "Cấu hình địa chỉ và tùy chọn LLM đám mây",
+    "클라우드 LLM 엔드포인트 및 설정 구성"
+  ],
+  "Local LLM": [
+    "Local LLM",
+    "LLM cục bộ",
+    "로컬 LLM"
+  ],
+  "Manage offline inference fallbacks": [
+    "Manage offline inference fallbacks",
+    "Quản lý suy luận ngoại tuyến dự phòng",
+    "오프라인 추론 대체 설정 관리"
+  ],
+  "Buzz relay/identity and NES session service": [
+    "Buzz relay/identity and NES session service",
+    "Máy chủ, danh tính Buzz và dịch vụ phiên NES",
+    "Buzz 릴레이/신원 및 NES 세션 서비스"
+  ],
+  "Durable API proxy usage and endpoints": [
+    "Durable API proxy usage and endpoints",
+    "Mức sử dụng và địa chỉ proxy API được lưu",
+    "API 프록시 사용량 및 엔드포인트 관리"
+  ],
+  "SSH Connections": [
+    "SSH Connections",
+    "Kết nối SSH",
+    "SSH 연결"
+  ],
+  "Manage remote terminal connections": [
+    "Manage remote terminal connections",
+    "Quản lý kết nối terminal từ xa",
+    "원격 터미널 연결 관리"
+  ],
+  "View orchestration command and server logs": [
+    "View orchestration command and server logs",
+    "Xem nhật ký điều phối lệnh và máy chủ",
+    "명령 오케스트레이션 및 서버 로그 보기"
+  ],
+  "Navigation": [
+    "Navigation",
+    "Điều hướng",
+    "탐색"
+  ],
+  "Customize sidebar item layout ordering": [
+    "Customize sidebar item layout ordering",
+    "Tùy chỉnh thứ tự thanh điều hướng",
+    "사이드바 항목 순서 설정"
+  ],
+  "This pet pack is already installed. Replace it with the selected folder?": [
+    "This pet pack is already installed. Replace it with the selected folder?",
+    "Gói thú cưng đã được cài. Thay thế bằng thư mục vừa chọn?",
+    "이 펫 팩은 이미 설치되어 있습니다. 선택한 폴더로 교체할까요?"
+  ],
+  "Invalid Headers JSON.": [
+    "Invalid Headers JSON.",
+    "JSON header không hợp lệ.",
+    "헤더 JSON이 유효하지 않습니다."
+  ],
+  "Configuration saved successfully!": [
+    "Configuration saved successfully!",
+    "Đã lưu cấu hình!",
+    "설정을 저장했습니다!"
+  ],
+  "Category-based Configuration": [
+    "Category-based Configuration",
+    "Cấu hình theo danh mục",
+    "카테고리별 설정"
+  ],
+  "Category": [
+    "Category",
+    "Danh mục",
+    "카테고리"
+  ],
+  "Theme Settings": [
+    "Theme Settings",
+    "Cấu hình chủ đề",
+    "테마 설정"
+  ],
+  "App Theme": [
+    "App Theme",
+    "Chủ đề ứng dụng",
+    "앱 테마"
+  ],
+  "Change overall visual styles": [
+    "Change overall visual styles",
+    "Đổi kiểu hiển thị tổng thể",
+    "전체 화면 스타일 변경"
+  ],
+  "Light": [
+    "Light",
+    "Sáng",
+    "밝게"
+  ],
+  "Display & Scaling": [
+    "Display & Scaling",
+    "Hiển thị và tỉ lệ",
+    "화면 및 배율"
+  ],
+  "UI Scale / Zoom": [
+    "UI Scale / Zoom",
+    "Tỉ lệ / thu phóng giao diện",
+    "UI 배율 / 확대"
+  ],
+  "Phóng to toàn bộ giao diện (chữ, thanh bên, biểu tượng, panel, popups).": [
+    "Scale the entire interface (text, sidebar, icons, panels, and popups).",
+    "Phóng to toàn bộ giao diện (chữ, thanh bên, biểu tượng, khung và hộp thoại).",
+    "전체 인터페이스(텍스트, 사이드바, 아이콘, 패널, 팝업)를 확대합니다."
+  ],
+  "Thu nhỏ (Ctrl -)": [
+    "Zoom out (Ctrl -)",
+    "Thu nhỏ (Ctrl -)",
+    "축소(Ctrl -)"
+  ],
+  "(Mặc định)": [
+    "(Default)",
+    "(Mặc định)",
+    "(기본값)"
+  ],
+  "(Khuyên dùng)": [
+    "(Recommended)",
+    "(Khuyên dùng)",
+    "(권장)"
+  ],
+  "Phóng to (Ctrl +)": [
+    "Zoom in (Ctrl +)",
+    "Phóng to (Ctrl +)",
+    "확대(Ctrl +)"
+  ],
+  "Đặt lại 100% (Ctrl 0)": [
+    "Reset to 100% (Ctrl 0)",
+    "Đặt lại 100% (Ctrl 0)",
+    "100%로 초기화(Ctrl 0)"
+  ],
+  "💡 Phím tắt nhanh:": [
+    "💡 Shortcuts:",
+    "💡 Phím tắt:",
+    "💡 단축키:"
+  ],
+  "để phóng to,": [
+    "to zoom in,",
+    "để phóng to,",
+    "확대,"
+  ],
+  "để thu nhỏ,": [
+    "to zoom out,",
+    "để thu nhỏ,",
+    "축소,"
+  ],
+  "để về 100%.": [
+    "to reset to 100%.",
+    "để về 100%.",
+    "100%로 복원."
+  ],
+  "UI Font Family (Phông chữ giao diện)": [
+    "UI Font Family",
+    "Phông chữ giao diện",
+    "UI 글꼴"
+  ],
+  "Chọn font chuẩn (Segoe UI / Inter) giúp chữ dày dặn, to và dễ đọc hơn đáng kể.": [
+    "Choose a standard font (Segoe UI / Inter) for clearer, larger, more readable text.",
+    "Chọn phông chữ chuẩn (Segoe UI / Inter) để chữ rõ, lớn và dễ đọc hơn.",
+    "표준 글꼴(Segoe UI / Inter)을 선택하면 글자가 더 선명하고 크며 읽기 편해집니다."
+  ],
+  "Terminal Font Settings": [
+    "Terminal Font Settings",
+    "Cấu hình phông chữ terminal",
+    "터미널 글꼴 설정"
+  ],
+  "Terminal Font Size": [
+    "Terminal Font Size",
+    "Cỡ chữ terminal",
+    "터미널 글자 크기"
+  ],
+  "Cỡ chữ cho tất cả terminal sessions (áp dụng ngay lập tức).": [
+    "Font size for all terminal sessions (applies immediately).",
+    "Cỡ chữ của mọi phiên terminal (áp dụng ngay).",
+    "모든 터미널 세션의 글자 크기입니다(즉시 적용)."
+  ],
+  "Terminal Font": [
+    "Terminal Font",
+    "Phông chữ terminal",
+    "터미널 글꼴"
+  ],
+  "Phông chữ monospace hiển thị trong cửa sổ terminal.": [
+    "Monospace font used in terminal windows.",
+    "Phông chữ đơn cách hiển thị trong terminal.",
+    "터미널에 표시할 고정폭 글꼴입니다."
+  ],
+  "Live Preview": [
+    "Live Preview",
+    "Xem trước trực tiếp",
+    "실시간 미리 보기"
+  ],
+  "Scale:": [
+    "Scale:",
+    "Tỉ lệ:",
+    "배율:"
+  ],
+  "% | Term:": [
+    "% | Term:",
+    "% | Terminal:",
+    "% | 터미널:"
+  ],
+  "Giao diện CLX: Chữ rõ nét, kích thước hiển thị cân đối": [
+    "CLX interface: Clear text, balanced display size",
+    "Giao diện CLX: Chữ rõ nét, kích thước cân đối",
+    "CLX 인터페이스: 선명한 글자, 균형 잡힌 크기"
+  ],
+  "All modules compiled successfully (60 FPS, ready)": [
+    "All modules compiled successfully (60 FPS, ready)",
+    "Đã biên dịch mọi mô-đun (60 FPS, sẵn sàng)",
+    "모든 모듈 컴파일 완료(60 FPS, 준비됨)"
+  ],
+  "Animated Pets": [
+    "Animated Pets",
+    "Thú cưng hoạt họa",
+    "애니메이션 펫"
+  ],
+  "Built-in companions and private local pet packs": [
+    "Built-in companions and private local pet packs",
+    "Bạn đồng hành có sẵn và gói thú cưng cục bộ riêng",
+    "기본 동반자 및 개인 로컬 펫 팩"
+  ],
+  "Importing…": [
+    "Importing…",
+    "Đang nhập…",
+    "가져오는 중…"
+  ],
+  "Import Folder": [
+    "Import Folder",
+    "Nhập thư mục",
+    "폴더 가져오기"
+  ],
+  "Enable Pet Overlay": [
+    "Enable Pet Overlay",
+    "Bật thú cưng trên màn hình",
+    "펫 오버레이 활성화"
+  ],
+  "Show the selected animated pet across CLX": [
+    "Show the selected animated pet across CLX",
+    "Hiển thị thú cưng đã chọn trên CLX",
+    "선택한 애니메이션 펫을 CLX에 표시"
+  ],
+  "Select Pet": [
+    "Select Pet",
+    "Chọn thú cưng",
+    "펫 선택"
+  ],
+  "Local Pack": [
+    "Local Pack",
+    "Gói cục bộ",
+    "로컬 팩"
+  ],
+  "Built-in": [
+    "Built-in",
+    "Có sẵn",
+    "기본 제공"
+  ],
+  "Pet Tuning": [
+    "Pet Tuning",
+    "Tinh chỉnh thú cưng",
+    "펫 조정"
+  ],
+  "Saved separately for": [
+    "Saved separately for",
+    "Lưu riêng cho",
+    "개별 저장:"
+  ],
+  "; preview and live overlay update immediately.": [
+    "; preview and live overlay update immediately.",
+    "; bản xem trước và thú cưng trên màn hình cập nhật ngay.",
+    "; 미리 보기와 실시간 오버레이에 즉시 적용됩니다."
+  ],
+  "Size": [
+    "Size",
+    "Kích thước",
+    "크기"
+  ],
+  "Speed": [
+    "Speed",
+    "Tốc độ",
+    "속도"
+  ],
+  "Move Preview": [
+    "Move Preview",
+    "Xem trước chuyển động",
+    "동작 미리 보기"
+  ],
+  "Isolated 320×220 stage; the live overlay is not interrupted.": [
+    "Isolated 320×220 stage; the live overlay is not interrupted.",
+    "Khung xem riêng 320×220; không làm gián đoạn thú cưng trên màn hình.",
+    "독립된 320×220 미리 보기 영역으로 실시간 오버레이가 중단되지 않습니다."
+  ],
+  "Replay": [
+    "Replay",
+    "Phát lại",
+    "다시 재생"
+  ],
+  "Idle": [
+    "Idle",
+    "Đứng yên",
+    "대기"
+  ],
+  "Travel": [
+    "Travel",
+    "Di chuyển",
+    "이동"
+  ],
+  "Blink": [
+    "Blink",
+    "Chớp mắt",
+    "눈 깜박임"
+  ],
+  "Cloud AI Companion": [
+    "Cloud AI Companion",
+    "Trợ lý AI đám mây",
+    "클라우드 AI 어시스턴트"
+  ],
+  "Enable Stream Mode (Server SSE)": [
+    "Enable Stream Mode (Server SSE)",
+    "Bật truyền từng phần (SSE máy chủ)",
+    "스트리밍 모드 활성화(서버 SSE)"
+  ],
+  "Built-in Local LLM": [
+    "Built-in Local LLM",
+    "LLM cục bộ tích hợp",
+    "내장 로컬 LLM"
+  ],
+  "Enable local LLM fallback": [
+    "Enable local LLM fallback",
+    "Bật LLM cục bộ dự phòng",
+    "로컬 LLM 대체 활성화"
+  ],
+  "Use local model when cloud API fails": [
+    "Use local model when cloud API fails",
+    "Dùng mô hình cục bộ khi API đám mây thất bại",
+    "클라우드 API 실패 시 로컬 모델 사용"
+  ],
+  "Model Status:": [
+    "Model Status:",
+    "Trạng thái mô hình:",
+    "모델 상태:"
+  ],
+  "🟢 Loaded": [
+    "🟢 Loaded",
+    "🟢 Đã tải",
+    "🟢 로드됨"
+  ],
+  "🔴 Unloaded": [
+    "🔴 Unloaded",
+    "🔴 Chưa tải",
+    "🔴 해제됨"
+  ],
+  "Unload": [
+    "Unload",
+    "Gỡ khỏi bộ nhớ",
+    "메모리 해제"
+  ],
+  "Load Model": [
+    "Load Model",
+    "Tải mô hình",
+    "모델 불러오기"
+  ],
+  "Inference Engine": [
+    "Inference Engine",
+    "Bộ máy suy luận",
+    "추론 엔진"
+  ],
+  "Candle (CPU - Lightweight, Standard Llama only)": [
+    "Candle (CPU - Lightweight, Standard Llama only)",
+    "Candle (CPU - nhẹ, chỉ Llama chuẩn)",
+    "Candle(CPU - 경량, 표준 Llama만 지원)"
+  ],
+  "Llama.cpp (Local server - GPU/AVX, GGUF models)": [
+    "Llama.cpp (Local server - GPU/AVX, GGUF models)",
+    "Llama.cpp (máy chủ cục bộ - GPU/AVX, mô hình GGUF)",
+    "Llama.cpp(로컬 서버 - GPU/AVX, GGUF 모델)"
+  ],
+  "GGUF Model Path": [
+    "GGUF Model Path",
+    "Đường dẫn mô hình GGUF",
+    "GGUF 모델 경로"
+  ],
+  "Select .gguf model file...": [
+    "Select .gguf model file...",
+    "Chọn tệp mô hình .gguf...",
+    ".gguf 모델 파일 선택..."
+  ],
+  "Llama Server Executable Path (Optional)": [
+    "Llama Server Executable Path (Optional)",
+    "Đường dẫn chương trình Llama Server (tùy chọn)",
+    "Llama Server 실행 파일 경로(선택 사항)"
+  ],
+  "Defaults to 'llama-server' in your PATH...": [
+    "Defaults to 'llama-server' in your PATH...",
+    "Mặc định dùng 'llama-server' trong PATH...",
+    "기본값은 PATH의 'llama-server'입니다..."
+  ],
+  "Local Server Port": [
+    "Local Server Port",
+    "Cổng máy chủ cục bộ",
+    "로컬 서버 포트"
+  ],
+  "Tokenizer Path (Optional)": [
+    "Tokenizer Path (Optional)",
+    "Đường dẫn bộ tách token (tùy chọn)",
+    "토크나이저 경로(선택 사항)"
+  ],
+  "Defaults to tokenizer.json next to model...": [
+    "Defaults to tokenizer.json next to model...",
+    "Mặc định dùng tokenizer.json cạnh mô hình...",
+    "기본값은 모델 옆의 tokenizer.json입니다..."
+  ],
+  "Temp (": [
+    "Temp (",
+    "Nhiệt độ (",
+    "온도 ("
+  ],
+  "Max Tokens (": [
+    "Max Tokens (",
+    "Token tối đa (",
+    "최대 토큰 ("
+  ],
+  "Cấu hình Navigation & Hiển thị Feature": [
+    "Navigation and feature visibility",
+    "Cấu hình điều hướng và hiển thị tính năng",
+    "탐색 및 기능 표시 설정"
+  ],
+  "Active Bar": [
+    "Active Bar",
+    "Thanh hoạt động",
+    "활동 표시줄"
+  ],
+  "Tùy chỉnh bật/tắt hiển thị các tính năng trên thanh Active Bar bên trái và sắp xếp thứ tự ưu tiên. Mặc định hệ thống chỉ hiển thị": [
+    "Toggle features on the left activity bar and set their order. By default, only these are shown:",
+    "Bật/tắt tính năng trên thanh hoạt động bên trái và sắp xếp thứ tự. Mặc định chỉ hiển thị",
+    "왼쪽 활동 표시줄의 기능 표시 여부와 순서를 설정합니다. 기본적으로 다음 항목만 표시됩니다:"
+  ],
+  "và": [
+    "and",
+    "và",
+    "및"
+  ],
+  "Quản lý terminal, agent CLI và tác vụ": [
+    "Manage terminals, CLI agents, and tasks",
+    "Quản lý terminal, trợ lý CLI và tác vụ",
+    "터미널, CLI 에이전트 및 작업 관리"
+  ],
+  "Lịch sử hội thoại & resume agent CLI": [
+    "Conversation history and CLI agent resume",
+    "Lịch sử hội thoại và tiếp tục trợ lý CLI",
+    "대화 기록 및 CLI 에이전트 재개"
+  ],
+  "Bảng điều khiển & giám sát hệ thống": [
+    "Dashboard and system monitoring",
+    "Bảng theo dõi và giám sát hệ thống",
+    "대시보드 및 시스템 모니터링"
+  ],
+  "Trình khởi chạy nhanh các ứng dụng ưa thích": [
+    "Quick launcher for favorite apps",
+    "Mở nhanh ứng dụng yêu thích",
+    "즐겨찾는 앱 빠른 실행"
+  ],
+  "Không gian làm việc cộng tác & chat P2P": [
+    "Collaborative workspace and P2P chat",
+    "Không gian cộng tác và trò chuyện P2P",
+    "협업 작업 공간 및 P2P 채팅"
+  ],
+  "Trò chơi cổ điển NES/SNES giải trí": [
+    "NES/SNES retro games",
+    "Trò chơi cổ điển NES/SNES",
+    "NES/SNES 레트로 게임"
+  ],
+  "Công cụ test & gọi API (Postman-like)": [
+    "API testing and request tool (Postman-like)",
+    "Công cụ kiểm tra và gọi API (tương tự Postman)",
+    "API 테스트 및 호출 도구(Postman 방식)"
+  ],
+  "Cài đặt hệ thống (cố định thanh dưới)": [
+    "System settings (pinned at bottom)",
+    "Cấu hình hệ thống (cố định phía dưới)",
+    "시스템 설정(하단 고정)"
+  ],
+  "Danh sách tính năng:": [
+    "Feature list:",
+    "Danh sách tính năng:",
+    "기능 목록:"
+  ],
+  "đang hiển thị": [
+    "visible",
+    "đang hiển thị",
+    "표시 중"
+  ],
+  "Chỉ hiện mặc định": [
+    "Show defaults only",
+    "Chỉ hiện mặc định",
+    "기본 항목만 표시"
+  ],
+  "Hiện tất cả": [
+    "Show all",
+    "Hiện tất cả",
+    "모두 표시"
+  ],
+  "Cố định dưới": [
+    "Pinned at bottom",
+    "Cố định dưới",
+    "하단 고정"
+  ],
+  "Mặc định": [
+    "Default",
+    "Mặc định",
+    "기본값"
+  ],
+  "Hiển thị": [
+    "Visible",
+    "Hiển thị",
+    "표시"
+  ],
+  "Đã ẩn": [
+    "Hidden",
+    "Đã ẩn",
+    "숨김"
+  ],
+  "Di chuyển lên": [
+    "Move up",
+    "Di chuyển lên",
+    "위로 이동"
+  ],
+  "Di chuyển xuống": [
+    "Move down",
+    "Di chuyển xuống",
+    "아래로 이동"
+  ],
+  "Reset to Default": [
+    "Reset to Default",
+    "Khôi phục mặc định",
+    "기본값 복원"
+  ],
+  "Thanh Active Bar sẽ tự động cập nhật ngay khi thay đổi": [
+    "The activity bar updates immediately after changes",
+    "Thanh hoạt động tự cập nhật ngay khi thay đổi",
+    "활동 표시줄은 변경 즉시 업데이트됩니다"
+  ],
+  "Please enter a config name.": [
+    "Please enter a config name.",
+    "Hãy nhập tên cấu hình.",
+    "설정 이름을 입력하세요."
+  ],
+  "Please enter a file path.": [
+    "Please enter a file path.",
+    "Hãy nhập đường dẫn tệp.",
+    "파일 경로를 입력하세요."
+  ],
+  "✏️ Edit Quick Config File": [
+    "✏️ Edit Quick Config File",
+    "✏️ Sửa tệp cấu hình nhanh",
+    "✏️ 빠른 설정 파일 수정"
+  ],
+  "⚡ Add Quick Config File": [
+    "⚡ Add Quick Config File",
+    "⚡ Thêm tệp cấu hình nhanh",
+    "⚡ 빠른 설정 파일 추가"
+  ],
+  "Config Name / Title *": [
+    "Config Name / Title *",
+    "Tên / tiêu đề cấu hình *",
+    "설정 이름 / 제목 *"
+  ],
+  "e.g. Nginx Server Config, Docker Compose": [
+    "e.g. Nginx Server Config, Docker Compose",
+    "Ví dụ: Cấu hình Nginx, Docker Compose",
+    "예: Nginx 서버 설정, Docker Compose"
+  ],
+  "File Path (Relative or Absolute) *": [
+    "File Path (Relative or Absolute) *",
+    "Đường dẫn tệp (tương đối hoặc tuyệt đối) *",
+    "파일 경로(상대 또는 절대) *"
+  ],
+  "e.g. docker-compose.yml, config/app.yaml, .env": [
+    "e.g. docker-compose.yml, config/app.yaml, .env",
+    "Ví dụ: docker-compose.yml, config/app.yaml, .env",
+    "예: docker-compose.yml, config/app.yaml, .env"
+  ],
+  "Group / Category (e.g. Docker, Environment, Database, General)": [
+    "Group / Category (e.g. Docker, Environment, Database, General)",
+    "Nhóm / danh mục (ví dụ: Docker, Môi trường, Cơ sở dữ liệu, Chung)",
+    "그룹 / 카테고리(예: Docker, 환경, 데이터베이스, 일반)"
+  ],
+  "e.g. Docker, Environment, Database": [
+    "e.g. Docker, Environment, Database",
+    "Ví dụ: Docker, Môi trường, Cơ sở dữ liệu",
+    "예: Docker, 환경, 데이터베이스"
+  ],
+  "Description (Mô tả chi tiết mục đích cấu hình)": [
+    "Description (purpose of the configuration)",
+    "Mô tả (mục đích cấu hình)",
+    "설명(설정의 용도)"
+  ],
+  "e.g. Cấu hình cổng server, môi trường và chuỗi kết nối database": [
+    "Example: Server ports, environment, and database connection strings",
+    "Ví dụ: Cổng máy chủ, môi trường và chuỗi kết nối cơ sở dữ liệu",
+    "예: 서버 포트, 환경 및 데이터베이스 연결 문자열"
+  ],
+  "Save Config": [
+    "Save Config",
+    "Lưu cấu hình",
+    "설정 저장"
+  ],
+  "Please fill in all required fields.": [
+    "Please fill in all required fields.",
+    "Hãy điền tất cả trường bắt buộc.",
+    "필수 항목을 모두 입력하세요."
+  ],
+  "Please specify a private key path.": [
+    "Please specify a private key path.",
+    "Hãy chỉ định đường dẫn khóa riêng.",
+    "개인 키 경로를 지정하세요."
+  ],
+  "Please select or specify a group.": [
+    "Please select or specify a group.",
+    "Hãy chọn hoặc nhập nhóm.",
+    "그룹을 선택하거나 입력하세요."
+  ],
+  "Edit VM Connection": [
+    "Edit VM Connection",
+    "Sửa kết nối máy ảo",
+    "가상 머신 연결 수정"
+  ],
+  "Add VM Connection": [
+    "Add VM Connection",
+    "Thêm kết nối máy ảo",
+    "가상 머신 연결 추가"
+  ],
+  "Protocol / Giao thức": [
+    "Protocol",
+    "Giao thức",
+    "프로토콜"
+  ],
+  "📟 SSH (Terminal)": [
+    "📟 SSH (Terminal)",
+    "📟 SSH (terminal)",
+    "📟 SSH(터미널)"
+  ],
+  "💻 RDP (Remote Desktop)": [
+    "💻 RDP (Remote Desktop)",
+    "💻 RDP (màn hình từ xa)",
+    "💻 RDP(원격 데스크톱)"
+  ],
+  "Connection Name *": [
+    "Connection Name *",
+    "Tên kết nối *",
+    "연결 이름 *"
+  ],
+  "e.g. AWS Staging": [
+    "e.g. AWS Staging",
+    "Ví dụ: AWS thử nghiệm",
+    "예: AWS 스테이징"
+  ],
+  "Group / Category *": [
+    "Group / Category *",
+    "Nhóm / danh mục *",
+    "그룹 / 카테고리 *"
+  ],
+  "New Group Name": [
+    "New Group Name",
+    "Tên nhóm mới",
+    "새 그룹 이름"
+  ],
+  "Host / IP Address *": [
+    "Host / IP Address *",
+    "Máy chủ / địa chỉ IP *",
+    "호스트 / IP 주소 *"
+  ],
+  "e.g. 192.168.1.100 or example.com": [
+    "e.g. 192.168.1.100 or example.com",
+    "Ví dụ: 192.168.1.100 hoặc example.com",
+    "예: 192.168.1.100 또는 example.com"
+  ],
+  "Port *": [
+    "Port *",
+    "Cổng *",
+    "포트 *"
+  ],
+  "Username *": [
+    "Username *",
+    "Tên người dùng *",
+    "사용자 이름 *"
+  ],
+  "Authentication Method": [
+    "Authentication Method",
+    "Phương thức xác thực",
+    "인증 방식"
+  ],
+  "Password (Optional)": [
+    "Password (Optional)",
+    "Mật khẩu (tùy chọn)",
+    "비밀번호(선택 사항)"
+  ],
+  "Password for VM": [
+    "Password for VM",
+    "Mật khẩu máy ảo",
+    "가상 머신 비밀번호"
+  ],
+  "Hide": [
+    "Hide",
+    "Ẩn",
+    "숨기기"
+  ],
+  "Show": [
+    "Show",
+    "Hiện",
+    "표시"
+  ],
+  "Private Key Path *": [
+    "Private Key Path *",
+    "Đường dẫn khóa riêng *",
+    "개인 키 경로 *"
+  ],
+  "e.g. C:\\Users\\july1\\.ssh\\id_rsa": [
+    "e.g. C:\\Users\\july1\\.ssh\\id_rsa",
+    "Ví dụ: C:\\Users\\july1\\.ssh\\id_rsa",
+    "예: C:\\Users\\july1\\.ssh\\id_rsa"
+  ],
+  "Local Workspace Folder (Optional)": [
+    "Local Workspace Folder (Optional)",
+    "Thư mục làm việc cục bộ (tùy chọn)",
+    "로컬 작업 폴더(선택 사항)"
+  ],
+  "e.g. C:\\Projects\\MyProject (mapped local directory)": [
+    "e.g. C:\\Projects\\MyProject (mapped local directory)",
+    "Ví dụ: C:\\Projects\\MyProject (thư mục ánh xạ cục bộ)",
+    "예: C:\\Projects\\MyProject(매핑된 로컬 폴더)"
+  ],
+  "Saved login password": [
+    "Saved login password",
+    "Mật khẩu đăng nhập đã lưu",
+    "저장된 로그인 비밀번호"
+  ],
+  "RDP Resolution": [
+    "RDP Resolution",
+    "Độ phân giải RDP",
+    "RDP 해상도"
+  ],
+  "🖥 Fullscreen": [
+    "🖥 Fullscreen",
+    "🖥 Toàn màn hình",
+    "🖥 전체 화면"
+  ],
+  "📺 Custom Default": [
+    "📺 Custom Default",
+    "📺 Mặc định tùy chỉnh",
+    "📺 사용자 지정 기본값"
+  ],
+  "Share Clipboard": [
+    "Share Clipboard",
+    "Chia sẻ bộ nhớ tạm",
+    "클립보드 공유"
+  ],
+  "Share Local Drives": [
+    "Share Local Drives",
+    "Chia sẻ ổ đĩa cục bộ",
+    "로컬 드라이브 공유"
+  ],
+  "Save Connection": [
+    "Save Connection",
+    "Lưu kết nối",
+    "연결 저장"
+  ],
+  "transferring": [
+    "transferring",
+    "đang truyền",
+    "전송 중"
+  ],
+  "idle": [
+    "idle",
+    "chờ",
+    "대기"
+  ],
+  "done": [
+    "done",
+    "hoàn tất",
+    "완료"
+  ],
+  "Transfer failed": [
+    "Transfer failed",
+    "Truyền tệp thất bại",
+    "파일 전송 실패"
+  ],
+  "📤 Upload to Server": [
+    "📤 Upload to Server",
+    "📤 Tải lên máy chủ",
+    "📤 서버에 업로드"
+  ],
+  "⬇️ Download from Server": [
+    "⬇️ Download from Server",
+    "⬇️ Tải về từ máy chủ",
+    "⬇️ 서버에서 다운로드"
+  ],
+  "Remote destination:": [
+    "Remote destination:",
+    "Đích từ xa:",
+    "원격 대상:"
+  ],
+  "Transferring...": [
+    "Transferring...",
+    "Đang truyền...",
+    "전송 중..."
+  ],
+  "✅ Transfer complete!": [
+    "✅ Transfer complete!",
+    "✅ Truyền tệp hoàn tất!",
+    "✅ 전송 완료!"
+  ],
+  "Upload": [
+    "Upload",
+    "Tải lên",
+    "업로드"
+  ],
+  "Download": [
+    "Download",
+    "Tải về",
+    "다운로드"
+  ],
+  "CLX application runtime logs": [
+    "CLX application runtime logs",
+    "Nhật ký hoạt động ứng dụng CLX",
+    "CLX 앱 실행 로그"
+  ],
+  "Auto-refresh": [
+    "Auto-refresh",
+    "Tự làm mới",
+    "자동 새로 고침"
+  ],
+  "Filter logs...": [
+    "Filter logs...",
+    "Lọc nhật ký...",
+    "로그 필터..."
+  ],
+  "Timestamp": [
+    "Timestamp",
+    "Dấu thời gian",
+    "타임스탬프"
+  ],
+  "Level": [
+    "Level",
+    "Cấp độ",
+    "수준"
+  ],
+  "Source": [
+    "Source",
+    "Nguồn",
+    "소스"
+  ],
+  "Message": [
+    "Message",
+    "Thông báo",
+    "메시지"
+  ],
+  "No matching entries.": [
+    "No matching entries.",
+    "Không có mục phù hợp.",
+    "일치하는 항목이 없습니다."
+  ],
+  "Generate a terminal command": [
+    "Generate a terminal command",
+    "Tạo lệnh terminal",
+    "터미널 명령 생성"
+  ],
+  "⌁ COMMAND ASSISTANT": [
+    "⌁ COMMAND ASSISTANT",
+    "⌁ TRỢ LÝ LỆNH",
+    "⌁ 명령 어시스턴트"
+  ],
+  "Close (Esc)": [
+    "Close (Esc)",
+    "Đóng (Esc)",
+    "닫기(Esc)"
+  ],
+  "Detecting the active shell…": [
+    "Detecting the active shell…",
+    "Đang nhận diện shell hiện tại…",
+    "활성 셸 감지 중…"
+  ],
+  "This session is not an eligible shell session.": [
+    "This session is not an eligible shell session.",
+    "Phiên này không phải phiên shell đủ điều kiện.",
+    "이 세션은 지원되는 셸 세션이 아닙니다."
+  ],
+  "Detection is uncertain. Choose the target environment.": [
+    "Detection is uncertain. Choose the target environment.",
+    "Chưa xác định chắc chắn. Hãy chọn môi trường đích.",
+    "정확히 감지하지 못했습니다. 대상 환경을 선택하세요."
+  ],
+  "Target operating system and shell": [
+    "Target operating system and shell",
+    "Hệ điều hành và shell đích",
+    "대상 운영체제 및 셸"
+  ],
+  "Choose target…": [
+    "Choose target…",
+    "Chọn đích…",
+    "대상 선택…"
+  ],
+  "Windows · Bash (default)": [
+    "Windows · Bash (default)",
+    "Windows · Bash (mặc định)",
+    "Windows · Bash(기본값)"
+  ],
+  "Describe the command you need…": [
+    "Describe the command you need…",
+    "Mô tả lệnh bạn cần…",
+    "필요한 명령을 설명하세요…"
+  ],
+  "Generating…": [
+    "Generating…",
+    "Đang tạo…",
+    "생성 중…"
+  ],
+  "syntax verified ·": [
+    "syntax verified ·",
+    "đã xác minh cú pháp ·",
+    "구문 검증됨 ·"
+  ],
+  "Syntax verified; runtime success still depends on the target system.": [
+    "Syntax verified; runtime success still depends on the target system.",
+    "Cú pháp đã được xác minh; kết quả chạy vẫn phụ thuộc hệ thống đích.",
+    "구문은 검증되었습니다. 실제 실행 성공 여부는 대상 시스템에 따라 달라집니다."
+  ],
+  "Insert": [
+    "Insert",
+    "Chèn",
+    "삽입"
+  ],
+  "No interactive sessions. Create one from the sidebar.": [
+    "No interactive sessions. Create one from the sidebar.",
+    "Chưa có phiên tương tác. Hãy tạo từ thanh bên.",
+    "대화형 세션이 없습니다. 사이드바에서 생성하세요."
+  ],
+  "Search terminal… (Enter=next, Shift+Enter=prev)": [
+    "Search terminal… (Enter=next, Shift+Enter=prev)",
+    "Tìm trong terminal… (Enter: tiếp, Shift+Enter: trước)",
+    "터미널 검색… (Enter: 다음, Shift+Enter: 이전)"
+  ],
+  "No match": [
+    "No match",
+    "Không khớp",
+    "일치 없음"
+  ],
+  "✓ Found": [
+    "✓ Found",
+    "✓ Đã tìm thấy",
+    "✓ 찾음"
+  ],
+  "Previous match (Shift+Enter)": [
+    "Previous match (Shift+Enter)",
+    "Kết quả trước (Shift+Enter)",
+    "이전 결과(Shift+Enter)"
+  ],
+  "Next match (Enter)": [
+    "Next match (Enter)",
+    "Kết quả tiếp (Enter)",
+    "다음 결과(Enter)"
+  ],
+  "⚡ MENTION FILE/FOLDER": [
+    "⚡ MENTION FILE/FOLDER",
+    "⚡ CHÈN TỆP/THƯ MỤC",
+    "⚡ 파일/폴더 삽입"
+  ],
+  "Indexing...": [
+    "Indexing...",
+    "Đang lập chỉ mục...",
+    "인덱싱 중..."
+  ],
+  "matches": [
+    "matches",
+    "kết quả",
+    "일치 항목"
+  ],
+  "type to search...": [
+    "type to search...",
+    "Nhập để tìm...",
+    "입력하여 검색..."
+  ],
+  "Loading directory files...": [
+    "Loading directory files...",
+    "Đang tải tệp trong thư mục...",
+    "폴더 파일 불러오는 중..."
+  ],
+  "No files or folders found": [
+    "No files or folders found",
+    "Không tìm thấy tệp hoặc thư mục",
+    "파일 또는 폴더를 찾을 수 없습니다"
+  ],
+  "↑↓ Navigate": [
+    "↑↓ Navigate",
+    "↑↓ Di chuyển",
+    "↑↓ 이동"
+  ],
+  "⏎ Select": [
+    "⏎ Select",
+    "⏎ Chọn",
+    "⏎ 선택"
+  ],
+  "Esc Close": [
+    "Esc Close",
+    "Esc Đóng",
+    "Esc 닫기"
+  ],
+  "🔍 RIPGREP SEARCH": [
+    "🔍 RIPGREP SEARCH",
+    "🔍 TÌM BẰNG RIPGREP",
+    "🔍 RIPGREP 검색"
+  ],
+  "Searching...": [
+    "Searching...",
+    "Đang tìm...",
+    "검색 중..."
+  ],
+  "text to find inside files...": [
+    "text to find inside files...",
+    "Nội dung cần tìm trong tệp...",
+    "파일에서 찾을 텍스트..."
+  ],
+  "Searching file contents...": [
+    "Searching file contents...",
+    "Đang tìm trong nội dung tệp...",
+    "파일 내용 검색 중..."
+  ],
+  "Type something to search inside files": [
+    "Type something to search inside files",
+    "Nhập nội dung để tìm trong tệp",
+    "파일에서 검색할 내용을 입력하세요"
+  ],
+  "(empty line)": [
+    "(empty line)",
+    "(dòng trống)",
+    "(빈 줄)"
+  ],
+  "Drop files to upload to server": [
+    "Drop files to upload to server",
+    "Thả tệp để tải lên máy chủ",
+    "파일을 놓아 서버에 업로드"
+  ],
+  "Unsaved changes": [
+    "Unsaved changes",
+    "Thay đổi chưa lưu",
+    "저장되지 않은 변경 사항"
+  ],
+  "✓ Valid Syntax": [
+    "✓ Valid Syntax",
+    "✓ Cú pháp hợp lệ",
+    "✓ 유효한 구문"
+  ],
+  "Diff": [
+    "Diff",
+    "So sánh",
+    "차이"
+  ],
+  "Format & clean indentation (JSON/YAML/TOML)": [
+    "Format & clean indentation (JSON/YAML/TOML)",
+    "Định dạng và sửa thụt dòng (JSON/YAML/TOML)",
+    "서식 및 들여쓰기 정리(JSON/YAML/TOML)"
+  ],
+  "⚡ Format": [
+    "⚡ Format",
+    "⚡ Định dạng",
+    "⚡ 서식 정리"
+  ],
+  "Revert changes": [
+    "Revert changes",
+    "Khôi phục thay đổi",
+    "변경 사항 되돌리기"
+  ],
+  "Revert": [
+    "Revert",
+    "Khôi phục",
+    "되돌리기"
+  ],
+  "Save file (Ctrl+S)": [
+    "Save file (Ctrl+S)",
+    "Lưu tệp (Ctrl+S)",
+    "파일 저장(Ctrl+S)"
+  ],
+  "Save file and send restart signal (Ctrl+C) to active CLI session": [
+    "Save file and send restart signal (Ctrl+C) to active CLI session",
+    "Lưu tệp và gửi tín hiệu khởi động lại (Ctrl+C) đến phiên CLI hiện tại",
+    "파일을 저장하고 활성 CLI 세션에 재시작 신호(Ctrl+C) 전송"
+  ],
+  "Save & Restart": [
+    "Save & Restart",
+    "Lưu và khởi động lại",
+    "저장 및 재시작"
+  ],
+  "Close file": [
+    "Close file",
+    "Đóng tệp",
+    "파일 닫기"
+  ],
+  "Loading file content…": [
+    "Loading file content…",
+    "Đang tải nội dung tệp…",
+    "파일 내용 불러오는 중…"
+  ],
+  "Cannot display this file": [
+    "Cannot display this file",
+    "Không thể hiển thị tệp này",
+    "이 파일을 표시할 수 없습니다"
+  ],
+  "Loading diff…": [
+    "Loading diff…",
+    "Đang tải so sánh…",
+    "차이 불러오는 중…"
+  ],
+  "No differences found.": [
+    "No differences found.",
+    "Không tìm thấy khác biệt.",
+    "차이가 없습니다."
+  ],
+  "⚡ CMD (": [
+    "⚡ CMD (",
+    "⚡ LỆNH (",
+    "⚡ 명령 ("
+  ],
+  "Mini terminal scale": [
+    "Mini terminal scale",
+    "Tỉ lệ terminal nhỏ",
+    "미니 터미널 배율"
+  ],
+  "New Terminal (dock to bottom)": [
+    "New Terminal (dock to bottom)",
+    "Terminal mới (gắn phía dưới)",
+    "새 터미널(하단 도킹)"
+  ],
+  "⚡ Drag here to dock CMD sessions at the bottom": [
+    "⚡ Drag here to dock CMD sessions at the bottom",
+    "⚡ Kéo vào đây để gắn phiên lệnh phía dưới",
+    "⚡ CMD 세션을 하단에 도킹하려면 여기로 드래그"
+  ],
+  "Stop / Close Session": [
+    "Stop / Close Session",
+    "Dừng / đóng phiên",
+    "세션 중지 / 닫기"
+  ],
+  "Show Right Panel": [
+    "Show Right Panel",
+    "Hiện khung bên phải",
+    "오른쪽 패널 표시"
+  ],
+  "AI AGENT (": [
+    "AI AGENT (",
+    "TRỢ LÝ AI (",
+    "AI 에이전트 ("
+  ],
+  "New Terminal (dock to right)": [
+    "New Terminal (dock to right)",
+    "Terminal mới (gắn bên phải)",
+    "새 터미널(오른쪽 도킹)"
+  ],
+  "Collapse panel": [
+    "Collapse panel",
+    "Thu gọn khung",
+    "패널 접기"
+  ],
+  "👾 Drag here to dock AI Agents on the right": [
+    "👾 Drag here to dock AI Agents on the right",
+    "👾 Kéo vào đây để gắn trợ lý AI bên phải",
+    "👾 AI 에이전트를 오른쪽에 도킹하려면 여기로 드래그"
+  ],
+  "📋 Copy": [
+    "📋 Copy",
+    "📋 Sao chép",
+    "📋 복사"
+  ],
+  "🧩 Copy as code": [
+    "🧩 Copy as code",
+    "🧩 Sao chép dạng mã",
+    "🧩 코드로 복사"
+  ],
+  "💡 Giải thích bằng AI": [
+    "💡 Explain with AI",
+    "💡 Giải thích bằng AI",
+    "💡 AI로 설명"
+  ],
+  "✨ Tối ưu văn bản": [
+    "✨ Improve text",
+    "✨ Tối ưu văn bản",
+    "✨ 텍스트 개선"
+  ],
+  "📋 Paste": [
+    "📋 Paste",
+    "📋 Dán",
+    "📋 붙여넣기"
+  ],
+  "🔄 Refresh Terminal": [
+    "🔄 Refresh Terminal",
+    "🔄 Làm mới terminal",
+    "🔄 터미널 새로 고침"
+  ],
+  "📋 Copy Session ID": [
+    "📋 Copy Session ID",
+    "📋 Sao chép ID phiên",
+    "📋 세션 ID 복사"
+  ],
+  "⬇️ Download File from Server": [
+    "⬇️ Download File from Server",
+    "⬇️ Tải tệp từ máy chủ",
+    "⬇️ 서버에서 파일 다운로드"
+  ],
+  "⬆️ Upload File to Server": [
+    "⬆️ Upload File to Server",
+    "⬆️ Tải tệp lên máy chủ",
+    "⬆️ 서버에 파일 업로드"
+  ],
+  "❌ Stop / Close Session": [
+    "❌ Stop / Close Session",
+    "❌ Dừng / đóng phiên",
+    "❌ 세션 중지 / 닫기"
+  ],
+  "Cyberpunk condensed aesthetic": [
+    "Cyberpunk condensed aesthetic",
+    "Kiểu chữ Cyberpunk hẹp",
+    "사이버펑크 압축 스타일"
+  ],
+  "Crisp, highly readable system font": [
+    "Crisp, highly readable system font",
+    "Phông hệ thống rõ nét, dễ đọc",
+    "선명하고 읽기 쉬운 시스템 글꼴"
+  ],
+  "Modern, clean, balanced readability": [
+    "Modern, clean, balanced readability",
+    "Hiện đại, gọn gàng, dễ đọc",
+    "현대적이고 깔끔한 균형 잡힌 가독성"
+  ],
+  "Developer monospace font": [
+    "Developer monospace font",
+    "Phông đơn cách cho lập trình viên",
+    "개발자용 고정폭 글꼴"
+  ],
+  "Cấu hình Docker containers, services & port mappings": [
+    "Docker containers, services, and port mappings",
+    "Cấu hình Docker, dịch vụ và ánh xạ cổng",
+    "Docker 컨테이너, 서비스 및 포트 매핑 설정"
+  ],
+  "Cấu hình biến môi trường và secret keys": [
+    "Environment variables and secret keys",
+    "Cấu hình biến môi trường và khóa bí mật",
+    "환경 변수 및 비밀 키 설정"
+  ],
+  "Cấu hình hệ thống và dịch vụ chính": [
+    "System and main service settings",
+    "Cấu hình hệ thống và dịch vụ chính",
+    "시스템 및 주요 서비스 설정"
+  ],
+  "Cấu hình dependencies và npx scripts": [
+    "Dependencies and npx scripts",
+    "Cấu hình thư viện và tập lệnh npx",
+    "의존성 및 npx 스크립트 설정"
+  ],
+  "Solar Teleport": [
+    "Solar Teleport",
+    "Dịch chuyển mặt trời",
+    "태양 순간이동"
+  ],
+  "Flame Clones Jutsu": [
+    "Flame Clones Jutsu",
+    "Thuật phân thân lửa",
+    "불꽃 분신술"
+  ],
+  "Shadow Clone Jutsu": [
+    "Shadow Clone Jutsu",
+    "Thuật ảnh phân thân",
+    "그림자 분신술"
+  ],
+  "20 Shadow Clones Screen Jutsu": [
+    "20 Shadow Clones Screen Jutsu",
+    "Thuật 20 ảnh phân thân",
+    "20개 그림자 분신술"
+  ],
+  "Instant Transmission": [
+    "Instant Transmission",
+    "Dịch chuyển tức thời",
+    "순간이동"
+  ],
+  "Big Kamehameha": [
+    "Big Kamehameha",
+    "Kamehameha lớn",
+    "대형 Kamehameha"
+  ],
+  "Web Shot": [
+    "Web Shot",
+    "Bắn tơ",
+    "거미줄 발사"
+  ],
+  "Web Zip": [
+    "Web Zip",
+    "Đu tơ",
+    "거미줄 이동"
+  ],
+  "Full Web Spider Matrix": [
+    "Full Web Spider Matrix",
+    "Ma trận tơ toàn màn hình",
+    "전체 거미줄 매트릭스"
+  ],
+  "Jackal (Xe Jeep)": [
+    "Jackal (Jeep)",
+    "Jackal (xe Jeep)",
+    "Jackal(지프)"
+  ],
+  "Generic NES Game": [
+    "Generic NES Game",
+    "Trò chơi NES chung",
+    "일반 NES 게임"
+  ],
+  "Thumbs up": [
+    "Thumbs up",
+    "Thích",
+    "좋아요"
+  ],
+  "Clap": [
+    "Clap",
+    "Vỗ tay",
+    "박수"
+  ],
+  "Laugh": [
+    "Laugh",
+    "Cười",
+    "웃음"
+  ],
+  "Wow": [
+    "Wow",
+    "Ngạc nhiên",
+    "놀람"
+  ],
+  "Cry": [
+    "Cry",
+    "Khóc",
+    "울음"
+  ],
+  "Fire": [
+    "Fire",
+    "Lửa",
+    "불꽃"
+  ],
+  "Heart": [
+    "Heart",
+    "Trái tim",
+    "하트"
+  ],
+  "Gamepad": [
+    "Gamepad",
+    "Tay cầm",
+    "게임패드"
+  ],
+  "Created: {v0}": [
+    "Created: {v0}",
+    "Đã tạo: {v0}",
+    "생성됨: {v0}"
+  ],
+  "Session started for {v0}": [
+    "Session started for {v0}",
+    "Đã mở phiên cho {v0}",
+    "{v0} 세션 시작됨"
+  ],
+  "Session {v0} exited cleanly.": [
+    "Session {v0} exited cleanly.",
+    "Phiên {v0} đã kết thúc bình thường.",
+    "세션 {v0}이 정상 종료되었습니다."
+  ],
+  "Session error on {v0}: {v1}": [
+    "Session error on {v0}: {v1}",
+    "Lỗi phiên {v0}: {v1}",
+    "세션 {v0} 오류: {v1}"
+  ],
+  "Saved tag #{v0} at {v1}": [
+    "Saved tag #{v0} at {v1}",
+    "Đã lưu thẻ #{v0} tại {v1}",
+    "{v1}에 태그 #{v0} 저장됨"
+  ],
+  "Save tag failed: {v0}": [
+    "Save tag failed: {v0}",
+    "Lưu thẻ thất bại: {v0}",
+    "태그 저장 실패: {v0}"
+  ],
+  "Opened: {v0}": [
+    "Opened: {v0}",
+    "Đã mở: {v0}",
+    "열림: {v0}"
+  ],
+  "Cannot read file: {v0}": [
+    "Cannot read file: {v0}",
+    "Không đọc được tệp: {v0}",
+    "파일 읽기 실패: {v0}"
+  ],
+  "Saved: {v0}": [
+    "Saved: {v0}",
+    "Đã lưu: {v0}",
+    "저장됨: {v0}"
+  ],
+  "Session created: {v0}": [
+    "Session created: {v0}",
+    "Đã tạo phiên: {v0}",
+    "세션 생성됨: {v0}"
+  ],
+  "Interactive start failed: {v0}": [
+    "Interactive start failed: {v0}",
+    "Mở phiên tương tác thất bại: {v0}",
+    "대화형 세션 시작 실패: {v0}"
+  ],
+  "Failed to write input to session {v0}: {v1}": [
+    "Failed to write input to session {v0}: {v1}",
+    "Không ghi được đầu vào cho phiên {v0}: {v1}",
+    "세션 {v0} 입력 쓰기 실패: {v1}"
+  ],
+  "Session stopped.": [
+    "Session stopped.",
+    "Đã dừng phiên.",
+    "세션이 중지되었습니다."
+  ],
+  "Stop failed: {v0}": [
+    "Stop failed: {v0}",
+    "Dừng thất bại: {v0}",
+    "중지 실패: {v0}"
+  ],
+  "Quick CLI session started.": [
+    "Quick CLI session started.",
+    "Đã mở phiên CLI nhanh.",
+    "빠른 CLI 세션이 시작되었습니다."
+  ],
+  "Failed to start Quick CLI: {v0}": [
+    "Failed to start Quick CLI: {v0}",
+    "Không mở được CLI nhanh: {v0}",
+    "빠른 CLI 시작 실패: {v0}"
+  ],
+  "Are you sure you want to delete the CLI \"{v0}\"?": [
+    "Are you sure you want to delete the CLI \"{v0}\"?",
+    "Bạn muốn xóa CLI \"{v0}\"?",
+    "CLI \"{v0}\"을 삭제할까요?"
+  ],
+  "CLI \"{v0}\" deleted.": [
+    "CLI \"{v0}\" deleted.",
+    "Đã xóa CLI \"{v0}\".",
+    "CLI \"{v0}\"이 삭제되었습니다."
+  ],
+  "CLI \"{v0}\" saved.": [
+    "CLI \"{v0}\" saved.",
+    "Đã lưu CLI \"{v0}\".",
+    "CLI \"{v0}\"이 저장되었습니다."
+  ],
+  "Save CLI failed: {v0}": [
+    "Save CLI failed: {v0}",
+    "Lưu CLI thất bại: {v0}",
+    "CLI 저장 실패: {v0}"
+  ],
+  "SSH session connected to {v0}.": [
+    "SSH session connected to {v0}.",
+    "Đã kết nối phiên SSH đến {v0}.",
+    "{v0}에 SSH 세션이 연결되었습니다."
+  ],
+  "SSH connection failed: {v0}": [
+    "SSH connection failed: {v0}",
+    "Kết nối SSH thất bại: {v0}",
+    "SSH 연결 실패: {v0}"
+  ],
+  "RDP session launched for {v0}.": [
+    "RDP session launched for {v0}.",
+    "Đã mở phiên RDP cho {v0}.",
+    "{v0}의 RDP 세션이 시작되었습니다."
+  ],
+  "RDP connection failed: {v0}": [
+    "RDP connection failed: {v0}",
+    "Kết nối RDP thất bại: {v0}",
+    "RDP 연결 실패: {v0}"
+  ],
+  "Connection \"{v0}\" saved.": [
+    "Connection \"{v0}\" saved.",
+    "Đã lưu kết nối \"{v0}\".",
+    "연결 \"{v0}\"이 저장되었습니다."
+  ],
+  "Failed to save connection: {v0}": [
+    "Failed to save connection: {v0}",
+    "Không lưu được kết nối: {v0}",
+    "연결 저장 실패: {v0}"
+  ],
+  "Are you sure you want to delete the VM connection \"{v0}\"?": [
+    "Are you sure you want to delete the VM connection \"{v0}\"?",
+    "Bạn muốn xóa kết nối máy ảo \"{v0}\"?",
+    "가상 머신 연결 \"{v0}\"을 삭제할까요?"
+  ],
+  "Delete Connection": [
+    "Delete Connection",
+    "Xóa kết nối",
+    "연결 삭제"
+  ],
+  "Connection \"{v0}\" deleted.": [
+    "Connection \"{v0}\" deleted.",
+    "Đã xóa kết nối \"{v0}\".",
+    "연결 \"{v0}\"이 삭제되었습니다."
+  ],
+  "📁 New Directory": [
+    "📁 New Directory",
+    "📁 Thư mục mới",
+    "📁 새 폴더"
+  ],
+  "📄 New File": [
+    "📄 New File",
+    "📄 Tệp mới",
+    "📄 새 파일"
+  ],
+  "Location": [
+    "Location",
+    "Vị trí",
+    "위치"
+  ],
+  "Directory Name": [
+    "Directory Name",
+    "Tên thư mục",
+    "폴더 이름"
+  ],
+  "File Name": [
+    "File Name",
+    "Tên tệp",
+    "파일 이름"
+  ],
+  "Content": [
+    "Content",
+    "Nội dung",
+    "내용"
+  ],
+  "File content...": [
+    "File content...",
+    "Nội dung tệp...",
+    "파일 내용..."
+  ],
+  "Create": [
+    "Create",
+    "Tạo",
+    "생성"
+  ],
+  "Original Text": [
+    "Original Text",
+    "Văn bản gốc",
+    "원본 텍스트"
+  ],
+  "Running built-in local inference...": [
+    "Running built-in local inference...",
+    "Đang chạy suy luận cục bộ tích hợp...",
+    "내장 로컬 추론 실행 중..."
+  ],
+  "Copied to clipboard!": [
+    "Copied to clipboard!",
+    "Đã sao chép vào bộ nhớ tạm!",
+    "클립보드에 복사했습니다!"
+  ],
+  "Failed to send to terminal: {v0}": [
+    "Failed to send to terminal: {v0}",
+    "Không gửi được đến terminal: {v0}",
+    "터미널 전송 실패: {v0}"
+  ],
+  "⚡ Run in Terminal": [
+    "⚡ Run in Terminal",
+    "⚡ Chạy trong terminal",
+    "⚡ 터미널에서 실행"
+  ],
+  "Interface language": [
+    "Interface language",
+    "Ngôn ngữ giao diện",
+    "인터페이스 언어"
+  ],
+  "Language": [
+    "Language",
+    "Ngôn ngữ",
+    "언어"
+  ],
+  "Applies immediately and is remembered on this device.": [
+    "Applies immediately and is remembered on this device.",
+    "Áp dụng ngay và ghi nhớ trên thiết bị này.",
+    "즉시 적용되며 이 기기에 저장됩니다."
+  ],
+  "Đang lọc theo {v0}. Click để bỏ lọc.": [
+    "Filtering by {v0}. Click to clear.",
+    "Đang lọc theo {v0}. Nhấp để bỏ lọc.",
+    "{v0} 필터 적용 중. 클릭하여 해제하세요."
+  ],
+  "Click để lọc theo agent: {v0}": [
+    "Click to filter by agent: {v0}",
+    "Nhấp để lọc theo trợ lý: {v0}",
+    "클릭하여 에이전트로 필터: {v0}"
+  ],
+  "Đang lọc theo model {v0}. Click để bỏ lọc.": [
+    "Filtering by model {v0}. Click to clear.",
+    "Đang lọc theo mô hình {v0}. Nhấp để bỏ lọc.",
+    "모델 {v0} 필터 적용 중. 클릭하여 해제하세요."
+  ],
+  "Click để lọc theo model: {v0}": [
+    "Click to filter by model: {v0}",
+    "Nhấp để lọc theo mô hình: {v0}",
+    "클릭하여 모델로 필터: {v0}"
+  ],
+  "Đang lọc theo thư mục {v0}. Click để bỏ lọc.": [
+    "Filtering by folder {v0}. Click to clear.",
+    "Đang lọc theo thư mục {v0}. Nhấp để bỏ lọc.",
+    "폴더 {v0} 필터 적용 중. 클릭하여 해제하세요."
+  ],
+  "Click để lọc theo thư mục: {v0}": [
+    "Click to filter by folder: {v0}",
+    "Nhấp để lọc theo thư mục: {v0}",
+    "클릭하여 폴더로 필터: {v0}"
+  ],
+  "Chạy lệnh resume chính xác: {v0}": [
+    "Run the exact resume command: {v0}",
+    "Chạy lệnh tiếp tục phiên: {v0}",
+    "정확한 세션 재개 명령 실행: {v0}"
+  ],
+  "Mở CLI {v0} kèm context của session này": [
+    "Open CLI {v0} with this session's context",
+    "Mở CLI {v0} kèm ngữ cảnh phiên này",
+    "이 세션의 컨텍스트로 CLI {v0} 열기"
+  ],
+  "Password stored — type to replace": [
+    "Password stored — type to replace",
+    "Đã lưu mật khẩu — nhập để thay thế",
+    "비밀번호 저장됨 — 입력하여 교체"
+  ],
+  "SSH password": [
+    "SSH password",
+    "Mật khẩu SSH",
+    "SSH 비밀번호"
+  ],
+  "Passphrase stored — type to replace": [
+    "Passphrase stored — type to replace",
+    "Đã lưu mật khẩu khóa — nhập để thay thế",
+    "키 암호 저장됨 — 입력하여 교체"
+  ],
+  "Message {v0}{v1}...": [
+    "Message {v0}{v1}...",
+    "Nhắn tin {v0}{v1}...",
+    "{v0}{v1}에 메시지..."
+  ],
+  "This is you": [
+    "This is you",
+    "Đây là bạn",
+    "나입니다"
+  ],
+  "Message {v0}": [
+    "Message {v0}",
+    "Nhắn tin {v0}",
+    "{v0}에 메시지"
+  ],
+  "Open direct message with {v0}": [
+    "Open direct message with {v0}",
+    "Mở tin nhắn trực tiếp với {v0}",
+    "{v0}와 직접 메시지 열기"
+  ],
+  "Add {v0}": [
+    "Add {v0}",
+    "Thêm {v0}",
+    "{v0} 추가"
+  ],
+  "Start {v0}": [
+    "Start {v0}",
+    "Mở {v0}",
+    "{v0} 시작"
+  ],
+  "Edit {v0}": [
+    "Edit {v0}",
+    "Sửa {v0}",
+    "{v0} 수정"
+  ],
+  "Delete {v0}": [
+    "Delete {v0}",
+    "Xóa {v0}",
+    "{v0} 삭제"
+  ],
+  "Remote Desktop to {v0}": [
+    "Remote Desktop to {v0}",
+    "Mở màn hình từ xa đến {v0}",
+    "{v0}에 원격 데스크톱 연결"
+  ],
+  "Connect SSH to {v0}": [
+    "Connect SSH to {v0}",
+    "Kết nối SSH đến {v0}",
+    "{v0}에 SSH 연결"
+  ],
+  "Launch RDP": [
+    "Launch RDP",
+    "Mở RDP",
+    "RDP 실행"
+  ],
+  "Connect SSH": [
+    "Connect SSH",
+    "Kết nối SSH",
+    "SSH 연결"
+  ],
+  "Revalidates PID and start identity before stopping": [
+    "Revalidates PID and start identity before stopping",
+    "Xác minh lại PID và định danh khởi động trước khi dừng",
+    "중지 전에 PID와 시작 식별자를 다시 확인합니다"
+  ],
+  "Stable process start identity is unavailable": [
+    "Stable process start identity is unavailable",
+    "Không có định danh khởi động tiến trình ổn định",
+    "안정적인 프로세스 시작 식별자가 없습니다"
+  ],
+  "Leave blank to keep saved secret": [
+    "Leave blank to keep saved secret",
+    "Để trống để giữ thông tin bí mật đã lưu",
+    "저장된 비밀 정보를 유지하려면 비워 두세요"
+  ],
+  "Required": [
+    "Required",
+    "Bắt buộc",
+    "필수"
+  ],
+  "Optional": [
+    "Optional",
+    "Tùy chọn",
+    "선택 사항"
+  ],
+  "Play an action with {v0}": [
+    "Play an action with {v0}",
+    "Thực hiện động tác với {v0}",
+    "{v0}의 동작 재생"
+  ],
+  "{v0} · Click to play an action": [
+    "{v0} · Click to play an action",
+    "{v0} · Nhấp để thực hiện động tác",
+    "{v0} · 클릭하여 동작 재생"
+  ],
+  "{v0} {v1} preview": [
+    "{v0} {v1} preview",
+    "Xem trước {v1} của {v0}",
+    "{v0} {v1} 미리 보기"
+  ],
+  "Tắt AI Bot tự chơi": [
+    "Disable autoplay AI bot",
+    "Tắt bot AI tự chơi",
+    "자동 플레이 AI 봇 비활성화"
+  ],
+  "Bật Laya AI Bot tự động chơi": [
+    "Enable Laya AI bot autoplay",
+    "Bật bot AI Laya tự chơi",
+    "Laya AI 봇 자동 플레이 활성화"
+  ],
+  "Laya Service Online": [
+    "Laya Service Online",
+    "Dịch vụ Laya trực tuyến",
+    "Laya 서비스 온라인"
+  ],
+  "Laya Service Offline": [
+    "Laya Service Offline",
+    "Dịch vụ Laya ngoại tuyến",
+    "Laya 서비스 오프라인"
+  ],
+  "Game profile đang kích hoạt: {v0}": [
+    "Active game profile: {v0}",
+    "Hồ sơ trò chơi hiện tại: {v0}",
+    "활성 게임 프로필: {v0}"
+  ],
+  "{v0} — double-click to rename": [
+    "{v0} — double-click to rename",
+    "{v0} — nhấp đúp để đổi tên",
+    "{v0} — 두 번 클릭하여 이름 변경"
+  ],
+  "Close {v0}": [
+    "Close {v0}",
+    "Đóng {v0}",
+    "{v0} 닫기"
+  ],
+  "Reasoning Effort: {v0}": [
+    "Reasoning Effort: {v0}",
+    "Mức suy luận: {v0}",
+    "추론 수준: {v0}"
+  ],
+  "Prompt: {v0} / Comp: {v1}": [
+    "Prompt: {v0} / Comp: {v1}",
+    "Đầu vào: {v0} / Đầu ra: {v1}",
+    "입력: {v0} / 출력: {v1}"
+  ],
+  "{v0}{v1}\nSingle-click to launch\nHover for options": [
+    "{v0}{v1}\nSingle-click to launch\nHover for options",
+    "{v0}{v1}\nNhấp một lần để mở\nDi chuột để xem tùy chọn",
+    "{v0}{v1}\n한 번 클릭하여 실행\n마우스를 올려 옵션 표시"
+  ],
+  "Open {v0} in {v1}": [
+    "Open {v0} in {v1}",
+    "Mở {v0} trong {v1}",
+    "{v1}에서 {v0} 열기"
+  ],
+  "CLI is no longer available": [
+    "CLI is no longer available",
+    "CLI không còn khả dụng",
+    "CLI를 더 이상 사용할 수 없습니다"
+  ],
+  "State your reasoning...": [
+    "State your reasoning...",
+    "Nêu lập luận của bạn...",
+    "추론을 설명하세요..."
+  ],
+  "Dead units comm channel...": [
+    "Dead units comm channel...",
+    "Kênh liên lạc của đơn vị đã bị loại...",
+    "제거된 유닛의 통신 채널..."
+  ],
+  "Nhấp để ẩn khỏi thanh Active Bar": [
+    "Click to hide from the activity bar",
+    "Nhấp để ẩn khỏi thanh hoạt động",
+    "클릭하여 활동 표시줄에서 숨기기"
+  ],
+  "Nhấp để hiển thị trên thanh Active Bar": [
+    "Click to show on the activity bar",
+    "Nhấp để hiện trên thanh hoạt động",
+    "클릭하여 활동 표시줄에 표시"
+  ],
+  "e.g. root or ubuntu": [
+    "e.g. root or ubuntu",
+    "Ví dụ: root hoặc ubuntu",
+    "예: root 또는 ubuntu"
+  ],
+  "e.g. Administrator": [
+    "e.g. Administrator",
+    "Ví dụ: Administrator",
+    "예: Administrator"
+  ],
+  "Paste at the current prompt without pressing Enter": [
+    "Paste at the current prompt without pressing Enter",
+    "Dán vào lời nhắc hiện tại, không nhấn Enter",
+    "Enter를 누르지 않고 현재 프롬프트에 붙여넣기"
+  ],
+  "Insert is available only at a recognized empty shell prompt": [
+    "Insert is available only at a recognized empty shell prompt",
+    "Chỉ chèn được khi nhận diện lời nhắc shell đang trống",
+    "인식된 빈 셸 프롬프트에서만 삽입할 수 있습니다"
+  ],
+  "e.g. my-folder": [
+    "e.g. my-folder",
+    "Ví dụ: my-folder",
+    "예: my-folder"
+  ],
+  "e.g. config.json": [
+    "e.g. config.json",
+    "Ví dụ: config.json",
+    "예: config.json"
+  ],
+  "Confirm": [
+    "Confirm",
+    "Xác nhận",
+    "확인"
+  ],
+  "Theme: {theme}": [
+    "Theme: {theme}",
+    "Chủ đề: {theme}",
+    "테마: {theme}"
+  ],
+  "Switch to {theme} theme": [
+    "Switch to {theme} theme",
+    "Đổi sang chủ đề {theme}",
+    "{theme} 테마로 전환"
+  ],
+  "💬 {count} reply": [
+    "💬 {count} reply",
+    "💬 {count} lượt trả lời",
+    "💬 답장 {count}개"
+  ],
+  "💬 {count} replies": [
+    "💬 {count} replies",
+    "💬 {count} lượt trả lời",
+    "💬 답장 {count}개"
+  ],
+  "{count} unread messages": [
+    "{count} unread messages",
+    "{count} tin chưa đọc",
+    "읽지 않은 메시지 {count}개"
+  ],
+  "Cafeteria / Command Core": [
+    "Cafeteria / Command Core",
+    "Căn tin / Lõi chỉ huy",
+    "식당 / 지휘 코어"
+  ],
+  "Quantum Reactor": [
+    "Quantum Reactor",
+    "Lò phản ứng lượng tử",
+    "퀀텀 원자로"
+  ],
+  "Server Farm / Comms": [
+    "Server Farm / Comms",
+    "Cụm máy chủ / Liên lạc",
+    "서버 팜 / 통신"
+  ],
+  "Electrical & Power Grid": [
+    "Electrical & Power Grid",
+    "Điện và lưới năng lượng",
+    "전기 및 전력망"
+  ],
+  "MedBay & Bio Scanner": [
+    "MedBay & Bio Scanner",
+    "Phòng y tế và máy quét sinh học",
+    "의무실 및 생체 스캐너"
+  ],
+  "Oxygen & Life Support": [
+    "Oxygen & Life Support",
+    "Oxy và hỗ trợ sự sống",
+    "산소 및 생명 유지"
+  ],
+  "Transit Deck": [
+    "Transit Deck",
+    "Hành lang trung chuyển",
+    "이동 구역"
+  ],
+  "Calibrate Optical Cables": [
+    "Calibrate Optical Cables",
+    "Hiệu chỉnh cáp quang",
+    "광학 케이블 보정"
+  ],
+  "Biometric Card Authorization": [
+    "Biometric Card Authorization",
+    "Xác thực thẻ sinh trắc",
+    "생체 인증 카드 승인"
+  ],
+  "Rebalance Quantum Disk": [
+    "Rebalance Quantum Disk",
+    "Cân bằng đĩa lượng tử",
+    "퀀텀 디스크 균형 조정"
+  ],
+  "Extract Telemetry Logs": [
+    "Extract Telemetry Logs",
+    "Trích nhật ký đo đạc",
+    "텔레메트리 로그 추출"
+  ],
+  "All station subsystems are calibrated.": [
+    "All station subsystems are calibrated.",
+    "Đã hiệu chỉnh mọi phân hệ của trạm.",
+    "모든 기지 하위 시스템이 보정되었습니다."
+  ],
+  "Every rogue process was ejected.": [
+    "Every rogue process was ejected.",
+    "Đã loại bỏ mọi tiến trình phản loạn.",
+    "모든 로그 프로세스가 제거되었습니다."
+  ],
+  "Rogue processes now control the station.": [
+    "Rogue processes now control the station.",
+    "Tiến trình phản loạn đã kiểm soát trạm.",
+    "로그 프로세스가 기지를 장악했습니다."
+  ],
+  "Rajdhani (Mặc định Cyberpunk)": [
+    "Rajdhani (Cyberpunk default)",
+    "Rajdhani (mặc định Cyberpunk)",
+    "Rajdhani(사이버펑크 기본값)"
+  ],
+  "Segoe UI (Chuẩn Windows - Rõ nét, chữ lớn)": [
+    "Segoe UI (Windows standard - clear, large text)",
+    "Segoe UI (chuẩn Windows - rõ nét, chữ lớn)",
+    "Segoe UI(Windows 표준 - 선명하고 큰 글자)"
+  ],
+  "Inter / Modern Sans (Dễ đọc)": [
+    "Inter / Modern Sans (readable)",
+    "Inter / Modern Sans (dễ đọc)",
+    "Inter / Modern Sans(읽기 편함)"
+  ],
+  "Cascadia Mono (Mặc định Windows)": [
+    "Cascadia Mono (Windows default)",
+    "Cascadia Mono (mặc định Windows)",
+    "Cascadia Mono(Windows 기본값)"
+  ],
+  "Monospace (Hệ thống)": [
+    "Monospace (system)",
+    "Đơn cách (hệ thống)",
+    "고정폭(시스템)"
+  ],
+  "Phoenix": [
+    "Phoenix",
+    "Phượng hoàng",
+    "불사조"
+  ],
+  "Naruto (Seventh Hokage)": [
+    "Naruto (Seventh Hokage)",
+    "Naruto (Hokage đệ thất)",
+    "Naruto(제7대 호카게)"
+  ],
+  "Goku (Ultra Instinct)": [
+    "Goku (Ultra Instinct)",
+    "Goku (Bản năng vô cực)",
+    "Goku(무의식의 극의)"
+  ],
+  "Spider-Man (Người Nhện)": [
+    "Spider-Man",
+    "Spider-Man (Người Nhện)",
+    "Spider-Man(스파이더맨)"
+  ],
+  "Select a CLI and start an interactive session.": [
+    "Select a CLI and start an interactive session.",
+    "Chọn CLI và mở phiên tương tác.",
+    "CLI를 선택하고 대화형 세션을 시작하세요."
+  ],
+  "Force kill": [
+    "Force kill",
+    "Buộc dừng",
+    "강제 종료"
+  ],
+  "session": [
+    "session",
+    "phiên",
+    "세션"
+  ],
+  "cli": [
+    "CLI",
+    "CLI",
+    "CLI"
+  ],
+  "ssh": [
+    "SSH",
+    "SSH",
+    "SSH"
+  ],
+  "action": [
+    "action",
+    "thao tác",
+    "작업"
+  ],
+  "host": [
+    "host",
+    "chủ phòng",
+    "호스트"
+  ],
+  "guest": [
+    "guest",
+    "khách",
+    "게스트"
+  ],
+  "HOST": [
+    "HOST",
+    "CHỦ PHÒNG",
+    "호스트"
+  ],
+  "GUEST": [
+    "GUEST",
+    "KHÁCH",
+    "게스트"
+  ],
+  "travel": [
+    "travel",
+    "di chuyển",
+    "이동"
+  ],
+  "blink": [
+    "blink",
+    "chớp mắt",
+    "눈 깜박임"
+  ],
+  "connected": [
+    "connected",
+    "đã kết nối",
+    "연결됨"
+  ],
+  "disconnected": [
+    "disconnected",
+    "đã ngắt kết nối",
+    "연결 끊김"
+  ],
+  "waiting": [
+    "waiting",
+    "đang chờ",
+    "대기 중"
+  ],
+  "joining": [
+    "joining",
+    "đang tham gia",
+    "참가 중"
+  ],
+  "ready": [
+    "ready",
+    "sẵn sàng",
+    "준비됨"
+  ],
+  "playing": [
+    "playing",
+    "đang chơi",
+    "플레이 중"
+  ],
+  "ended": [
+    "ended",
+    "đã kết thúc",
+    "종료됨"
+  ],
+  "paused": [
+    "paused",
+    "tạm dừng",
+    "일시 정지됨"
+  ],
+  "IDLE": [
+    "IDLE",
+    "CHỜ",
+    "대기"
+  ],
+  "SUCCESS": [
+    "SUCCESS",
+    "THÀNH CÔNG",
+    "성공"
+  ],
+  "Error: {error}": [
+    "Error: {error}",
+    "Lỗi: {error}",
+    "오류: {error}"
+  ],
+  "🔧 Running: {tool}...": [
+    "🔧 Running: {tool}...",
+    "🔧 Đang chạy: {tool}...",
+    "🔧 실행 중: {tool}..."
+  ],
+  "Connection successful": [
+    "Connection successful",
+    "Kết nối thành công",
+    "연결 성공"
+  ],
+  "host key unverified": [
+    "host key unverified",
+    "khóa máy chủ chưa xác minh",
+    "호스트 키 미검증"
+  ],
+  "YOU · {name}": [
+    "YOU · {name}",
+    "BẠN · {name}",
+    "나 · {name}"
+  ],
+  "Đã chuyển sang {v0}! Context đã lưu & copy clipboard.": [
+    "Transferred to {v0}! Context saved and copied to clipboard.",
+    "Đã chuyển sang {v0}! Ngữ cảnh đã lưu và sao chép.",
+    "{v0}로 전달했습니다! 컨텍스트를 저장하고 클립보드에 복사했습니다."
+  ],
+  "SSH hop requires a username": [
+    "SSH hop requires a username",
+    "Chặng SSH cần tên người dùng",
+    "SSH 경유에 사용자 이름이 필요합니다"
+  ],
+  "SSH hop password is required": [
+    "SSH hop password is required",
+    "Chặng SSH cần mật khẩu",
+    "SSH 경유에 비밀번호가 필요합니다"
+  ],
+  "SSH hop key path is required": [
+    "SSH hop key path is required",
+    "Chặng SSH cần đường dẫn khóa",
+    "SSH 경유에 키 경로가 필요합니다"
+  ],
+  "Headers must be a valid JSON Object": [
+    "Headers must be a valid JSON Object",
+    "Header phải là đối tượng JSON hợp lệ",
+    "헤더는 유효한 JSON 객체여야 합니다"
+  ],
+  "General Configs": [
+    "General Configs",
+    "Cấu hình chung",
+    "일반 설정"
+  ],
+  "System logs from CLX backend — ring-buffer of last 500 entries. Filter by level (ERROR/WARN/INFO/DEBUG) and source.": [
+    "System logs from CLX backend — ring-buffer of last 500 entries. Filter by level (ERROR/WARN/INFO/DEBUG) and source.",
+    "Nhật ký CLX — giữ 500 mục gần nhất. Lọc theo cấp độ (ERROR/WARN/INFO/DEBUG) và nguồn.",
+    "CLX 백엔드 로그 — 최근 500개 항목을 보관합니다. 수준(ERROR/WARN/INFO/DEBUG) 및 소스로 필터링합니다."
+  ],
+  "Port monitor: track TCP ports on localhost or remote SSH hosts. Shows PID, RAM, CPU, uptime. Kill hung listeners. View live service logs.": [
+    "Port monitor: track TCP ports on localhost or remote SSH hosts. Shows PID, RAM, CPU, uptime. Kill hung listeners. View live service logs.",
+    "Theo dõi cổng TCP cục bộ hoặc qua SSH. Xem PID, RAM, CPU, thời gian hoạt động, dừng tiến trình bị treo và xem nhật ký trực tiếp.",
+    "로컬 또는 원격 SSH 호스트의 TCP 포트를 추적합니다. PID, RAM, CPU, 가동 시간을 확인하고 멈춘 리스너를 종료하며 실시간 서비스 로그를 봅니다."
+  ],
+  "LLM Proxy: embedded Axum HTTP proxy providing OpenAI-compatible /v1/chat/completions on 127.0.0.1:{port}. Load-balanced across configurable backends.": [
+    "LLM Proxy: embedded Axum HTTP proxy providing OpenAI-compatible /v1/chat/completions on 127.0.0.1:{port}. Load-balanced across configurable backends.",
+    "Proxy LLM: cung cấp /v1/chat/completions tương thích OpenAI tại 127.0.0.1:{port}, cân bằng tải giữa các máy chủ đã cấu hình.",
+    "LLM 프록시: 127.0.0.1:{port}에서 OpenAI 호환 /v1/chat/completions를 제공합니다. 설정된 백엔드 간에 부하를 분산합니다."
+  ],
+  "Target Monitor: enter an IP or domain to filter all TCP connections to/from that target. Uses nslookup for domain resolution.": [
+    "Target Monitor: enter an IP or domain to filter all TCP connections to/from that target. Uses nslookup for domain resolution.",
+    "Theo dõi đích: nhập IP hoặc tên miền để lọc kết nối TCP đến/từ đích đó. Dùng nslookup để phân giải tên miền.",
+    "대상 모니터: IP 또는 도메인을 입력하여 해당 대상의 TCP 연결을 필터링합니다. nslookup으로 도메인을 확인합니다."
+  ],
+  "Connection Log: realtime dump of all TCP connections from this machine via netstat. Sorted by remote address frequency. Aggregated 1/5/10 min stats.": [
+    "Connection Log: realtime dump of all TCP connections from this machine via netstat. Sorted by remote address frequency. Aggregated 1/5/10 min stats.",
+    "Nhật ký kết nối: xem kết nối TCP trực tiếp qua netstat, sắp theo tần suất địa chỉ từ xa và thống kê 1/5/10 phút.",
+    "연결 로그: netstat으로 이 컴퓨터의 TCP 연결을 실시간 표시합니다. 원격 주소 빈도순으로 정렬하며 1/5/10분 통계를 제공합니다."
+  ],
+  "OS credential vault is unavailable. Secrets are session-only and will be requested after restart.": [
+    "OS credential vault is unavailable. Secrets are session-only and will be requested after restart.",
+    "Kho bảo mật hệ điều hành không khả dụng. Thông tin bí mật chỉ dùng trong phiên này và sẽ được hỏi lại sau khi khởi động lại.",
+    "운영체제 자격 증명 저장소를 사용할 수 없습니다. 비밀 정보는 현재 세션에만 유지되며 재시작 후 다시 요청됩니다."
+  ],
+  "Ready to load a ROM.": [
+    "Ready to load a ROM.",
+    "Sẵn sàng tải ROM.",
+    "ROM을 불러올 준비가 되었습니다."
+  ],
+  "Saved state to Slot {v0}": [
+    "Saved state to Slot {v0}",
+    "Đã lưu trạng thái vào vị trí {v0}",
+    "슬롯 {v0}에 상태 저장됨"
+  ],
+  "Loaded state from Slot {v0}": [
+    "Loaded state from Slot {v0}",
+    "Đã tải trạng thái từ vị trí {v0}",
+    "슬롯 {v0}에서 상태 불러옴"
+  ],
+  "Set the NES session service URL before hosting a public room.": [
+    "Set the NES session service URL before hosting a public room.",
+    "Đặt URL dịch vụ phiên NES trước khi tạo phòng công khai.",
+    "공개 방을 생성하기 전에 NES 세션 서비스 URL을 설정하세요."
+  ],
+  "Choose a local ROM before hosting a public room.": [
+    "Choose a local ROM before hosting a public room.",
+    "Chọn ROM cục bộ trước khi tạo phòng công khai.",
+    "공개 방을 생성하기 전에 로컬 ROM을 선택하세요."
+  ],
+  "Auto-saved stage upon player disconnect!": [
+    "Auto-saved stage upon player disconnect!",
+    "Đã tự lưu khi người chơi ngắt kết nối!",
+    "플레이어 연결 해제 시 자동 저장되었습니다!"
+  ],
+  "Copy failed": [
+    "Copy failed",
+    "Sao chép thất bại",
+    "복사 실패"
+  ],
+  "Copied": [
+    "Copied",
+    "Đã sao chép",
+    "복사됨"
+  ],
+  "Content #{v0}": [
+    "Content #{v0}",
+    "Nội dung #{v0}",
+    "내용 #{v0}"
+  ],
+  "Tool Calls": [
+    "Tool Calls",
+    "Lệnh gọi công cụ",
+    "도구 호출"
+  ],
+  "Finish Reason": [
+    "Finish Reason",
+    "Lý do kết thúc",
+    "종료 이유"
+  ],
+  "Other": [
+    "Other",
+    "Khác",
+    "기타"
+  ],
+  "All files": [
+    "All files",
+    "Tất cả tệp",
+    "모든 파일"
+  ],
+  "Unsupported session": [
+    "Unsupported session",
+    "Phiên không được hỗ trợ",
+    "지원되지 않는 세션"
+  ],
+  "Enter project tag name:": [
+    "Enter project tag name:",
+    "Nhập tên thẻ dự án:",
+    "프로젝트 태그 이름 입력:"
+  ],
+  "Enter remote file path to download:": [
+    "Enter remote file path to download:",
+    "Nhập đường dẫn tệp từ xa cần tải:",
+    "다운로드할 원격 파일 경로 입력:"
+  ],
+  "Invalid JSON syntax": [
+    "Invalid JSON syntax",
+    "Cú pháp JSON không hợp lệ",
+    "잘못된 JSON 구문"
+  ],
+  "Line {v0}: YAML forbids tab characters for indentation. Use spaces instead.": [
+    "Line {v0}: YAML forbids tab characters for indentation. Use spaces instead.",
+    "Dòng {v0}: YAML không cho dùng tab để thụt lề. Hãy dùng dấu cách.",
+    "{v0}행: YAML에서는 들여쓰기에 탭을 사용할 수 없습니다. 공백을 사용하세요."
+  ],
+  "Line {v0}: Missing '=' in key-value environment line.": [
+    "Line {v0}: Missing '=' in key-value environment line.",
+    "Dòng {v0}: Thiếu dấu '=' trong cặp khóa và giá trị môi trường.",
+    "{v0}행: 환경 변수의 키와 값 사이에 '='가 없습니다."
+  ],
+  "Canvas 2D context unavailable": [
+    "Canvas 2D context unavailable",
+    "Không có ngữ cảnh vẽ 2D",
+    "2D 캔버스 컨텍스트를 사용할 수 없습니다"
+  ],
+  "Waiting for the other player's local ROM hash": [
+    "Waiting for the other player's local ROM hash",
+    "Đang chờ mã băm ROM của người chơi kia",
+    "상대 플레이어의 로컬 ROM 해시 대기 중"
+  ],
+  "Room WebSocket connection failed": [
+    "Room WebSocket connection failed",
+    "Kết nối WebSocket đến phòng thất bại",
+    "방 WebSocket 연결 실패"
+  ],
+  "Room WebSocket disconnected": [
+    "Room WebSocket disconnected",
+    "WebSocket phòng đã ngắt kết nối",
+    "방 WebSocket 연결 해제됨"
+  ],
+  "ROM hash mismatch": [
+    "ROM hash mismatch",
+    "Mã băm ROM không khớp",
+    "ROM 해시 불일치"
+  ],
+  "ROM mismatch: both players must select the exact same ROM": [
+    "ROM mismatch: both players must select the exact same ROM",
+    "ROM không khớp: hai người chơi phải chọn cùng bản ROM",
+    "ROM 불일치: 두 플레이어가 정확히 같은 ROM을 선택해야 합니다"
+  ],
+  "ROM matched; input-only lockstep active": [
+    "ROM matched; input-only lockstep active",
+    "ROM khớp; đã bật đồng bộ thao tác",
+    "ROM 일치; 입력 전용 동기화 활성"
+  ],
+  "The other player left the room": [
+    "The other player left the room",
+    "Người chơi kia đã rời phòng",
+    "상대 플레이어가 방을 나갔습니다"
+  ],
+  "Peer reported a synchronization error": [
+    "Peer reported a synchronization error",
+    "Người chơi kia báo lỗi đồng bộ",
+    "상대가 동기화 오류를 보고했습니다"
+  ],
+  "State mismatch at frame {v0}": [
+    "State mismatch at frame {v0}",
+    "Trạng thái không khớp tại khung hình {v0}",
+    "프레임 {v0}에서 상태 불일치"
+  ],
+  "Emulator state diverged at frame {v0}": [
+    "Emulator state diverged at frame {v0}",
+    "Trạng thái giả lập lệch tại khung hình {v0}",
+    "프레임 {v0}에서 에뮬레이터 상태가 달라졌습니다"
+  ],
+  "Lockstep paused for both players": [
+    "Lockstep paused for both players",
+    "Đồng bộ đã tạm dừng cho cả hai người chơi",
+    "두 플레이어의 동기화가 일시 정지되었습니다"
+  ],
+  "Input-only lockstep active": [
+    "Input-only lockstep active",
+    "Đã bật đồng bộ thao tác",
+    "입력 전용 동기화 활성"
+  ],
+  "SNES canvas has no stage container": [
+    "SNES canvas has no stage container",
+    "Khung SNES không có vùng chứa",
+    "SNES 캔버스에 표시 영역이 없습니다"
+  ],
+  "SNES runtime failed to download": [
+    "SNES runtime failed to download",
+    "Không tải được bộ chạy SNES",
+    "SNES 런타임 다운로드 실패"
+  ],
+  "SNES core boot timed out": [
+    "SNES core boot timed out",
+    "Khởi động bộ giả lập SNES quá thời gian",
+    "SNES 코어 시작 시간 초과"
+  ],
+  "SNES core ready": [
+    "SNES core ready",
+    "Bộ giả lập SNES sẵn sàng",
+    "SNES 코어 준비됨"
+  ],
+  "SNES save state rejected: unexpected payload size": [
+    "SNES save state rejected: unexpected payload size",
+    "Từ chối trạng thái lưu SNES: kích thước dữ liệu không đúng",
+    "SNES 상태 저장 거부: 예상과 다른 데이터 크기"
+  ],
+  "SNES save state restore failed": [
+    "SNES save state restore failed",
+    "Khôi phục trạng thái SNES thất bại",
+    "SNES 상태 복원 실패"
+  ],
+  "Could not reopen terminal. Check the CLI configuration and folder.": [
+    "Could not reopen terminal. Check the CLI configuration and folder.",
+    "Không mở lại được terminal. Hãy kiểm tra cấu hình CLI và thư mục.",
+    "터미널을 다시 열 수 없습니다. CLI 설정과 폴더를 확인하세요."
+  ],
+  "Inline command assistance is disabled for CLI and nested TUI sessions": [
+    "Inline command assistance is disabled for CLI and nested TUI sessions",
+    "Trợ giúp lệnh được tắt cho phiên CLI và TUI lồng nhau",
+    "CLI 및 중첩 TUI 세션에서는 인라인 명령 지원이 비활성화됩니다"
+  ],
+  "The active shell and operating system could not be detected; choose a target": [
+    "The active shell and operating system could not be detected; choose a target",
+    "Không thể xác định shell và hệ điều hành hiện tại; hãy chọn môi trường đích",
+    "현재 셸과 운영체제를 감지할 수 없습니다. 대상을 선택하세요"
+  ],
+  "Select Bash and the Linux distro family before generating a command": [
+    "Select Bash and the Linux distro family before generating a command",
+    "Chọn Bash và họ bản phân phối Linux trước khi tạo lệnh",
+    "명령을 생성하기 전에 Bash와 Linux 배포판 계열을 선택하세요"
+  ],
+  "No Content": [
+    "No Content",
+    "Không có nội dung",
+    "내용 없음"
+  ],
+  "Not Modified": [
+    "Not Modified",
+    "Không thay đổi",
+    "변경 없음"
+  ],
+  "Bad Request": [
+    "Bad Request",
+    "Yêu cầu không hợp lệ",
+    "잘못된 요청"
+  ],
+  "Unauthorized": [
+    "Unauthorized",
+    "Chưa xác thực",
+    "인증되지 않음"
+  ],
+  "Forbidden": [
+    "Forbidden",
+    "Không được phép",
+    "접근 금지"
+  ],
+  "Not Found": [
+    "Not Found",
+    "Không tìm thấy",
+    "찾을 수 없음"
+  ],
+  "Method Not Allowed": [
+    "Method Not Allowed",
+    "Phương thức không được phép",
+    "허용되지 않는 메서드"
+  ],
+  "Rate Limited": [
+    "Rate Limited",
+    "Vượt giới hạn tần suất",
+    "요청 제한"
+  ],
+  "Internal Server Error": [
+    "Internal Server Error",
+    "Lỗi nội bộ máy chủ",
+    "서버 내부 오류"
+  ],
+  "Bad Gateway": [
+    "Bad Gateway",
+    "Lỗi cổng trung gian",
+    "잘못된 게이트웨이"
+  ],
+  "Service Unavailable": [
+    "Service Unavailable",
+    "Dịch vụ không khả dụng",
+    "서비스 사용 불가"
+  ],
+  "Gateway Timeout": [
+    "Gateway Timeout",
+    "Cổng trung gian quá thời gian",
+    "게이트웨이 시간 초과"
+  ],
+  "Created": [
+    "Created",
+    "Đã tạo",
+    "생성됨"
+  ],
+  "Accepted": [
+    "Accepted",
+    "Đã chấp nhận",
+    "접수됨"
+  ],
+  "auth failed": [
+    "auth failed",
+    "xác thực thất bại",
+    "인증 실패"
+  ],
+  "reconnecting": [
+    "reconnecting",
+    "đang kết nối lại",
+    "다시 연결 중"
+  ],
+  "matching-rom": [
+    "matching ROM",
+    "đang đối chiếu ROM",
+    "ROM 비교 중"
+  ],
+  "synced": [
+    "synchronized",
+    "đã đồng bộ",
+    "동기화됨"
+  ],
+  "peer-left": [
+    "peer left",
+    "người chơi kia đã rời",
+    "상대가 나감"
+  ],
+  "Running CLI": [
+    "Running CLI",
+    "CLI đang chạy",
+    "CLI 실행 중"
+  ],
+  "Built-in companion": [
+    "Built-in companion",
+    "Bạn đồng hành có sẵn",
+    "기본 제공 동반자"
+  ],
+  "live": [
+    "live",
+    "trực tiếp",
+    "실시간"
+  ],
+  "polling": [
+    "polling",
+    "đang kiểm tra định kỳ",
+    "폴링 중"
+  ],
+  "No changes or empty file.": [
+    "No changes or empty file.",
+    "Không có thay đổi hoặc tệp trống.",
+    "변경 사항이 없거나 파일이 비어 있습니다."
+  ],
+  "Error loading diff.": [
+    "Error loading diff.",
+    "Lỗi tải so sánh.",
+    "차이 불러오기 오류."
+  ],
+  "Local pet '{v0}' has no pack id": [
+    "Local pet '{v0}' has no pack id",
+    "Thú cưng cục bộ '{v0}' không có ID gói",
+    "로컬 펫 '{v0}'에 팩 ID가 없습니다"
+  ],
+  "Could not decode pet image: {v0}": [
+    "Could not decode pet image: {v0}",
+    "Không đọc được ảnh thú cưng: {v0}",
+    "펫 이미지 해독 실패: {v0}"
+  ],
+  "Env Variables": [
+    "Environment Variables",
+    "Biến môi trường",
+    "환경 변수"
+  ],
+  "App Config": [
+    "App Configuration",
+    "Cấu hình ứng dụng",
+    "앱 구성"
+  ],
+  "Package Manifest": [
+    "Package Manifest",
+    "Tệp khai báo gói",
+    "패키지 매니페스트"
+  ],
+  "Direct Message": [
+    "Direct Message",
+    "Tin nhắn trực tiếp",
+    "다이렉트 메시지"
+  ],
+  "Executables": [
+    "Executables",
+    "Tệp thực thi",
+    "실행 파일"
+  ],
+  "Local monitoring is available": [
+    "Local monitoring is available",
+    "Đã sẵn sàng giám sát cục bộ",
+    "로컬 모니터링을 사용할 수 있습니다"
+  ],
+  "SSH route and target authentication succeeded": [
+    "SSH route and target authentication succeeded",
+    "Kết nối SSH và xác thực máy đích thành công",
+    "SSH 경로 연결 및 대상 인증에 성공했습니다"
+  ],
+  "Host key unverified": [
+    "Host key unverified",
+    "Khóa máy chủ chưa được xác minh",
+    "호스트 키가 확인되지 않았습니다"
+  ],
+  "Environment": [
+    "Environment",
+    "Môi trường",
+    "환경"
+  ],
+  "Cannot format: {v0}": [
+    "Cannot format: {v0}",
+    "Không thể định dạng: {v0}",
+    "서식을 지정할 수 없습니다: {v0}"
+  ],
+  "A request ID is required": [
+    "A request ID is required",
+    "Cần có mã yêu cầu",
+    "요청 ID가 필요합니다"
+  ],
+  "Describe the command you need": [
+    "Describe the command you need",
+    "Hãy mô tả lệnh bạn cần",
+    "필요한 명령을 설명하세요"
+  ],
+  "The request is too long": [
+    "The request is too long",
+    "Yêu cầu quá dài",
+    "요청이 너무 깁니다"
+  ],
+  "Command suggestion cancelled": [
+    "Command suggestion cancelled",
+    "Đã hủy gợi ý lệnh",
+    "명령 제안이 취소되었습니다"
+  ],
+  "Command suggestion timed out": [
+    "Command suggestion timed out",
+    "Gợi ý lệnh đã hết thời gian chờ",
+    "명령 제안 시간이 초과되었습니다"
+  ],
+  "Inline command assistance is available only in shell sessions": [
+    "Inline command assistance is available only in shell sessions",
+    "Trợ giúp lệnh chỉ dùng được trong phiên shell",
+    "인라인 명령 지원은 셸 세션에서만 사용할 수 있습니다"
+  ],
+  "Choose a supported shell and distro before generating a command": [
+    "Choose a supported shell and distro before generating a command",
+    "Chọn shell và bản phân phối được hỗ trợ trước khi tạo lệnh",
+    "명령을 생성하기 전에 지원되는 셸과 배포판을 선택하세요"
+  ],
+  "The request contains no usable text after redaction": [
+    "The request contains no usable text after redaction",
+    "Yêu cầu không còn nội dung sử dụng được sau khi che dữ liệu nhạy cảm",
+    "민감한 정보를 가린 후 요청에 사용할 수 있는 텍스트가 없습니다"
+  ],
+  "no LLM Proxy backends are configured": [
+    "no LLM Proxy backends are configured",
+    "chưa cấu hình backend LLM Proxy",
+    "구성된 LLM 프록시 백엔드가 없습니다"
+  ],
+  "No provider returned a syntax-verified command. {details}": [
+    "No provider returned a syntax-verified command. {details}",
+    "Không nhà cung cấp nào trả về lệnh đã xác minh cú pháp. {details}",
+    "구문 검증을 통과한 명령을 반환한 공급자가 없습니다. {details}"
+  ],
+  "WSL environment detection failed: {error}": [
+    "WSL environment detection failed: {error}",
+    "Không thể xác định môi trường WSL: {error}",
+    "WSL 환경 감지 실패: {error}"
+  ],
+  "SSH environment detection failed: {error}": [
+    "SSH environment detection failed: {error}",
+    "Không thể xác định môi trường SSH: {error}",
+    "SSH 환경 감지 실패: {error}"
+  ],
+  "SSH environment detection task failed: {error}": [
+    "SSH environment detection task failed: {error}",
+    "Tác vụ xác định môi trường SSH thất bại: {error}",
+    "SSH 환경 감지 작업 실패: {error}"
+  ],
+  "SSH environment detection timed out": [
+    "SSH environment detection timed out",
+    "Xác định môi trường SSH đã hết thời gian chờ",
+    "SSH 환경 감지 시간이 초과되었습니다"
+  ],
+  "A CLI/TUI session cannot be overridden as a shell": [
+    "A CLI/TUI session cannot be overridden as a shell",
+    "Không thể chọn phiên CLI/TUI làm phiên shell",
+    "CLI/TUI 세션을 셸로 재정의할 수 없습니다"
+  ],
+  "Choose Windows, Ubuntu/Debian, or RHEL-family for Bash": [
+    "Choose Windows, Ubuntu/Debian, or RHEL-family for Bash",
+    "Chọn Windows, Ubuntu/Debian hoặc họ RHEL cho Bash",
+    "Bash용 Windows, Ubuntu/Debian 또는 RHEL 계열을 선택하세요"
+  ],
+  "Windows Bash is supported only for a local session": [
+    "Windows Bash is supported only for a local session",
+    "Bash trên Windows chỉ được hỗ trợ trong phiên cục bộ",
+    "Windows Bash는 로컬 세션에서만 지원됩니다"
+  ],
+  "The selected shell is not supported for this session transport": [
+    "The selected shell is not supported for this session transport",
+    "Shell đã chọn không được hỗ trợ cho kiểu kết nối của phiên này",
+    "선택한 셸은 이 세션의 연결 방식에서 지원되지 않습니다"
+  ],
+  "provider response contained no command content": [
+    "provider response contained no command content",
+    "phản hồi của nhà cung cấp không chứa lệnh",
+    "공급자 응답에 명령 내용이 없습니다"
+  ],
+  "provider response exceeded 512 KiB": [
+    "provider response exceeded 512 KiB",
+    "phản hồi của nhà cung cấp vượt quá 512 KiB",
+    "공급자 응답이 512 KiB를 초과했습니다"
+  ],
+  "failed reading provider response: {error}": [
+    "failed reading provider response: {error}",
+    "không thể đọc phản hồi của nhà cung cấp: {error}",
+    "공급자 응답 읽기 실패: {error}"
+  ],
+  "model returned {shell} syntax for a {dialect} terminal": [
+    "model returned {shell} syntax for a {dialect} terminal",
+    "mô hình trả về cú pháp {shell} cho terminal {dialect}",
+    "모델이 {dialect} 터미널에 대해 {shell} 구문을 반환했습니다"
+  ],
+  "command must contain between 1 and 4096 bytes": [
+    "command must contain between 1 and 4096 bytes",
+    "lệnh phải có từ 1 đến 4096 byte",
+    "명령은 1~4096바이트여야 합니다"
+  ],
+  "command must be one line without terminal control characters": [
+    "command must be one line without terminal control characters",
+    "lệnh phải nằm trên một dòng và không chứa ký tự điều khiển terminal",
+    "명령은 터미널 제어 문자 없이 한 줄이어야 합니다"
+  ],
+  "unsupported shell validator": [
+    "unsupported shell validator",
+    "không hỗ trợ trình kiểm tra shell này",
+    "지원되지 않는 셸 검증기입니다"
+  ],
+  "cmd command is outside the verified strict subset": [
+    "cmd command is outside the verified strict subset",
+    "lệnh cmd nằm ngoài tập cú pháp đã được xác minh",
+    "cmd 명령이 검증된 제한 구문 범위를 벗어납니다"
+  ],
+  "cmd grouping and batch blocks are outside the verified strict subset": [
+    "cmd grouping and batch blocks are outside the verified strict subset",
+    "nhóm lệnh và khối batch của cmd nằm ngoài tập cú pháp đã xác minh",
+    "cmd 그룹 및 배치 블록이 검증된 제한 구문 범위를 벗어납니다"
+  ],
+  "cmd command has an empty pipeline or chain segment": [
+    "cmd command has an empty pipeline or chain segment",
+    "lệnh cmd có đoạn pipeline hoặc chuỗi lệnh rỗng",
+    "cmd 명령에 빈 파이프라인 또는 연결 구간이 있습니다"
+  ],
+  "single '&' chains are outside the verified strict subset": [
+    "single '&' chains are outside the verified strict subset",
+    "chuỗi lệnh dùng dấu '&' đơn nằm ngoài tập cú pháp đã xác minh",
+    "단일 '&'로 연결된 명령은 검증된 제한 구문 범위를 벗어납니다"
+  ],
+  "cmd command ends with a dangling caret escape": [
+    "cmd command ends with a dangling caret escape",
+    "lệnh cmd kết thúc bằng dấu thoát ^ không đầy đủ",
+    "cmd 명령이 완성되지 않은 ^ 이스케이프로 끝납니다"
+  ],
+  "cmd command has an unmatched double quote": [
+    "cmd command has an unmatched double quote",
+    "lệnh cmd có dấu nháy kép không khớp",
+    "cmd 명령에 짝이 맞지 않는 큰따옴표가 있습니다"
+  ],
+  "cmd command ends with an empty chain segment": [
+    "cmd command ends with an empty chain segment",
+    "lệnh cmd kết thúc bằng đoạn lệnh rỗng",
+    "cmd 명령이 빈 연결 구간으로 끝납니다"
+  ],
+  "cmd redirection is missing a target": [
+    "cmd redirection is missing a target",
+    "chuyển hướng cmd thiếu đích",
+    "cmd 리디렉션에 대상이 없습니다"
+  ],
+  "cmd environment-variable expansion has an unmatched '%'": [
+    "cmd environment-variable expansion has an unmatched '%'",
+    "biểu thức biến môi trường cmd có dấu '%' không khớp",
+    "cmd 환경 변수 확장에 짝이 맞지 않는 '%'가 있습니다"
+  ],
+  "SSH profile list is unavailable": [
+    "SSH profile list is unavailable",
+    "Không có danh sách cấu hình SSH",
+    "SSH 프로필 목록을 사용할 수 없습니다"
+  ],
+  "SSH profile list is invalid": [
+    "SSH profile list is invalid",
+    "Danh sách cấu hình SSH không hợp lệ",
+    "SSH 프로필 목록이 잘못되었습니다"
+  ],
+  "SSH profile '{name}' was not found": [
+    "SSH profile '{name}' was not found",
+    "Không tìm thấy cấu hình SSH '{name}'",
+    "SSH 프로필 '{name}'을 찾을 수 없습니다"
+  ],
+  "Bash parser rejected the command: {error}": [
+    "Bash parser rejected the command: {error}",
+    "Bộ phân tích Bash từ chối lệnh: {error}",
+    "Bash 파서가 명령을 거부했습니다: {error}"
+  ],
+  "Bash validation task failed: {error}": [
+    "Bash validation task failed: {error}",
+    "Tác vụ kiểm tra Bash thất bại: {error}",
+    "Bash 검증 작업 실패: {error}"
+  ],
+  "Bash validation timed out": [
+    "Bash validation timed out",
+    "Kiểm tra Bash đã hết thời gian chờ",
+    "Bash 검증 시간이 초과되었습니다"
+  ],
+  "Bash validation is supported only for local, WSL, and SSH sessions": [
+    "Bash validation is supported only for local, WSL, and SSH sessions",
+    "Kiểm tra Bash chỉ hỗ trợ phiên cục bộ, WSL và SSH",
+    "Bash 검증은 로컬, WSL 및 SSH 세션에서만 지원됩니다"
+  ],
+  "Uncategorized": [
+    "Uncategorized",
+    "Chưa phân nhóm",
+    "미분류"
+  ]
+}

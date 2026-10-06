@@ -1,3 +1,5 @@
+import { tFeedback as trFeedback, t as tr, useLocale, getIntlLocale } from '../i18n';
+import { formatRelativeTime as timeAgo } from '../i18n';
 // Agent Session Browser — browse Hermes, Antigravity, Claude, and Codex sessions.
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { AgentSessionEntry, AgentSessionMessage, CliDefinition } from '../types';
@@ -68,23 +70,10 @@ export function getAgentResumeCommand(session: AgentSessionEntry): ResumeCommand
   };
 }
 
-function timeAgo(ts: number): string {
-  if (!ts || ts <= 0) return '—';
-  const now = Date.now() / 1000;
-  const diff = now - ts;
-  if (diff < 0) return 'vừa xong';
-  if (diff < 60) return 'vừa xong';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m trước`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h trước`;
-  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d trước`;
-  const d = new Date(ts * 1000);
-  return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
-}
-
 function formatFullDate(ts: number): string {
   if (!ts || ts <= 0) return '—';
   const d = new Date(ts * 1000);
-  return `${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${d.toLocaleDateString()}`;
+  return `${d.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit' })} ${d.toLocaleDateString(getIntlLocale())}`;
 }
 
 function truncate(s: string, n: number): string {
@@ -92,6 +81,7 @@ function truncate(s: string, n: number): string {
 }
 
 export function AgentSessionPanel() {
+  const locale = useLocale();
   const [sessions, setSessions] = useState<AgentSessionEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<AgentSessionEntry | null>(null);
@@ -444,28 +434,24 @@ export function AgentSessionPanel() {
       {/* Header bar */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-700/60 bg-zinc-900/95 shrink-0">
         <span className="text-base font-bold tracking-wide flex items-center gap-1.5 text-zinc-100">
-          <span>🗂</span> Agent Sessions
-        </span>
+          <span>🗂</span>{tr(" Agent Sessions")}</span>
         <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
-          {filteredSessions.length} / {sessions.length} sessions
-        </span>
+          {filteredSessions.length} / {sessions.length}{tr(" sessions")}</span>
         <div className="flex-1" />
         {isFilterActive && (
           <button
             onClick={clearAllFilters}
             className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-800 transition-colors cursor-pointer"
-            title="Xóa tất cả các điều kiện lọc"
+            title={tr("Xóa tất cả các điều kiện lọc")}
           >
-            <span>✕</span> Xóa bộ lọc
-          </button>
+            <span>✕</span>{tr(" Xóa bộ lọc")}</button>
         )}
         <button
           onClick={refresh}
           className="text-xs text-zinc-300 hover:text-white px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-          title="Tải lại danh sách sessions"
+          title={tr("Tải lại danh sách sessions")}
         >
-          <span>🔄</span> Làm mới
-        </button>
+          <span>🔄</span>{tr(" Làm mới")}</button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -479,8 +465,7 @@ export function AgentSessionPanel() {
                 ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
-          >
-            Tất cả ({agentCounts.all})
+          >{tr("Tất cả (")}{agentCounts.all})
           </button>
           <button
             onClick={() => handleSelectAgent('hermes')}
@@ -543,9 +528,7 @@ export function AgentSessionPanel() {
                 ? 'bg-zinc-600 text-white font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
-          >
-            Toàn thời gian
-          </button>
+          >{tr("Toàn thời gian")}</button>
           <button
             onClick={() => setDateFilter('today')}
             className={`px-2 py-1 text-xs rounded-md font-medium transition-all cursor-pointer ${
@@ -553,9 +536,7 @@ export function AgentSessionPanel() {
                 ? 'bg-zinc-600 text-white font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
-          >
-            Hôm nay
-          </button>
+          >{tr("Hôm nay")}</button>
           <button
             onClick={() => setDateFilter('7d')}
             className={`px-2 py-1 text-xs rounded-md font-medium transition-all cursor-pointer ${
@@ -563,9 +544,7 @@ export function AgentSessionPanel() {
                 ? 'bg-zinc-600 text-white font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
-          >
-            7 ngày
-          </button>
+          >{tr("7 ngày")}</button>
           <button
             onClick={() => setDateFilter('30d')}
             className={`px-2 py-1 text-xs rounded-md font-medium transition-all cursor-pointer ${
@@ -573,16 +552,14 @@ export function AgentSessionPanel() {
                 ? 'bg-zinc-600 text-white font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
-          >
-            30 ngày
-          </button>
+          >{tr("30 ngày")}</button>
         </div>
 
         {/* Search input */}
         <div className="relative flex-1 min-w-[200px]">
           <input
             type="text"
-            placeholder="🔍 Tìm tiêu đề, thư mục, model, session ID..."
+            placeholder={tr("🔍 Tìm tiêu đề, thư mục, model, session ID...")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-3 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all"
@@ -601,43 +578,41 @@ export function AgentSessionPanel() {
       {/* Active Filter Chips Bar */}
       {isFilterActive && (
         <div className="px-4 py-1.5 bg-zinc-950/70 border-b border-zinc-800 flex flex-wrap items-center gap-1.5 text-xs shrink-0">
-          <span className="text-zinc-500 font-medium text-[11px] mr-1">Đang lọc:</span>
+          <span className="text-zinc-500 font-medium text-[11px] mr-1">{tr("Đang lọc:")}</span>
           {agentFilter !== 'all' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px]">
-              <span>Agent: {agentFilter}</span>
+              <span>{tr("Agent: ")}{agentFilter}</span>
               <button onClick={() => setAgentFilter('all')} className="hover:text-white font-bold ml-0.5 cursor-pointer">✕</button>
             </span>
           )}
           {tagFilter?.type === 'model' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[11px]">
-              <span>Model: {tagFilter.display}</span>
+              <span>{tr("Model: ")}{tagFilter.display}</span>
               <button onClick={() => setTagFilter(null)} className="hover:text-white font-bold ml-0.5 cursor-pointer">✕</button>
             </span>
           )}
           {tagFilter?.type === 'folder' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[11px]">
-              <span>Thư mục: {tagFilter.display}</span>
+              <span>{tr("Thư mục: ")}{tagFilter.display}</span>
               <button onClick={() => setTagFilter(null)} className="hover:text-white font-bold ml-0.5 cursor-pointer">✕</button>
             </span>
           )}
           {dateFilter !== 'all' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-700/60 text-zinc-300 border border-zinc-600 text-[11px]">
-              <span>Thời gian: {dateFilter === 'today' ? 'Hôm nay' : dateFilter === '7d' ? '7 ngày' : '30 ngày'}</span>
+              <span>{tr("Thời gian: ")}{dateFilter === 'today' ? tr("Hôm nay") : dateFilter === '7d' ? tr("7 ngày") : tr("30 ngày")}</span>
               <button onClick={() => setDateFilter('all')} className="hover:text-white font-bold ml-0.5 cursor-pointer">✕</button>
             </span>
           )}
           {searchQuery.trim() && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700 text-[11px]">
-              <span>Từ khóa: "{searchQuery}"</span>
+              <span>{tr("Từ khóa: \"")}{searchQuery}"</span>
               <button onClick={() => setSearchQuery('')} className="hover:text-white font-bold ml-0.5 cursor-pointer">✕</button>
             </span>
           )}
           <button
             onClick={clearAllFilters}
             className="text-amber-400 hover:text-amber-300 ml-auto text-[11px] underline font-medium cursor-pointer"
-          >
-            ✕ Xóa tất cả
-          </button>
+          >{tr("✕ Xóa tất cả")}</button>
         </div>
       )}
 
@@ -648,19 +623,17 @@ export function AgentSessionPanel() {
           {loading ? (
             <div className="flex flex-col items-center justify-center h-48 text-zinc-500 text-xs gap-2">
               <span className="animate-spin text-lg">⟳</span>
-              <span>Đang tải danh sách session...</span>
+              <span>{tr("Đang tải danh sách session...")}</span>
             </div>
           ) : filteredSessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-zinc-500 text-xs gap-2">
               <span className="text-2xl">📭</span>
-              <span>Không tìm thấy session nào phù hợp</span>
+              <span>{tr("Không tìm thấy session nào phù hợp")}</span>
               {isFilterActive && (
                 <button
                   onClick={clearAllFilters}
                   className="text-xs text-amber-400 hover:text-amber-300 underline font-medium"
-                >
-                  Xóa bộ lọc để xem tất cả
-                </button>
+                >{tr("Xóa bộ lọc để xem tất cả")}</button>
               )}
             </div>
           ) : (
@@ -703,8 +676,8 @@ export function AgentSessionPanel() {
                         }`}
                         title={
                           isAgentActive
-                            ? `Đang lọc theo ${s.agent}. Click để bỏ lọc.`
-                            : `Click để lọc theo agent: ${s.agent}`
+                            ? tr("Đang lọc theo {v0}. Click để bỏ lọc.", { v0: String(s.agent) })
+                            : tr("Click để lọc theo agent: {v0}", { v0: String(s.agent) })
                         }
                       >
                         {getAgentBadge(s.agent)}
@@ -737,8 +710,8 @@ export function AgentSessionPanel() {
                           }`}
                           title={
                             isModelActive
-                              ? `Đang lọc theo model ${s.model}. Click để bỏ lọc.`
-                              : `Click để lọc theo model: ${s.model}`
+                              ? tr("Đang lọc theo model {v0}. Click để bỏ lọc.", { v0: String(s.model) })
+                              : tr("Click để lọc theo model: {v0}", { v0: String(s.model) })
                           }
                         >
                           {s.model}
@@ -748,8 +721,7 @@ export function AgentSessionPanel() {
                       {/* Message Count */}
                       {s.messageCount > 0 && (
                         <span className="text-zinc-500 text-[10px]">
-                          💬 {s.messageCount} lượt
-                        </span>
+                          💬 {s.messageCount}{tr(" lượt")}</span>
                       )}
 
                       {/* Clickable Folder Tag */}
@@ -767,8 +739,8 @@ export function AgentSessionPanel() {
                           }`}
                           title={
                             isFolderActive
-                              ? `Đang lọc theo thư mục ${folderName || s.cwd}. Click để bỏ lọc.`
-                              : `Click để lọc theo thư mục: ${s.cwd}`
+                              ? tr("Đang lọc theo thư mục {v0}. Click để bỏ lọc.", { v0: String(folderName || s.cwd) })
+                              : tr("Click để lọc theo thư mục: {v0}", { v0: String(s.cwd) })
                           }
                         >
                           <span>📂</span>
@@ -803,10 +775,10 @@ export function AgentSessionPanel() {
                 <button
                   onClick={() => handleResumeSession(selectedSession)}
                   className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold shadow-md shadow-amber-900/20 flex items-center gap-1.5 shrink-0 transition-all active:scale-95"
-                  title={`Chạy lệnh resume chính xác: ${getAgentResumeCommand(selectedSession).commandDisplay}`}
+                  title={tr("Chạy lệnh resume chính xác: {v0}", { v0: String(getAgentResumeCommand(selectedSession).commandDisplay) })}
                 >
                   <span>▶</span>
-                  <span>Resume Session</span>
+                  <span>{tr("Resume Session")}</span>
                 </button>
               </div>
 
@@ -819,22 +791,22 @@ export function AgentSessionPanel() {
                 <button
                   onClick={() => handleCopyResumeCmd(getAgentResumeCommand(selectedSession).commandDisplay)}
                   className="text-zinc-400 hover:text-white px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] shrink-0 font-sans flex items-center gap-1 transition-all"
-                  title="Sao chép lệnh resume"
+                  title={tr("Sao chép lệnh resume")}
                 >
                   <span>{copyResumeCmdStatus ? '✓' : '📋'}</span>
-                  <span>{copyResumeCmdStatus ? 'Đã copy' : 'Copy'}</span>
+                  <span>{copyResumeCmdStatus ? tr("Đã copy") : tr("Copy")}</span>
                 </button>
               </div>
 
               {/* Real path / metadata info */}
               <div className="text-[11px] text-zinc-400 space-y-1 bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-800/80">
                 <div className="flex items-center gap-2">
-                  <span className="text-zinc-500 font-medium shrink-0">Session ID:</span>
+                  <span className="text-zinc-500 font-medium shrink-0">{tr("Session ID:")}</span>
                   <span className="font-mono text-zinc-300 select-all truncate">{selectedSession.id}</span>
                 </div>
                 {selectedSession.cwd && (
                   <div className="flex items-center gap-2 truncate">
-                    <span className="text-zinc-500 font-medium shrink-0">Working Dir:</span>
+                    <span className="text-zinc-500 font-medium shrink-0">{tr("Working Dir:")}</span>
                     <span className="text-zinc-300 truncate select-all font-mono text-[10px]" title={selectedSession.cwd}>
                       {selectedSession.cwd}
                     </span>
@@ -842,7 +814,7 @@ export function AgentSessionPanel() {
                 )}
                 {selectedSession.realPath && (
                   <div className="flex items-center gap-2 truncate">
-                    <span className="text-zinc-500 font-medium shrink-0">Real Path:</span>
+                    <span className="text-zinc-500 font-medium shrink-0">{tr("Real Path:")}</span>
                     <span className="text-zinc-400 text-[10px] truncate select-all font-mono" title={selectedSession.realPath}>
                       {selectedSession.realPath}
                     </span>
@@ -863,7 +835,7 @@ export function AgentSessionPanel() {
                     }`}
                   >
                     <span>📋</span>
-                    <span>{copyPathStatus ? '✓ Đã copy path' : 'Copy Real Path'}</span>
+                    <span>{copyPathStatus ? tr("✓ Đã copy path") : tr("Copy Real Path")}</span>
                   </button>
                 )}
 
@@ -877,12 +849,12 @@ export function AgentSessionPanel() {
                   }`}
                 >
                   <span>📄</span>
-                  <span>{copyContextStatus ? '✓ Đã copy context' : 'Copy Context'}</span>
+                  <span>{copyContextStatus ? tr("✓ Đã copy context") : tr("Copy Context")}</span>
                 </button>
 
                 {/* 3. Transfer to Agent Dropdown / Buttons */}
                 <div className="flex items-center gap-1 ml-auto">
-                  <span className="text-[11px] text-zinc-400 font-medium">⚡ Chuyển sang:</span>
+                  <span className="text-[11px] text-zinc-400 font-medium">{tr("⚡ Chuyển sang:")}</span>
                   <div className="flex items-center gap-1">
                     {handoffClis.map((cli) => (
                       <button
@@ -890,7 +862,7 @@ export function AgentSessionPanel() {
                         onClick={() => handleTransferToAgent(cli)}
                         disabled={transferring}
                         className="px-2 py-0.5 text-[11px] rounded bg-zinc-800 hover:bg-amber-600 hover:text-white text-zinc-300 border border-zinc-700 font-medium transition-all"
-                        title={`Mở CLI ${cli.name} kèm context của session này`}
+                        title={tr("Mở CLI {v0} kèm context của session này", { v0: String(cli.name) })}
                       >
                         {cli.name}
                       </button>
@@ -903,7 +875,7 @@ export function AgentSessionPanel() {
               {transferSuccess && (
                 <div className="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 flex items-center gap-1.5">
                   <span>✓</span>
-                  <span>{transferSuccess}</span>
+                  <span>{trFeedback(transferSuccess ?? '')}</span>
                 </div>
               )}
             </div>
@@ -913,12 +885,12 @@ export function AgentSessionPanel() {
               {loadingPreview ? (
                 <div className="flex items-center justify-center h-32 text-zinc-500 text-xs gap-2">
                   <span className="animate-spin text-sm">⟳</span>
-                  <span>Đang tải nội dung hội thoại...</span>
+                  <span>{tr("Đang tải nội dung hội thoại...")}</span>
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-zinc-500 text-xs gap-1">
-                  <span>Không có tin nhắn chi tiết</span>
-                  <span className="text-[10px] text-zinc-600">Session có thể chỉ chứa metadata hoặc logs bên ngoài</span>
+                  <span>{tr("Không có tin nhắn chi tiết")}</span>
+                  <span className="text-[10px] text-zinc-600">{tr("Session có thể chỉ chứa metadata hoặc logs bên ngoài")}</span>
                 </div>
               ) : (
                 messages.map((m, i) => {
@@ -934,7 +906,7 @@ export function AgentSessionPanel() {
                     >
                       <div className="flex items-center justify-between text-[10px] font-bold mb-1">
                         <span className={isUser ? 'text-blue-400' : 'text-amber-400'}>
-                          {isUser ? '👤 Người dùng (User)' : '🤖 Trợ lý (AI)'}
+                          {isUser ? tr("👤 Người dùng (User)") : tr("🤖 Trợ lý (AI)")}
                         </span>
                         {m.timestamp > 0 && (
                           <span className="text-zinc-500 font-normal">
@@ -954,11 +926,8 @@ export function AgentSessionPanel() {
         ) : (
           <div className="w-[52%] border-l border-zinc-700/60 flex flex-col items-center justify-center text-zinc-500 text-xs p-6 text-center gap-2">
             <span className="text-3xl">👈</span>
-            <span className="font-medium text-zinc-300 text-sm">Chọn một session để xem chi tiết</span>
-            <p className="text-[11px] text-zinc-500 max-w-sm">
-              Double-click session để Resume ngay với lệnh chính xác của từng agent.
-              Xem trước tin nhắn, sao chép đường dẫn file thực tế, xuất context hoặc chuyển tiếp sang Agent khác.
-            </p>
+            <span className="font-medium text-zinc-300 text-sm">{tr("Chọn một session để xem chi tiết")}</span>
+            <p className="text-[11px] text-zinc-500 max-w-sm">{tr("Double-click session để Resume ngay với lệnh chính xác của từng agent. Xem trước tin nhắn, sao chép đường dẫn file thực tế, xuất context hoặc chuyển tiếp sang Agent khác.")}</p>
           </div>
         )}
       </div>

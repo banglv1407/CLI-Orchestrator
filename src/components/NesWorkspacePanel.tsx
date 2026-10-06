@@ -1,3 +1,4 @@
+import { tFeedback as trFeedback, t as tr, useLocale } from '../i18n';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   nesGetConfig,
@@ -562,39 +563,35 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-cyber-line px-4 py-3">
         <div className="flex items-center gap-3">
-          <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">
-            🎮 NES Multiplayer
-          </h2>
+          <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold">{tr("🎮 NES Multiplayer")}</h2>
           {mode !== "home" && (
             <button
               type="button"
               onClick={handleBackHome}
               className="rounded border border-cyber-line/40 px-2 py-0.5 text-[10px] font-semibold text-slate-400 hover:text-white hover:border-cyber-neon/40 transition"
-            >
-              ← Home
-            </button>
+            >{tr("← Home")}</button>
           )}
         </div>
         <div className="flex items-center gap-2">
           {autoSavedNotice && (
             <span className="rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[11px] font-semibold text-emerald-300 animate-pulse">
-              ✨ {autoSavedNotice}
+              ✨ {tr(autoSavedNotice ?? '')}
             </span>
           )}
           {saveError && (
             <span className="rounded bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[11px] font-semibold text-rose-300">
-              {saveError}
+              {trFeedback(saveError ?? '')}
             </span>
           )}
           <button
             type="button"
             onClick={() => setShowKeyConfig(true)}
             className="rounded border border-cyber-line/50 bg-cyber-base/60 px-2.5 py-1 text-[11px] font-semibold text-amber-300 hover:border-amber-400 hover:text-amber-200 transition flex items-center gap-1.5"
-            title="Configure Controller Key Mapping"
+            title={tr("Configure Controller Key Mapping")}
           >
-            <span>⌨️ Controls</span>
+            <span>{tr("⌨️ Controls")}</span>
           </button>
-          <span className="text-[10px] text-slate-500">Windows x64 · input-only WSS</span>
+          <span className="text-[10px] text-slate-500">{tr("Windows x64 · input-only WSS")}</span>
         </div>
       </div>
 
@@ -604,13 +601,13 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
           <HomeView
             config={config}
             serverStatus={serverStatus}
-            serverError={serverError}
+            serverError={trFeedback(serverError ?? '')}
             onTestServer={handleTestServer}
             testingServer={testingServer}
             onHostGame={() => setMode("host-setup")}
             rooms={rooms}
             roomsLoading={roomsLoading}
-            roomError={roomError}
+            roomError={trFeedback(roomError ?? '')}
             onRefreshRooms={() => void refreshRooms(config)}
             onJoinRoom={(room) => void handleJoinRoom(room)}
           />
@@ -621,8 +618,8 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
             setServiceUrl={setServiceUrl}
             onSaveConfig={handleSaveConfig}
             romPayload={romPayload}
-            romError={romError}
-            sessionError={roomError}
+            romError={trFeedback(romError ?? '')}
+            sessionError={trFeedback(roomError ?? '')}
             onPickRom={handlePickRom}
             onStart={handleStartHostGame}
             onStartSolo={handleStartSoloGame}
@@ -721,7 +718,7 @@ function HomeView(props: {
     <div className="grid gap-4">
       <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/60 p-5">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-200">Session Service</h3>
+          <h3 className="text-sm font-semibold text-slate-200">{tr("Session Service")}</h3>
           <span
             className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
               props.serverStatus === "ok"
@@ -731,11 +728,11 @@ function HomeView(props: {
                   : "bg-slate-500/15 text-slate-400"
             }`}
           >
-            {props.serverStatus === "ok" ? "OK" : props.serverStatus === "error" ? "Error" : "Not tested"}
+            {props.serverStatus === "ok" ? tr("OK") : props.serverStatus === "error" ? tr("Error") : tr("Not tested")}
           </span>
         </div>
         <p className="text-[11px] text-slate-400">
-          {hasUrl ? props.config.service_base_url : "No service URL configured. Set it in Host Setup."}
+          {hasUrl ? props.config.service_base_url : tr("No service URL configured. Set it in Host Setup.")}
         </p>
         {props.serverError && <p className="mt-2 text-[11px] text-rose-400">{props.serverError}</p>}
         <button
@@ -744,29 +741,25 @@ function HomeView(props: {
           disabled={props.testingServer}
           className="mt-3 rounded border border-cyber-line/40 px-3 py-1.5 text-[11px] font-semibold text-slate-300 hover:text-white hover:border-cyber-neon/40 transition disabled:opacity-50"
         >
-          {props.testingServer ? "Testing…" : "Test server"}
+          {props.testingServer ? tr("Testing…") : tr("Test server")}
         </button>
       </div>
 
       <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/60 p-5">
-        <h3 className="text-sm font-semibold text-slate-200">Host a Game</h3>
-        <p className="mt-1 text-[11px] text-slate-400">
-          Both players load the same ROM locally; only controller input is sent through the room service.
-        </p>
+        <h3 className="text-sm font-semibold text-slate-200">{tr("Host a Game")}</h3>
+        <p className="mt-1 text-[11px] text-slate-400">{tr("Both players load the same ROM locally; only controller input is sent through the room service.")}</p>
         <button
           type="button"
           onClick={props.onHostGame}
           className="mt-3 rounded bg-cyber-electric px-4 py-2 text-[12px] font-bold text-white hover:bg-cyber-electric/80 transition"
-        >
-          Host Game
-        </button>
+        >{tr("Host Game")}</button>
       </div>
 
       <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/60 p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-slate-200">Live Rooms</h3>
-            <p className="mt-1 text-[11px] text-slate-500">Open rooms can be claimed by exactly one Player 2.</p>
+            <h3 className="text-sm font-semibold text-slate-200">{tr("Live Rooms")}</h3>
+            <p className="mt-1 text-[11px] text-slate-500">{tr("Open rooms can be claimed by exactly one Player 2.")}</p>
           </div>
           <button
             type="button"
@@ -774,27 +767,24 @@ function HomeView(props: {
             disabled={props.roomsLoading || !hasUrl}
             className="rounded border border-cyber-line/40 px-3 py-1.5 text-[11px] font-semibold text-slate-300 hover:border-cyber-neon/40 hover:text-white disabled:opacity-40"
           >
-            {props.roomsLoading ? "Refreshing…" : "Refresh"}
+            {props.roomsLoading ? tr("Refreshing…") : tr("Refresh")}
           </button>
         </div>
-        {props.roomError && <p className="mt-3 text-[11px] text-rose-400">{props.roomError}</p>}
+        {props.roomError && <p className="mt-3 text-[11px] text-rose-400">{trFeedback(props.roomError ?? '')}</p>}
         <div className="mt-3 grid gap-2">
           {!props.roomsLoading && props.rooms.length === 0 && (
-            <div className="rounded border border-dashed border-cyber-line/40 px-3 py-4 text-center text-[11px] text-slate-500">
-              No live rooms yet. Start one and wait for Player 2.
-            </div>
+            <div className="rounded border border-dashed border-cyber-line/40 px-3 py-4 text-center text-[11px] text-slate-500">{tr("No live rooms yet. Start one and wait for Player 2.")}</div>
           )}
           {props.rooms.map((room) => (
             <div key={room.room_id} className="flex items-center justify-between rounded border border-cyber-line/30 bg-cyber-base/50 px-3 py-2">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
-                  <span>{room.joinable ? "Waiting for Player 2" : room.state}</span>
+                  <span>{room.joinable ? tr("Waiting for Player 2") : tr(room.state)}</span>
                   <span className={`rounded px-1.5 py-0.5 text-[9px] uppercase ${room.joinable ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-400"}`}>
                     {room.participant_count}/2
                   </span>
                 </div>
-                <div className="mt-1 truncate font-mono text-[10px] text-slate-500" title={room.host_pubkey}>
-                  Host {room.host_pubkey.slice(0, 12)}… · Room {room.room_id.slice(0, 8)}
+                <div className="mt-1 truncate font-mono text-[10px] text-slate-500" title={room.host_pubkey}>{tr("Host ")}{room.host_pubkey.slice(0, 12)}{tr("… · Room ")}{room.room_id.slice(0, 8)}
                 </div>
                 <div className="mt-1 truncate font-mono text-[11px] text-emerald-300" title={room.host_rom_name}>
                   ROM: {room.host_rom_name}
@@ -806,7 +796,7 @@ function HomeView(props: {
                 disabled={!room.joinable}
                 className="ml-3 rounded bg-cyber-electric px-3 py-1.5 text-[11px] font-bold text-white hover:bg-cyber-electric/80 disabled:bg-slate-700 disabled:text-slate-500"
               >
-                {room.joinable ? "Join as P2" : "Full"}
+                {room.joinable ? tr("Join as P2") : tr("Full")}
               </button>
             </div>
           ))}
@@ -831,7 +821,7 @@ function HostSetupView(props: {
   return (
     <div className="grid max-w-2xl gap-4">
       <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/60 p-5">
-        <h3 className="text-sm font-semibold text-slate-200">1 · Service URL</h3>
+        <h3 className="text-sm font-semibold text-slate-200">{tr("1 · Service URL")}</h3>
         <div className="mt-2 flex gap-2">
           <input
             type="text"
@@ -844,24 +834,18 @@ function HostSetupView(props: {
             type="button"
             onClick={props.onSaveConfig}
             className="rounded border border-cyber-line/40 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:border-cyber-neon/40 transition"
-          >
-            Save
-          </button>
+          >{tr("Save")}</button>
         </div>
-        <p className="mt-1 text-[10px] text-slate-500">
-          Public URLs must be HTTPS/WSS. Plain HTTP is allowed only for localhost development.
-        </p>
+        <p className="mt-1 text-[10px] text-slate-500">{tr("Public URLs must be HTTPS/WSS. Plain HTTP is allowed only for localhost development.")}</p>
       </div>
 
       <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/60 p-5">
-        <h3 className="text-sm font-semibold text-slate-200">2 · Local ROM</h3>
+        <h3 className="text-sm font-semibold text-slate-200">{tr("2 · Local ROM")}</h3>
         <button
           type="button"
           onClick={props.onPickRom}
           className="mt-2 rounded border border-cyber-line/40 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:border-cyber-neon/40 transition"
-        >
-          Choose ROM (.nes / .sfc / .smc)…
-        </button>
+        >{tr("Choose ROM (.nes / .sfc / .smc)…")}</button>
         {props.romPayload && (
           <div className="mt-3 rounded bg-cyber-base/60 px-3 py-2 text-[11px] font-mono text-slate-300">
             <div className="flex items-center gap-2">
@@ -876,35 +860,29 @@ function HostSetupView(props: {
           </div>
         )}
         {props.romError && <p className="mt-2 text-[11px] text-rose-400">{props.romError}</p>}
-        <p className="mt-2 text-[10px] text-slate-500">
-          The ROM stays on this machine. It is never uploaded or shared. NES (.nes) and SNES (.sfc/.smc/.fig/.swc) files ≤ 16 MiB are accepted.
-        </p>
+        <p className="mt-2 text-[10px] text-slate-500">{tr("The ROM stays on this machine. It is never uploaded or shared. NES (.nes) and SNES (.sfc/.smc/.fig/.swc) files ≤ 16 MiB are accepted.")}</p>
       </div>
 
       <div className="rounded-xl border border-cyber-line/40 bg-cyber-panel/60 p-5">
-        <h3 className="text-sm font-semibold text-slate-200">3 · Choose Play Mode</h3>
+        <h3 className="text-sm font-semibold text-slate-200">{tr("3 · Choose Play Mode")}</h3>
         <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={!props.romPayload}
             onClick={props.onStartSolo}
             className="rounded border border-emerald-400/50 bg-emerald-500/10 px-4 py-2 text-[12px] font-bold text-emerald-300 hover:bg-emerald-500/20 transition disabled:opacity-40"
-          >
-            Play Solo
-          </button>
+          >{tr("Play Solo")}</button>
           <button
             type="button"
             disabled={!props.romPayload || props.waiting || !props.serviceUrl.trim()}
             onClick={props.onStart}
             className="rounded bg-cyber-electric px-4 py-2 text-[12px] font-bold text-white hover:bg-cyber-electric/80 transition disabled:opacity-40"
           >
-            {props.waiting ? "Waiting for Player 2…" : "Host Public Room"}
+            {props.waiting ? tr("Waiting for Player 2…") : tr("Host Public Room")}
           </button>
         </div>
         {props.sessionError && <p className="mt-2 text-[11px] text-rose-400">{props.sessionError}</p>}
-        <p className="mt-1 text-[10px] text-slate-500">
-          Solo never contacts the room service. Public hosting adds the room to Live Rooms and waits for Player 2.
-        </p>
+        <p className="mt-1 text-[10px] text-slate-500">{tr("Solo never contacts the room service. Public hosting adds the room to Live Rooms and waits for Player 2.")}</p>
       </div>
     </div>
   );
@@ -924,9 +902,7 @@ function NesReactionPicker(props: { enabled: boolean; onReact: (id: NesReactionI
         onClick={() => setOpen((value) => !value)}
         className="rounded border border-fuchsia-400/40 bg-fuchsia-500/10 px-3 py-1.5 text-[12px] font-semibold text-fuchsia-200 hover:bg-fuchsia-500/20 disabled:cursor-not-allowed disabled:opacity-40"
         aria-expanded={open}
-      >
-        😀 Reactions
-      </button>
+      >{tr("😀 Reactions")}</button>
       {open && (
         <div className="absolute left-0 top-full z-20 mt-2 flex w-56 flex-wrap gap-1 rounded-lg border border-fuchsia-400/30 bg-slate-950/95 p-2 shadow-xl">
           {NES_REACTIONS.map((reaction) => (
@@ -934,8 +910,8 @@ function NesReactionPicker(props: { enabled: boolean; onReact: (id: NesReactionI
               key={reaction.id}
               type="button"
               className="rounded px-2 py-1 text-lg hover:bg-fuchsia-500/20"
-              title={reaction.label}
-              aria-label={reaction.label}
+              title={tr(reaction.label)}
+              aria-label={tr(reaction.label)}
               onClick={() => { props.onReact(reaction.id); setOpen(false); }}
             >
               {reaction.emoji}
@@ -983,6 +959,7 @@ function HostGameView(props: {
   reaction: VisibleReaction;
   onReact: (id: NesReactionId) => void;
 }) {
+  const locale = useLocale();
   const [resMode, setResMode] = useState<ResolutionMode>(() => {
     return (localStorage.getItem("clx-nes-res-mode") as ResolutionMode) || "auto";
   });
@@ -1050,31 +1027,25 @@ function HostGameView(props: {
             disabled={!props.romLoaded || (props.online && !["synced", "paused"].includes(props.netplayStatus))}
             className="rounded bg-cyber-electric px-4 py-1.5 text-[12px] font-bold text-white hover:bg-cyber-electric/80 transition disabled:opacity-40"
           >
-            {props.running ? "Pause" : props.paused ? "Resume" : "Play"}
+            {props.running ? tr("Pause") : props.paused ? tr("Resume") : tr("Play")}
           </button>
           <button
             type="button"
             onClick={props.onReset}
             disabled={!props.romLoaded || (props.online && !["synced", "paused"].includes(props.netplayStatus))}
             className="rounded border border-cyber-line/40 px-3 py-1.5 text-[12px] font-semibold text-slate-300 hover:text-white hover:border-cyber-neon/40 transition disabled:opacity-40"
-          >
-            Reset
-          </button>
+          >{tr("Reset")}</button>
           <button
             type="button"
             onClick={props.onQuitGame}
             className="rounded border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-[12px] font-semibold text-rose-300 hover:bg-rose-500/20 hover:border-rose-400 transition"
-            title="Stop emulation and unload ROM"
-          >
-            ⏹️ Exit Game
-          </button>
+            title={tr("Stop emulation and unload ROM")}
+          >{tr("⏹️ Exit Game")}</button>
           <button
             type="button"
             onClick={props.onOpenControls}
             className="rounded border border-cyber-line/40 bg-cyber-base/50 px-3 py-1.5 text-[12px] font-semibold text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
-          >
-            ⌨️ Controls
-          </button>
+          >{tr("⌨️ Controls")}</button>
 
           {!props.isSnes && (
             <NesLayaBotControl bot={props.layaBot} romLoaded={props.romLoaded} />
@@ -1084,57 +1055,53 @@ function HostGameView(props: {
 
           {/* Save / Load State Controls */}
           <div className="flex items-center gap-1.5 ml-1 rounded border border-cyber-line/40 bg-cyber-base/40 px-2 py-1 text-xs">
-            <span className="text-[10px] text-slate-400 font-mono">Slot:</span>
+            <span className="text-[10px] text-slate-400 font-mono">{tr("Slot:")}</span>
             <select
               value={props.selectedSlot}
               onChange={(e) => props.onSelectSlot(e.target.value)}
               className="bg-transparent text-[11px] font-semibold text-cyber-neon outline-none cursor-pointer"
             >
-              <option value="1" className="bg-slate-900 text-slate-200">Slot 1</option>
-              <option value="2" className="bg-slate-900 text-slate-200">Slot 2</option>
-              <option value="3" className="bg-slate-900 text-slate-200">Slot 3</option>
-              <option value="auto" className="bg-slate-900 text-slate-200">Auto Save</option>
+              <option value="1" className="bg-slate-900 text-slate-200">{tr("Slot 1")}</option>
+              <option value="2" className="bg-slate-900 text-slate-200">{tr("Slot 2")}</option>
+              <option value="3" className="bg-slate-900 text-slate-200">{tr("Slot 3")}</option>
+              <option value="auto" className="bg-slate-900 text-slate-200">{tr("Auto Save")}</option>
             </select>
             <button
               type="button"
               onClick={() => props.onSaveState(props.selectedSlot)}
               disabled={!props.romLoaded}
               className="rounded bg-indigo-600/80 hover:bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white transition disabled:opacity-40"
-              title="Save snapshot to current slot"
-            >
-              💾 Save
-            </button>
+              title={tr("Save snapshot to current slot")}
+            >{tr("💾 Save")}</button>
             <button
               type="button"
               onClick={() => props.onLoadState(props.selectedSlot)}
               disabled={!props.romLoaded || !props.hasSaveSlot}
               className="rounded border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300 transition disabled:opacity-40"
-              title="Load snapshot from current slot"
-            >
-              📂 Load
-            </button>
+              title={tr("Load snapshot from current slot")}
+            >{tr("📂 Load")}</button>
           </div>
 
           {/* Resolution Selector */}
           <div className="flex items-center gap-1 ml-2 rounded border border-cyber-line/40 bg-cyber-base/40 px-2 py-1 text-xs">
-            <span className="text-[10px] text-slate-400 font-mono">Res:</span>
+            <span className="text-[10px] text-slate-400 font-mono">{tr("Res:")}</span>
             <select
               value={resMode}
               onChange={(e) => handleResChange(e.target.value as ResolutionMode)}
               className="bg-transparent text-[11px] font-semibold text-cyber-neon outline-none cursor-pointer"
             >
-              <option value="auto" className="bg-slate-900 text-slate-200">Auto Crisp (Pixel-Perfect)</option>
+              <option value="auto" className="bg-slate-900 text-slate-200">{tr("Auto Crisp (Pixel-Perfect)")}</option>
               <option value="1x" className="bg-slate-900 text-slate-200">1x (256×240)</option>
               <option value="2x" className="bg-slate-900 text-slate-200">2x (512×480)</option>
               <option value="3x" className="bg-slate-900 text-slate-200">3x (768×720)</option>
               <option value="4x" className="bg-slate-900 text-slate-200">4x (1024×960)</option>
-              <option value="fit" className="bg-slate-900 text-slate-200">Fit (Native Aspect)</option>
+              <option value="fit" className="bg-slate-900 text-slate-200">{tr("Fit (Native Aspect)")}</option>
             </select>
           </div>
 
           <span className="text-[11px] text-slate-500">{props.emuStatus}</span>
           <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${!props.online || props.netplayStatus === "synced" ? "bg-emerald-500/15 text-emerald-400" : props.netplayStatus === "failed" ? "bg-rose-500/15 text-rose-400" : "bg-amber-500/15 text-amber-300"}`}>
-            {!props.online ? "Solo" : props.netplayStatus === "synced" ? "ROM matched · input sync" : props.netplayStatus}
+            {!props.online ? tr("Solo") : props.netplayStatus === "synced" ? tr("ROM matched · input sync") : props.netplayStatus}
           </span>
         </div>
         {props.romPayload && (
@@ -1162,8 +1129,8 @@ function HostGameView(props: {
         <NesReactionOverlay reaction={props.reaction} />
       </div>
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
-        <span>{props.online ? props.netplayDetail ?? "Player 1: local ROM · waiting for Player 2 ROM hash" : "Player 1: Keyboard + Gamepad · local solo session"}</span>
-        <span>Native 256x240 Framebuffer · 44.1kHz Hi-Fi Audio</span>
+        <span>{props.online ? props.netplayDetail ?? tr("Player 1: local ROM · waiting for Player 2 ROM hash") : tr("Player 1: Keyboard + Gamepad · local solo session")}</span>
+        <span>{tr("Native 256x240 Framebuffer · 44.1kHz Hi-Fi Audio")}</span>
       </div>
     </div>
   );
@@ -1180,31 +1147,26 @@ function GuestInviteView(props: {
   return (
     <div className="mx-auto grid max-w-2xl gap-4 rounded-xl border border-cyber-line/40 bg-cyber-panel/60 p-5">
       <div>
-        <h3 className="text-sm font-semibold text-slate-200">Join as Player 2</h3>
-        <p className="mt-1 font-mono text-[10px] text-slate-500">Room {props.roomId?.slice(0, 8) ?? "unknown"}</p>
+        <h3 className="text-sm font-semibold text-slate-200">{tr("Join as Player 2")}</h3>
+        <p className="mt-1 font-mono text-[10px] text-slate-500">{tr("Room ")}{props.roomId?.slice(0, 8) ?? tr("unknown")}</p>
       </div>
       <div className="rounded border border-cyber-line/30 bg-cyber-base/50 p-4">
         {props.hostRomName && (
-          <p className="mt-2 font-mono text-[11px] text-emerald-300" title={props.hostRomName}>
-            Host ROM: {props.hostRomName}
+          <p className="mt-2 font-mono text-[11px] text-emerald-300" title={props.hostRomName}>{tr("Host ROM: ")}{props.hostRomName}
           </p>
         )}
-        <p className="text-[11px] text-slate-300">Choose your own local copy of the ROM.</p>
-        <button type="button" onClick={props.onPickRom} className="mt-3 rounded border border-cyber-line/40 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:border-cyber-neon/40 hover:text-white">
-          Choose ROM (.nes / .sfc / .smc)…
-        </button>
+        <p className="text-[11px] text-slate-300">{tr("Choose your own local copy of the ROM.")}</p>
+        <button type="button" onClick={props.onPickRom} className="mt-3 rounded border border-cyber-line/40 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:border-cyber-neon/40 hover:text-white">{tr("Choose ROM (.nes / .sfc / .smc)…")}</button>
         {props.romPayload && (
           <div className="mt-3 rounded bg-cyber-base px-3 py-2 font-mono text-[10px] text-emerald-400">
             <span className="mr-2 rounded bg-cyber-neon/20 px-1.5 py-0.5 font-bold uppercase text-cyber-neon">{props.romPayload.console}</span>
             {props.romPayload.name} · sha256 {props.romPayload.sha256.slice(0, 12)}…
           </div>
         )}
-        <p className="mt-2 text-[10px] text-slate-500">Only the SHA-256 is compared privately. ROM bytes never leave this machine.</p>
+        <p className="mt-2 text-[10px] text-slate-500">{tr("Only the SHA-256 is compared privately. ROM bytes never leave this machine.")}</p>
       </div>
-      {props.error && <p className="text-[11px] text-rose-400">{props.error}</p>}
-      <button type="button" disabled={!props.romPayload || !props.roomId} onClick={props.onJoin} className="w-fit rounded bg-cyber-electric px-4 py-2 text-[12px] font-bold text-white disabled:opacity-40">
-        Verify ROM & Join
-      </button>
+      {props.error && <p className="text-[11px] text-rose-400">{trFeedback(props.error ?? '')}</p>}
+      <button type="button" disabled={!props.romPayload || !props.roomId} onClick={props.onJoin} className="w-fit rounded bg-cyber-electric px-4 py-2 text-[12px] font-bold text-white disabled:opacity-40">{tr("Verify ROM & Join")}</button>
     </div>
   );
 }
@@ -1234,65 +1196,53 @@ function GuestGameView(props: {
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between rounded-xl border border-cyber-line/40 bg-cyber-panel/60 px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-200">Player 2</h3>
-          <p className="mt-1 font-mono text-[10px] text-slate-500">
-            Room {props.room?.room_id.slice(0, 8) ?? "connecting"} · {props.detail ?? props.status}
+          <h3 className="text-sm font-semibold text-slate-200">{tr("Player 2")}</h3>
+          <p className="mt-1 font-mono text-[10px] text-slate-500">{tr("Room ")}{props.room?.room_id.slice(0, 8) ?? tr("connecting")} · {tr(props.detail ?? props.status)}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {props.room?.host_rom_name && (
-            <p className="mt-1 font-mono text-[11px] text-emerald-300" title={props.room.host_rom_name}>
-              Host ROM: {props.room.host_rom_name}
+            <p className="mt-1 font-mono text-[11px] text-emerald-300" title={props.room.host_rom_name}>{tr("Host ROM: ")}{props.room.host_rom_name}
             </p>
           )}
           <button type="button" onClick={props.onToggleRun} disabled={!props.romLoaded || !["synced", "paused"].includes(props.status)} className="rounded bg-cyber-electric px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40">
-            {props.running ? "Pause" : props.paused ? "Resume" : "Play"}
+            {props.running ? tr("Pause") : props.paused ? tr("Resume") : tr("Play")}
           </button>
-          <button type="button" onClick={props.onReset} disabled={!props.romLoaded || !["synced", "paused"].includes(props.status)} className="rounded border border-cyber-line/40 px-3 py-1.5 text-[11px] font-semibold text-slate-300 disabled:opacity-40">
-            Reset
-          </button>
-          <button type="button" onClick={props.onOpenControls} className="rounded border border-amber-400/40 px-3 py-1.5 text-[11px] font-semibold text-amber-300">
-            ⌨️ P2 Controls
-          </button>
+          <button type="button" onClick={props.onReset} disabled={!props.romLoaded || !["synced", "paused"].includes(props.status)} className="rounded border border-cyber-line/40 px-3 py-1.5 text-[11px] font-semibold text-slate-300 disabled:opacity-40">{tr("Reset")}</button>
+          <button type="button" onClick={props.onOpenControls} className="rounded border border-amber-400/40 px-3 py-1.5 text-[11px] font-semibold text-amber-300">{tr("⌨️ P2 Controls")}</button>
 
           <NesReactionPicker enabled={["synced", "paused"].includes(props.status)} onReact={props.onReact} />
 
           {/* Save / Load State for Guest */}
           <div className="flex items-center gap-1.5 rounded border border-cyber-line/40 bg-cyber-base/40 px-2 py-1 text-xs">
-            <span className="text-[10px] text-slate-400 font-mono">Slot:</span>
+            <span className="text-[10px] text-slate-400 font-mono">{tr("Slot:")}</span>
             <select
               value={props.selectedSlot}
               onChange={(e) => props.onSelectSlot(e.target.value)}
               className="bg-transparent text-[11px] font-semibold text-cyber-neon outline-none cursor-pointer"
             >
-              <option value="1" className="bg-slate-900 text-slate-200">Slot 1</option>
-              <option value="2" className="bg-slate-900 text-slate-200">Slot 2</option>
-              <option value="3" className="bg-slate-900 text-slate-200">Slot 3</option>
-              <option value="auto" className="bg-slate-900 text-slate-200">Auto Save</option>
+              <option value="1" className="bg-slate-900 text-slate-200">{tr("Slot 1")}</option>
+              <option value="2" className="bg-slate-900 text-slate-200">{tr("Slot 2")}</option>
+              <option value="3" className="bg-slate-900 text-slate-200">{tr("Slot 3")}</option>
+              <option value="auto" className="bg-slate-900 text-slate-200">{tr("Auto Save")}</option>
             </select>
             <button
               type="button"
               onClick={() => props.onSaveState(props.selectedSlot)}
               disabled={!props.romLoaded}
               className="rounded bg-indigo-600/80 hover:bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white transition disabled:opacity-40"
-              title="Save snapshot to current slot"
-            >
-              💾 Save
-            </button>
+              title={tr("Save snapshot to current slot")}
+            >{tr("💾 Save")}</button>
             <button
               type="button"
               onClick={() => props.onLoadState(props.selectedSlot)}
               disabled={!props.romLoaded || !props.hasSaveSlot}
               className="rounded border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300 transition disabled:opacity-40"
-              title="Load snapshot from current slot"
-            >
-              📂 Load
-            </button>
+              title={tr("Load snapshot from current slot")}
+            >{tr("📂 Load")}</button>
           </div>
 
-          <button type="button" onClick={props.onLeave} className="rounded border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300">
-            Leave Room
-          </button>
+          <button type="button" onClick={props.onLeave} className="rounded border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300">{tr("Leave Room")}</button>
         </div>
       </div>
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-cyber-line/40 bg-black/90 p-2">
@@ -1306,9 +1256,9 @@ function GuestGameView(props: {
         <NesReactionOverlay reaction={props.reaction} />
       </div>
       <div className="flex items-center justify-between text-[10px] text-slate-500">
-        <span>{props.romPayload?.name ?? "Local ROM"} · only P2 input and state hashes leave this machine.</span>
+        <span>{props.romPayload?.name ?? tr("Local ROM")}{tr(" · only P2 input and state hashes leave this machine.")}</span>
         <span className={props.status === "synced" ? "text-emerald-400" : props.status === "failed" ? "text-rose-400" : "text-amber-300"}>
-          {props.status}
+          {tr(String(props.status))}
         </span>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { t as tr, useLocale } from '../i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppTheme, CliDefinition, SessionInfo, SshConnection } from '../types';
 
@@ -69,6 +70,7 @@ export function CommandPalette({
   onAddCli, onAddSsh, onQuickSession, onSwitchView, onSwitchTheme,
   activeMainView,
 }: CommandPaletteProps) {
+  const locale = useLocale();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -98,7 +100,7 @@ export function CommandPalette({
       items.push({
         id: 'cli-' + c.name,
         type: 'cli' as const,
-        label: 'Start: ' + c.name,
+        label: tr("Start: ") + c.name,
         description: c.defaultWorkingDir ?? c.command,
         action: () => onOpenCliInteraction(c),
       });
@@ -125,105 +127,105 @@ export function CommandPalette({
     // Actions
     items.push({
       id: 'action-quick-right', type: 'action' as const,
-      label: 'Quick Shell (right panel)',
-      description: 'Open a shell session',
+      label: tr("Quick Shell (right panel)"),
+      description: tr("Open a shell session"),
       action: () => onQuickSession('right'),
     });
     items.push({
       id: 'action-quick-bottom', type: 'action' as const,
-      label: 'Quick Shell (bottom panel)',
-      description: 'Open a shell session',
+      label: tr("Quick Shell (bottom panel)"),
+      description: tr("Open a shell session"),
       action: () => onQuickSession('bottom'),
     });
     items.push({
       id: 'action-new-cli', type: 'action' as const,
-      label: 'New CLI Tool...',
-      description: 'Register a new CLI tool',
+      label: tr("New CLI Tool..."),
+      description: tr("Register a new CLI tool"),
       action: onAddCli,
     });
     items.push({
       id: 'action-quick-config', type: 'action' as const,
-      label: '⚡ Search & Edit Config Files',
-      description: 'Quickly open YAML, JSON, TOML, ENV configs',
+      label: tr("⚡ Search & Edit Config Files"),
+      description: tr("Quickly open YAML, JSON, TOML, ENV configs"),
       action: () => {
         window.dispatchEvent(new CustomEvent('open-quick-config-search'));
       },
     });
     items.push({
       id: 'action-new-ssh', type: 'action' as const,
-      label: 'New SSH Connection...',
-      description: 'Add a remote server',
+      label: tr("New SSH Connection..."),
+      description: tr("Add a remote server"),
       action: onAddSsh,
     });
 
     // Views
     items.push({
       id: 'action-view-companion', type: 'action' as const,
-      label: 'View: AI Companion',
-      description: 'Open AI Companion chat',
+      label: tr("View: AI Companion"),
+      description: tr("Open AI Companion chat"),
       action: () => window.dispatchEvent(new CustomEvent('open-sidebar-tab', { detail: 'ai-chat' })),
     });
     if (activeMainView !== 'terminal') {
       items.push({
         id: 'action-view-terminal', type: 'action' as const,
-        label: 'View: Terminal',
-        description: 'Switch to terminal view',
+        label: tr("View: Terminal"),
+        description: tr("Switch to terminal view"),
         action: () => onSwitchView('terminal'),
       });
     }
     if (activeMainView !== 'quickapps') {
       items.push({
         id: 'action-view-quickapps', type: 'action' as const,
-        label: 'View: Quick Apps',
-        description: 'Switch to quick apps panel',
+        label: tr("View: Quick Apps"),
+        description: tr("Switch to quick apps panel"),
         action: () => onSwitchView('quickapps'),
       });
     }
     if (activeMainView !== 'apiclient') {
       items.push({
         id: 'action-view-apiclient', type: 'action' as const,
-        label: 'View: API Client',
-        description: 'Switch to API client panel',
+        label: tr("View: API Client"),
+        description: tr("Switch to API client panel"),
         action: () => onSwitchView('apiclient'),
       });
     }
     if (activeMainView !== 'agent-sessions') {
       items.push({
         id: 'action-view-agent-sessions', type: 'action' as const,
-        label: 'View: Agent Sessions',
-        description: 'Browse agent conversation history',
+        label: tr("View: Agent Sessions"),
+        description: tr("Browse agent conversation history"),
         action: () => onSwitchView('agent-sessions'),
       });
     }
     if (activeMainView !== 'game') {
       items.push({
         id: 'action-view-game', type: 'action' as const,
-        label: 'View: Entertainment',
-        description: 'Switch to Entertainment & Games workspace',
+        label: tr("View: Entertainment"),
+        description: tr("Switch to Entertainment & Games workspace"),
         action: () => onSwitchView('game'),
       });
     }
     if (activeMainView !== 'proxy') {
       items.push({
         id: 'action-view-proxy', type: 'action' as const,
-        label: 'View: CliProxyAI',
-        description: 'Switch to proxy panel',
+        label: tr("View: CliProxyAI"),
+        description: tr("Switch to proxy panel"),
         action: () => onSwitchView('proxy'),
       });
     }
     if (activeMainView !== 'logs') {
       items.push({
         id: 'action-view-logs', type: 'action' as const,
-        label: 'View: System Logs',
-        description: 'Switch to system logs panel',
+        label: tr("View: System Logs"),
+        description: tr("Switch to system logs panel"),
         action: () => onSwitchView('logs'),
       });
     }
     if (activeMainView !== 'remote') {
       items.push({
         id: 'action-view-remote', type: 'action' as const,
-        label: 'View: Remote SSH',
-        description: 'Switch to remote SSH panel',
+        label: tr("View: Remote SSH"),
+        description: tr("Switch to remote SSH panel"),
         action: () => onSwitchView('remote'),
       });
     }
@@ -241,8 +243,8 @@ export function CommandPalette({
       items.push({
         id: 'settings-section-' + sec.id,
         type: 'action' as const,
-        label: sec.label,
-        description: sec.desc,
+        label: tr(sec.label),
+        description: tr(sec.desc),
         action: () => {
           window.dispatchEvent(new CustomEvent('open-settings', { detail: sec.id }));
         },
@@ -259,15 +261,15 @@ export function CommandPalette({
       if (t !== theme) {
         items.push({
           id: 'action-theme-' + t, type: 'action' as const,
-          label: 'Theme: ' + themeLabels[t],
-          description: 'Switch to ' + themeLabels[t] + ' theme',
+          label: tr('Theme: {theme}', { theme: tr(themeLabels[t]) }),
+          description: tr('Switch to {theme} theme', { theme: tr(themeLabels[t]) }),
           action: () => onSwitchTheme(t),
         });
       }
     }
 
     return items;
-  }, [
+  }, [locale,
     sessions, clis, sshConnections, theme, activeMainView,
     onSelectSession, onOpenCliInteraction, onConnectSsh, onConnectRdp,
     onAddCli, onAddSsh, onQuickSession, onSwitchView, onSwitchTheme,
@@ -353,7 +355,7 @@ export function CommandPalette({
             value={query}
             onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command or search..."
+            placeholder={tr("Type a command or search...")}
             className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 text-sm outline-none border-none"
             spellCheck={false}
           />
@@ -365,9 +367,7 @@ export function CommandPalette({
         {/* Results */}
         <div ref={listRef} className="max-h-72 overflow-y-auto py-1">
           {results.length === 0 ? (
-            <div className="px-4 py-6 text-center text-slate-500 text-sm">
-              No matching commands
-            </div>
+            <div className="px-4 py-6 text-center text-slate-500 text-sm">{tr("No matching commands")}</div>
           ) : (
             results.map((item, idx) => {
               const active = idx === safeIndex;
@@ -391,7 +391,7 @@ export function CommandPalette({
                     </span>
                   )}
                   <span className="text-[10px] text-slate-600 uppercase w-14 text-right">
-                    {item.type}
+                    {tr(item.type)}
                   </span>
                 </button>
               );
@@ -401,9 +401,9 @@ export function CommandPalette({
 
         {/* Footer */}
         <div className="flex items-center gap-3 px-4 py-2 border-t border-cyber-line text-[10px] text-slate-500">
-          <span>arrow keys navigate</span>
-          <span>enter select</span>
-          <span>esc close</span>
+          <span>{tr("arrow keys navigate")}</span>
+          <span>{tr("enter select")}</span>
+          <span>{tr("esc close")}</span>
         </div>
       </div>
     </div>

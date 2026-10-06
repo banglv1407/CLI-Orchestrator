@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getRemoteSystemStats } from '../lib/tauri';
 import type { SshConnection, RemoteSystemStats } from '../types';
@@ -104,9 +105,9 @@ export function RemoteMonitorWidget({ connection, visible }: RemoteMonitorWidget
       {!collapsed && (
         <div className="rmon-body">
           {error ? (
-            <div className="rmon-error">⚠ Connection failed</div>
+            <div className="rmon-error">{tr("⚠ Connection failed")}</div>
           ) : !stats ? (
-            <div className="rmon-loading">Collecting data...</div>
+            <div className="rmon-loading">{tr("Collecting data...")}</div>
           ) : (
             <>
               <GaugeBar label="CPU" value={stats.cpuUsage} color="#ff6b6b" />
@@ -117,14 +118,13 @@ export function RemoteMonitorWidget({ connection, visible }: RemoteMonitorWidget
                 detail={`${fmtBytes(stats.memoryUsed)} / ${fmtBytes(stats.memoryTotal)}`}
               />
               <GaugeBar
-                label="Disk"
+                label={tr("Disk")}
                 value={diskPct}
                 color="#ffe66d"
                 detail={`${fmtBytes(stats.diskUsed)} / ${fmtBytes(stats.diskTotal)}`}
               />
               <canvas ref={canvasRef} className="rmon-sparkline" width={190} height={32} />
-              <div className="rmon-meta">
-                Load: {stats.loadAverage.toFixed(2)} · Up: {fmtUptime(stats.uptimeSeconds)}
+              <div className="rmon-meta">{tr("Load: ")}{stats.loadAverage.toFixed(2)}{tr(" · Up: ")}{fmtUptime(stats.uptimeSeconds)}
               </div>
             </>
           )}

@@ -1,3 +1,4 @@
+import { t as tr, useLocale } from '../i18n';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getApiClientStore,
@@ -266,9 +267,9 @@ function KeyValueRow({ row, onChangeKey, onChangeValue, onToggle, onDelete }: {
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <button type="button" onClick={onToggle} className={"w-5 h-5 shrink-0 rounded text-[10px] flex items-center justify-center border transition " + (row.enabled ? 'bg-cyber-electric/20 border-cyber-electric/40 text-cyber-electric' : 'bg-transparent border-cyber-line/30 text-slate-600')} title="Toggle">{"\u2713"}</button>
-      <input type="text" placeholder="Key" value={row.key} onChange={(e) => onChangeKey(e.target.value)} className={"flex-1 rounded border bg-cyber-base/50 px-2 py-1.5 text-[11px] text-slate-300 font-mono outline-none transition placeholder:text-slate-600 focus:border-cyber-neon/50 " + (row.enabled ? 'border-cyber-line/50' : 'border-cyber-line/20 opacity-50')} />
-      <input type="text" placeholder="Value" value={row.value} onChange={(e) => onChangeValue(e.target.value)} className={"flex-1 rounded border bg-cyber-base/50 px-2 py-1.5 text-[11px] text-slate-300 font-mono outline-none transition placeholder:text-slate-600 focus:border-cyber-neon/50 " + (row.enabled ? 'border-cyber-line/50' : 'border-cyber-line/20 opacity-50')} />
+      <button type="button" onClick={onToggle} className={"w-5 h-5 shrink-0 rounded text-[10px] flex items-center justify-center border transition " + (row.enabled ? 'bg-cyber-electric/20 border-cyber-electric/40 text-cyber-electric' : 'bg-transparent border-cyber-line/30 text-slate-600')} title={tr("Toggle")}>{"\u2713"}</button>
+      <input type="text" placeholder={tr("Key")} value={row.key} onChange={(e) => onChangeKey(e.target.value)} className={"flex-1 rounded border bg-cyber-base/50 px-2 py-1.5 text-[11px] text-slate-300 font-mono outline-none transition placeholder:text-slate-600 focus:border-cyber-neon/50 " + (row.enabled ? 'border-cyber-line/50' : 'border-cyber-line/20 opacity-50')} />
+      <input type="text" placeholder={tr("Value")} value={row.value} onChange={(e) => onChangeValue(e.target.value)} className={"flex-1 rounded border bg-cyber-base/50 px-2 py-1.5 text-[11px] text-slate-300 font-mono outline-none transition placeholder:text-slate-600 focus:border-cyber-neon/50 " + (row.enabled ? 'border-cyber-line/50' : 'border-cyber-line/20 opacity-50')} />
       <button type="button" onClick={onDelete} className="w-5 h-5 shrink-0 flex items-center justify-center rounded text-slate-600 hover:text-red-400 transition"><TrashSmallIcon /></button>
     </div>
   );
@@ -279,6 +280,7 @@ function KeyValueRow({ row, onChangeKey, onChangeValue, onToggle, onDelete }: {
 // ---------------------------------------------------------------------------
 
 export function ApiClientPanel() {
+  const locale = useLocale();
   const st = useApiClientStore();
 
   // ── Resize state (local — UI only) ──
@@ -403,14 +405,14 @@ export function ApiClientPanel() {
     <div ref={panelRef} className="flex h-full flex-col bg-cyber-base overflow-hidden relative">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-cyber-line p-3 bg-cyber-base/70">
-        <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold flex items-center gap-2"><ApiIcon />API Client</h2>
-        <span className="text-[9px] text-slate-500 ml-auto font-mono">Ctrl+Enter to send</span>
+        <h2 className="font-display text-xs uppercase tracking-[0.2em] text-cyber-neon font-bold flex items-center gap-2"><ApiIcon />{tr("API Client")}</h2>
+        <span className="text-[9px] text-slate-500 ml-auto font-mono">{tr("Ctrl+Enter to send")}</span>
       </div>
 
       {/* Curl paste */}
       <div className="flex shrink-0 gap-2 border-b border-cyber-line/50 bg-cyber-panel/20 px-3 py-2">
-        <input type="text" placeholder="Paste curl command here..." value={st.curlInput} onChange={(e) => setCurlInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handlePasteCurl(); }} className="flex-1 rounded border border-cyber-line bg-cyber-base/50 px-2.5 py-1 text-[11px] text-slate-300 font-mono outline-none placeholder:text-slate-600 focus:border-cyber-neon/50 transition" />
-        <button type="button" onClick={handlePasteCurl} disabled={!st.curlInput.trim()} className="shrink-0 rounded border border-cyber-neon/40 bg-cyber-neon/10 px-3 py-1 text-[10px] font-semibold text-cyber-neon transition hover:bg-cyber-neon/20 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wider">Parse Curl</button>
+        <input type="text" placeholder={tr("Paste curl command here...")} value={st.curlInput} onChange={(e) => setCurlInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handlePasteCurl(); }} className="flex-1 rounded border border-cyber-line bg-cyber-base/50 px-2.5 py-1 text-[11px] text-slate-300 font-mono outline-none placeholder:text-slate-600 focus:border-cyber-neon/50 transition" />
+        <button type="button" onClick={handlePasteCurl} disabled={!st.curlInput.trim()} className="shrink-0 rounded border border-cyber-neon/40 bg-cyber-neon/10 px-3 py-1 text-[10px] font-semibold text-cyber-neon transition hover:bg-cyber-neon/20 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wider">{tr("Parse Curl")}</button>
       </div>
 
       {/* URL bar */}
@@ -421,8 +423,8 @@ export function ApiClientPanel() {
           <button type="button" onClick={abortRequest} className="h-9 shrink-0 rounded-r-md border border-red-500/40 bg-red-500/10 px-4 text-[11px] font-bold text-red-400 uppercase tracking-wider hover:bg-red-500/20 transition"><LoaderSpinner /></button>
         ) : (
           <>
-            <button type="button" onClick={sendRequest} disabled={!st.url.trim()} className="h-9 shrink-0 border-y border-r border-cyber-electric/40 bg-cyber-electric/10 px-4 text-[11px] font-bold text-cyber-electric uppercase tracking-wider transition hover:bg-cyber-electric/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"><PlayIcon />Send</button>
-            <button type="button" onClick={copyCurl} disabled={!st.url.trim()} title="Copy as cURL" className="h-9 shrink-0 rounded-r-md border border-cyber-line/40 bg-cyber-base/50 px-3 text-[10px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition uppercase tracking-wider font-semibold disabled:opacity-30 disabled:cursor-not-allowed">cURL</button>
+            <button type="button" onClick={sendRequest} disabled={!st.url.trim()} className="h-9 shrink-0 border-y border-r border-cyber-electric/40 bg-cyber-electric/10 px-4 text-[11px] font-bold text-cyber-electric uppercase tracking-wider transition hover:bg-cyber-electric/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"><PlayIcon />{tr("Send")}</button>
+            <button type="button" onClick={copyCurl} disabled={!st.url.trim()} title={tr("Copy as cURL")} className="h-9 shrink-0 rounded-r-md border border-cyber-line/40 bg-cyber-base/50 px-3 text-[10px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition uppercase tracking-wider font-semibold disabled:opacity-30 disabled:cursor-not-allowed">cURL</button>
           </>
         )}
       </div>
@@ -431,7 +433,7 @@ export function ApiClientPanel() {
       <div className="flex shrink-0 border-b border-cyber-line">
         {(['params', 'headers', 'body', 'runner'] as const).map((tab) => (
           <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={"px-4 py-2 text-[11px] font-semibold uppercase tracking-wider transition border-b-2 -mb-[1px] " + (st.activeTab === tab ? 'text-cyber-electric border-cyber-electric' : 'text-slate-500 border-transparent hover:text-slate-300')}>
-            {tab === 'params' ? 'Params' : tab === 'headers' ? 'Headers' : tab === 'body' ? 'Body' : 'Runner'}
+            {tab === 'params' ? tr("Params") : tab === 'headers' ? tr("Headers") : tab === 'body' ? tr("Body") : tr("Runner")}
           </button>
         ))}
       </div>
@@ -448,17 +450,17 @@ export function ApiClientPanel() {
                 onDelete={() => kvActionsRef.current.deleteRow(st.activeTab === 'params' ? st.params : st.headers, st.activeTab === 'params' ? setParams : setHeaders, row.id)}
               />
             ))}
-            <button type="button" onClick={() => addRow(st.activeTab === 'params' ? st.params : st.headers, st.activeTab === 'params' ? setParams : setHeaders)} className="mt-2 flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyber-neon transition font-semibold uppercase"><PlusIcon />{'Add ' + (st.activeTab === 'params' ? 'Param' : 'Header')}</button>
+            <button type="button" onClick={() => addRow(st.activeTab === 'params' ? st.params : st.headers, st.activeTab === 'params' ? setParams : setHeaders)} className="mt-2 flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyber-neon transition font-semibold uppercase"><PlusIcon />{tr("Add ") + (st.activeTab === 'params' ? tr("Param") : tr("Header"))}</button>
           </div>
         )}
 
         {st.activeTab === 'body' && (
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-cyber-line/30 bg-cyber-base/20 shrink-0">
-              <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Request Body</span>
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">{tr("Request Body")}</span>
               <div className="flex items-center gap-1">
-                <button type="button" onClick={prettyBody} className="rounded border border-cyber-line/40 px-1.5 py-0.5 text-[9px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition flex items-center gap-1"><PrettyIcon />Pretty</button>
-                <button type="button" onClick={copyBodyToClipboard} className="rounded border border-cyber-line/40 px-1.5 py-0.5 text-[9px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition flex items-center gap-1"><CopyIcon />Copy</button>
+                <button type="button" onClick={prettyBody} className="rounded border border-cyber-line/40 px-1.5 py-0.5 text-[9px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition flex items-center gap-1"><PrettyIcon />{tr("Pretty")}</button>
+                <button type="button" onClick={copyBodyToClipboard} className="rounded border border-cyber-line/40 px-1.5 py-0.5 text-[9px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition flex items-center gap-1"><CopyIcon />{tr("Copy")}</button>
               </div>
             </div>
             <textarea value={st.body} onChange={(e) => setBody(e.target.value)} placeholder='{"key": "value"}' className="flex-1 resize-none bg-transparent px-3 py-2 text-[12px] text-slate-300 font-mono outline-none placeholder:text-slate-600" spellCheck={false} />
@@ -470,50 +472,50 @@ export function ApiClientPanel() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
             <div className="grid grid-cols-4 gap-3">
               <div className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3">
-                <label className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Concurrency</label>
+                <label className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{tr("Concurrency")}</label>
                 <input type="number" min={1} max={100} value={st.runner.concurrency} onChange={(e) => setRunnerConcurrency(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))} disabled={st.runner.running} className="w-full rounded border border-cyber-line/50 bg-cyber-base px-2 py-1.5 text-[13px] font-bold text-cyber-electric font-mono outline-none focus:border-cyber-neon/50 disabled:opacity-40" />
               </div>
               <div className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3">
-                <label className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Mode</label>
+                <label className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{tr("Mode")}</label>
                 <select value={st.runner.mode} onChange={(e) => setRunnerMode(e.target.value as 'count' | 'duration')} disabled={st.runner.running} className="w-full rounded border border-cyber-line/50 bg-cyber-base px-2 py-1.5 text-[12px] font-bold text-cyber-electric font-mono outline-none focus:border-cyber-neon/50 disabled:opacity-40">
-                  <option value="count">N requests</option><option value="duration">Duration</option>
+                  <option value="count">{tr("N requests")}</option><option value="duration">{tr("Duration")}</option>
                 </select>
               </div>
               {st.runner.mode === 'count' ? (
                 <div className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3">
-                  <label className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Total Requests</label>
+                  <label className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{tr("Total Requests")}</label>
                   <input type="number" min={1} max={100000} step={100} value={st.runner.total} onChange={(e) => setRunnerTotal(Math.max(1, parseInt(e.target.value) || 1))} disabled={st.runner.running} className="w-full rounded border border-cyber-line/50 bg-cyber-base px-2 py-1.5 text-[13px] font-bold text-cyber-electric font-mono outline-none focus:border-cyber-neon/50 disabled:opacity-40" />
                 </div>
               ) : (
                 <div className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3">
-                  <label className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Duration (sec)</label>
+                  <label className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{tr("Duration (sec)")}</label>
                   <input type="number" min={1} max={3600} value={st.runner.durationSec} onChange={(e) => setRunnerDurationSec(Math.max(1, parseInt(e.target.value) || 1))} disabled={st.runner.running} className="w-full rounded border border-cyber-line/50 bg-cyber-base px-2 py-1.5 text-[13px] font-bold text-cyber-electric font-mono outline-none focus:border-cyber-neon/50 disabled:opacity-40" />
                 </div>
               )}
               <div className="flex items-end">
                 {st.runner.running ? (
-                  <button type="button" onClick={stopBenchmark} className="w-full rounded border border-red-500/50 bg-red-500/15 px-3 py-2 text-[11px] font-bold text-red-400 uppercase tracking-wider transition hover:bg-red-500/25">Stop</button>
+                  <button type="button" onClick={stopBenchmark} className="w-full rounded border border-red-500/50 bg-red-500/15 px-3 py-2 text-[11px] font-bold text-red-400 uppercase tracking-wider transition hover:bg-red-500/25">{tr("Stop")}</button>
                 ) : (
-                  <button type="button" onClick={runBenchmark} disabled={!st.url.trim()} className="w-full rounded border border-cyber-neon/50 bg-cyber-neon/15 px-3 py-2 text-[11px] font-bold text-cyber-neon uppercase tracking-wider transition hover:bg-cyber-neon/25 disabled:opacity-30 disabled:cursor-not-allowed">Start</button>
+                  <button type="button" onClick={runBenchmark} disabled={!st.url.trim()} className="w-full rounded border border-cyber-neon/50 bg-cyber-neon/15 px-3 py-2 text-[11px] font-bold text-cyber-neon uppercase tracking-wider transition hover:bg-cyber-neon/25 disabled:opacity-30 disabled:cursor-not-allowed">{tr("Start")}</button>
                 )}
               </div>
             </div>
             <div className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3 space-y-2">
-              <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Progress</span><span className="text-[10px] font-mono text-slate-500">{st.runner.mode === 'count' ? st.runner.sent + ' / ' + st.runner.total + ' (' + Math.round((st.runner.sent / Math.max(st.runner.total, 1)) * 100) + '%)' : st.runner.sent + ' sent'}</span></div>
+              <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{tr("Progress")}</span><span className="text-[10px] font-mono text-slate-500">{st.runner.mode === 'count' ? st.runner.sent + ' / ' + st.runner.total + ' (' + Math.round((st.runner.sent / Math.max(st.runner.total, 1)) * 100) + '%)' : st.runner.sent + tr(" sent")}</span></div>
               <div className="h-2 rounded-full bg-cyber-base overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-cyber-electric to-cyber-neon transition-all duration-300" style={{ width: st.runner.mode === 'count' ? Math.min(100, (st.runner.sent / Math.max(st.runner.total, 1)) * 100) + '%' : '100%' }} /></div>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {[{ label: 'Requests/sec', value: st.runner.reqPerSec, color: 'text-cyber-neon' },{ label: 'Sent', value: st.runner.sent, color: 'text-cyber-electric' },{ label: '2xx OK', value: st.runner.success, color: 'text-green-400' },{ label: 'Errors', value: st.runner.errors, color: st.runner.errors > 0 ? 'text-red-400' : 'text-slate-400' }].map((stat) => (<div key={stat.label} className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3 text-center"><div className={'text-2xl font-bold font-mono ' + stat.color}>{stat.value}</div><div className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 mt-0.5">{stat.label}</div></div>))}
+              {[{ label: 'Requests/sec', value: st.runner.reqPerSec, color: 'text-cyber-neon' },{ label: 'Sent', value: st.runner.sent, color: 'text-cyber-electric' },{ label: '2xx OK', value: st.runner.success, color: 'text-green-400' },{ label: 'Errors', value: st.runner.errors, color: st.runner.errors > 0 ? 'text-red-400' : 'text-slate-400' }].map((stat) => (<div key={stat.label} className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3 text-center"><div className={'text-2xl font-bold font-mono ' + stat.color}>{stat.value}</div><div className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 mt-0.5">{tr(stat.label)}</div></div>))}
             </div>
             {st.runner.latencies.length > 0 && (
               <div className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3">
-                <h4 className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Latency (ms)</h4>
+                <h4 className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">{tr("Latency (ms)")}</h4>
                 <div className="grid grid-cols-6 gap-2 text-center">
-                  {[{ label: 'Min', val: runnerStats.min },{ label: 'Avg', val: runnerStats.avg },{ label: 'P50', val: runnerStats.p50 },{ label: 'P95', val: runnerStats.p95 },{ label: 'P99', val: runnerStats.p99 },{ label: 'Max', val: runnerStats.max }].map((s) => (<div key={s.label} className="rounded bg-cyber-base/50 px-2 py-1.5"><div className="text-[13px] font-bold font-mono text-slate-200">{s.val}</div><div className="text-[8px] font-semibold uppercase tracking-wider text-slate-500">{s.label}</div></div>))}
+                  {[{ label: 'Min', val: runnerStats.min },{ label: 'Avg', val: runnerStats.avg },{ label: 'P50', val: runnerStats.p50 },{ label: 'P95', val: runnerStats.p95 },{ label: 'P99', val: runnerStats.p99 },{ label: 'Max', val: runnerStats.max }].map((s) => (<div key={s.label} className="rounded bg-cyber-base/50 px-2 py-1.5"><div className="text-[13px] font-bold font-mono text-slate-200">{s.val}</div><div className="text-[8px] font-semibold uppercase tracking-wider text-slate-500">{tr(s.label)}</div></div>))}
                 </div>
               </div>
             )}
-            {st.runner.errorList.length > 0 && (<div className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-red-400 mb-2">Errors (max 20 shown)</h4><div className="space-y-0.5 max-h-32 overflow-y-auto">{st.runner.errorList.map((e, i) => (<div key={i} className="text-[10px] font-mono text-red-300/80 break-all">{e}</div>))}</div></div>)}
+            {st.runner.errorList.length > 0 && (<div className="rounded-lg border border-cyber-line/40 bg-cyber-panel/20 p-3"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-red-400 mb-2">{tr("Errors (max 20 shown)")}</h4><div className="space-y-0.5 max-h-32 overflow-y-auto">{st.runner.errorList.map((e, i) => (<div key={i} className="text-[10px] font-mono text-red-300/80 break-all">{e}</div>))}</div></div>)}
           </div>
         )}
       </div>
@@ -527,18 +529,18 @@ export function ApiClientPanel() {
           <div className="flex shrink-0 items-center justify-between px-3 py-2 border-b border-cyber-line/30 bg-cyber-base/30">
             <div className="flex items-center gap-2">
               <span className={'text-lg font-bold font-mono ' + statusColor(st.response.status)}>{st.response.status}</span>
-              <span className="text-[11px] font-mono text-slate-300">{httpStatusText(st.response.status) || st.response.statusText}</span>
+              <span className="text-[11px] font-mono text-slate-300">{tr(httpStatusText(st.response.status)) || st.response.statusText}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[9px] text-slate-500 font-mono">{st.response.duration}ms</span>
               <span className="text-[9px] text-slate-500 font-mono">{fmtSize(st.response.size)}</span>
-              <button type="button" onClick={copyResponse} className="rounded border border-cyber-line/40 px-1.5 py-0.5 text-[9px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition flex items-center gap-1"><CopyIcon />{st.copied ? 'Copied!' : 'Copy'}</button>
+              <button type="button" onClick={copyResponse} className="rounded border border-cyber-line/40 px-1.5 py-0.5 text-[9px] text-slate-400 hover:text-cyber-neon hover:border-cyber-neon/40 transition flex items-center gap-1"><CopyIcon />{st.copied ? tr("Copied!") : tr("Copy")}</button>
             </div>
           </div>
 
           {Object.keys(st.response.headers).length > 0 && (
             <details className="shrink-0 border-b border-cyber-line/20">
-              <summary className="px-3 py-1.5 text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 font-semibold uppercase tracking-wider">{'Response Headers (' + Object.keys(st.response.headers).length + ')'}</summary>
+              <summary className="px-3 py-1.5 text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 font-semibold uppercase tracking-wider">{tr("Response Headers (") + Object.keys(st.response.headers).length + ')'}</summary>
               <div className="px-3 py-1.5 space-y-0.5 max-h-32 overflow-y-auto">{Object.entries(st.response.headers).map(([k, v]) => (<div key={k} className="flex gap-2 text-[10px] font-mono"><span className="text-cyber-neon shrink-0">{k}:</span><span className="text-slate-400 break-all">{v}</span></div>))}</div>
             </details>
           )}
@@ -549,7 +551,7 @@ export function ApiClientPanel() {
 
       {/* Loading indicator */}
       {st.isLoading && (
-        <div className="flex shrink-0 items-center gap-2 border-t border-cyber-line/50 bg-cyber-panel/20 px-3 py-2"><LoaderSpinner /><span className="text-[11px] text-slate-400 font-mono">{st.isStreaming ? 'Streaming... (click to abort)' : 'Sending request...'}</span></div>
+        <div className="flex shrink-0 items-center gap-2 border-t border-cyber-line/50 bg-cyber-panel/20 px-3 py-2"><LoaderSpinner /><span className="text-[11px] text-slate-400 font-mono">{st.isStreaming ? tr("Streaming... (click to abort)") : tr("Sending request...")}</span></div>
       )}
     </div>
   );

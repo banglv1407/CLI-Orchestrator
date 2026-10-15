@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'rea
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { FitAddon } from '@xterm/addon-fit';
-import { SearchAddon } from '@xterm/addon-search';
+import { SearchAddon, type ISearchResultChangeEvent } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import type {
   CliOutputEvent,
   CliStatusEvent,
   SessionInfo,
+  TerminalAgentSessionTitle,
   SshConnection,
   AppTheme,
   FileEntry,
@@ -27,6 +28,7 @@ import {
   terminalCommandCancel,
   terminalCommandDetectEnvironment,
   terminalCommandSuggest,
+  listTerminalSessionTitles,
 } from '../lib/tauri';
 import { RemoteMonitorWidget } from './RemoteMonitorWidget';
 import { SshFileTransferDialog } from './SshFileTransferDialog';
@@ -51,6 +53,9 @@ import { AgentSessionPanel } from './AgentSessionPanel';
 import { useUiActive } from '../hooks/useUiActive';
 import { copyTerminalSelection, getTerminalSelectionText, type TerminalCopyMode } from '../lib/terminalClipboard';
 import { getContextMenuPosition } from '../lib/contextMenu';
+import { getMiniTerminalTitle } from '../lib/terminalTitles';
+import { ConptyResizeAddon, INITIAL_TERMINAL_SIZE, TerminalResizeQueue } from '../lib/terminalResize';
+import { clearTerminalSearch, findTerminalText, handleTerminalSearchKey, preserveSearchSelectionOnResize, TERMINAL_SEARCH_LIMIT } from '../lib/terminalSearch';
 import { isConfigFile, validateConfigSyntax, formatConfigContent } from '../lib/configFiles';
 import {
   TerminalCommandPopup,
@@ -72,22 +77,55 @@ const getRelativePath = (fullPath: string, root: string) => {
   return rel.replace(/\\/g, '/');
 };
 
-function MarqueeTitle({ text, className = "text-slate-300", fontSizeClass = "text-[8px]" }: { text: string; className?: string; fontSizeClass?: string }) {
+function MarqueeTitle({ text, title = text, className = "text-slate-300", fontSizeClass = "text-[8px]" }: { text: string; title?: string; className?: string; fontSizeClass?: string }) {
   const isLong = text.length > 25;
   if (!isLong) {
     return (
-      <span className={`truncate max-w-[90%] font-mono font-semibold ${fontSizeClass} ${className}`} title={text}>
+      <span className={`truncate max-w-[90%] font-mono font-semibold ${fontSizeClass} ${className}`} title={title}>
         {text}
       </span>
     );
   }
   return (
-    <div className="cyber-marquee-container flex-1 max-w-[90%]" title={text}>
+    <div className="cyber-marquee-container flex-1 max-w-[90%]" title={title}>
       <div className={`cyber-marquee-track font-mono font-semibold ${fontSizeClass} ${className}`}>
         <span>{text}</span>
         <span style={{ paddingLeft: '24px' }}>{text}</span>
         <span style={{ paddingLeft: '24px' }}></span>
       </div>
+    </div>
+  );
+}
+
+type MiniTerminalDisplayMode = 'preview' | 'title-only';
+
+function MiniTerminalDisplayControl({ mode, onChange }: { mode: MiniTerminalDisplayMode; onChange: (mode: MiniTerminalDisplayMode) => void }) {
+  return (
+    <select
+      value={mode}
+      onChange={(event) => onChange(event.target.value === 'title-only' ? 'title-only' : 'preview')}
+      aria-label={tr("Mini terminal display")}
+      data-mini-terminal-display
+      className="min-w-0 rounded border border-cyber-line/55 bg-[#0a0f1f] px-1.5 py-1 text-[10px] text-slate-300 outline-none focus:border-cyber-electric"
+    >
+      <option value="preview">{tr("Mini terminal")}</option>
+      <option value="title-only">{tr("Title only")}</option>
+    </select>
+  );
+}
+
+function MiniTerminalTitleRow({ title, onStop }: { title: string; onStop: () => void }) {
+  return (
+    <div className="flex h-full min-w-0 items-center gap-2 px-2">
+      <span className="min-w-0 flex-1 truncate font-mono text-[11px] font-semibold text-slate-200" title={title}>{title}</span>
+      <button
+        type="button"
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => { event.stopPropagation(); onStop(); }}
+        title={tr("Stop / Close Session")}
+        aria-label={tr("Stop / Close Session")}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] text-slate-500 transition hover:bg-rose-500/20 hover:text-rose-400 focus-visible:ring-1 focus-visible:ring-rose-400"
+      >✕</button>
     </div>
   );
 }
@@ -138,12 +176,17 @@ interface TerminalHandle {
   writeQueueBytes: number;
   isWriting: boolean;
   isAtBottom: boolean;
+  cleanupTitle: () => void;
   cleanupScroll: () => void;
   cleanupMiniScroll: () => void;
+  resizeQueue: TerminalResizeQueue;
+  searchQuery: string;
+  cleanupSearch: () => void;
 }
 
 const INPUT_FLUSH_MS = 16;
 const MOUNT_DELAY_MS = 50;
+const TERMINAL_FIT_DELAY_MS = 80;
 const MAX_TERMINAL_WRITE_QUEUE_BYTES = 2 * 1024 * 1024;
 const TERMINAL_FONT_FAMILY = 'Cascadia Mono, CaskaydiaCove Nerd Font, Fira Code, Consolas, "Segoe UI Symbol", monospace';
 const TUI_CLI_NAME_PATTERNS = ['codex', 'opencode', 'claude', 'gemini', 'aider'];
@@ -318,8 +361,11 @@ export function TerminalPanel({
   // Search state
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResultCount, setSearchResultCount] = useState<number | null>(null);
+  const [searchResults, setSearchResults] = useState<ISearchResultChangeEvent | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+  const searchQueryRef = useRef('');
+  const searchFocusFrameRef = useRef<number | null>(null);
   // Ref for searchVisible — lets xterm key-handler closures read the latest value
   const searchVisibleRef = useRef(false);
 
@@ -335,6 +381,14 @@ export function TerminalPanel({
   useEffect(() => {
     localStorage.setItem('ai-cli-right-panel-visible', String(rightPanelVisible));
   }, [rightPanelVisible]);
+
+  const [miniTerminalDisplayMode, setMiniTerminalDisplayMode] = useState<MiniTerminalDisplayMode>(() => {
+    return localStorage.getItem('clx-mini-terminal-display-mode') === 'title-only' ? 'title-only' : 'preview';
+  });
+  const miniTerminalTitleOnly = miniTerminalDisplayMode === 'title-only';
+  useEffect(() => {
+    try { localStorage.setItem('clx-mini-terminal-display-mode', miniTerminalDisplayMode); } catch { /* Keep the display choice usable. */ }
+  }, [miniTerminalDisplayMode]);
 
   // ── @ Mention Autocomplete State ──
   const [mentionActive, setMentionActive] = useState(false);
@@ -356,6 +410,10 @@ export function TerminalPanel({
   const [rgResults, setRgResults] = useState<RipgrepMatch[]>([]);
   const [rgLoading, setRgLoading] = useState(false);
   const [termDimensions, setTermDimensions] = useState<Record<string, { cols: number; rows: number }>>({});
+  const [sessionTitles, setSessionTitles] = useState<Record<string, string>>({});
+  const [agentSessionTitles, setAgentSessionTitles] = useState<Record<string, TerminalAgentSessionTitle>>({});
+  const agentTitleRequestInFlight = useRef(false);
+  const titleSessionKey = sessions.map((session) => `${session.id}:${session.status}`).sort().join('\0');
   const rgInputRef = useRef<HTMLInputElement | null>(null);
   const mentionListRef = useRef<HTMLDivElement | null>(null);
   const rgListRef = useRef<HTMLDivElement | null>(null);
@@ -396,6 +454,51 @@ export function TerminalPanel({
     sessionsRef.current = sessions;
   }, [sessions]);
 
+  useEffect(() => {
+    if (!uiActive || !titleSessionKey) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      if (agentTitleRequestInFlight.current) {
+        timer = window.setTimeout(poll, 2000);
+        return;
+      }
+      agentTitleRequestInFlight.current = true;
+      try {
+        const titles = await listTerminalSessionTitles();
+        if (cancelled) return;
+        const currentSessions = new Map(sessionsRef.current.map((session) => [session.id, session]));
+        setAgentSessionTitles((current) => {
+          // Keep the last name of an exited PTY, but clear metadata when a
+          // running shell no longer owns a Hermes process.
+          const next = Object.fromEntries(Object.entries(current).filter(([id]) => {
+            const session = currentSessions.get(id);
+            return session && session.status !== 'running';
+          }));
+          for (const title of titles) {
+            if (currentSessions.has(title.sessionId)) next[title.sessionId] = title;
+          }
+          const unchanged = Object.keys(next).length === Object.keys(current).length &&
+            Object.entries(next).every(([id, value]) => {
+              const old = current[id];
+              return old?.agent === value.agent && old.agentSessionId === value.agentSessionId && old.title === value.title;
+            });
+          return unchanged ? current : next;
+        });
+      } catch {
+        // A temporary IPC failure must not replace an already resolved name.
+      } finally {
+        agentTitleRequestInFlight.current = false;
+        if (!cancelled) timer = window.setTimeout(poll, 2000);
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [uiActive, titleSessionKey]);
+
   const sshConnectionsRef = useRef(sshConnections);
   useEffect(() => {
     sshConnectionsRef.current = sshConnections;
@@ -414,35 +517,51 @@ export function TerminalPanel({
     return !!session?.cliName.startsWith('SSH:');
   }, []);
 
-  const openSearch = useCallback(() => {
-    setSearchVisible(true);
-    setTimeout(() => searchInputRef.current?.focus(), 50);
+  const focusSearchInput = useCallback((select = false) => {
+    if (searchFocusFrameRef.current !== null) window.cancelAnimationFrame(searchFocusFrameRef.current);
+    searchFocusFrameRef.current = window.requestAnimationFrame(() => {
+      searchFocusFrameRef.current = null;
+      if (!searchVisibleRef.current || !searchInputRef.current?.isConnected) return;
+      searchInputRef.current.focus();
+      if (select) searchInputRef.current.select();
+    });
   }, []);
 
+  const openSearch = useCallback(() => {
+    searchVisibleRef.current = true;
+    setSearchVisible(true);
+    focusSearchInput(true);
+  }, [focusSearchInput]);
+
   const closeSearch = useCallback(() => {
+    searchVisibleRef.current = false;
+    searchQueryRef.current = '';
+    if (searchFocusFrameRef.current !== null) {
+      window.cancelAnimationFrame(searchFocusFrameRef.current);
+      searchFocusFrameRef.current = null;
+    }
     setSearchVisible(false);
     setSearchQuery('');
-    setSearchResultCount(null);
-    // Clear highlight in current terminal
-    const sid = visibleSessionIdRef.current;
-    if (sid) {
-      try { terminalRefs.current[sid]?.search.clearDecorations(); } catch (_e) {}
+    setSearchResults(null);
+    for (const handle of Object.values(terminalRefs.current)) {
+      if (handle.searchQuery) clearTerminalSearch(handle.term, handle.search);
+      else handle.search.clearDecorations();
+      handle.searchQuery = '';
     }
   }, []);
 
-  const doSearch = useCallback((query: string, direction: 'next' | 'prev' = 'next') => {
+  const doSearch = useCallback((query: string, direction: 'next' | 'prev' = 'next', incremental = false) => {
     const sid = visibleSessionIdRef.current;
     if (!sid) return;
     const handle = terminalRefs.current[sid];
-    if (!handle || !query.trim()) {
-      setSearchResultCount(null);
+    if (!handle) return;
+    handle.searchQuery = query;
+    if (!query.length) {
+      clearTerminalSearch(handle.term, handle.search);
+      setSearchResults(null);
       return;
     }
-    const opts = { caseSensitive: false, regex: false, decorations: { matchBackground: '#f8e16a55', matchBorder: '#f8e16a', matchOverviewRuler: '#f8e16a', activeMatchBackground: '#f8e16acc', activeMatchBorder: '#00ffd1', activeMatchColorOverviewRuler: '#00ffd1' } };
-    const found = direction === 'next'
-      ? handle.search.findNext(query, opts)
-      : handle.search.findPrevious(query, opts);
-    setSearchResultCount(found ? 1 : 0);
+    findTerminalText(handle.term, handle.search, query, direction, incremental);
   }, []);
 
   // Custom Mouse Drag-to-Swap States and Handlers
@@ -474,6 +593,7 @@ export function TerminalPanel({
   const miniContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const inputBuffers = useRef<Record<string, string>>({});
   const inputTimers = useRef<Record<string, number>>({});
+  const fitTimers = useRef<Record<string, number>>({});
   const pendingTerminalWrites = useRef<Record<string, string[]>>({});
   const pendingTerminalWritesBytes = useRef<Record<string, number>>({});
   const miniSyncTimers = useRef<Record<string, number>>({});
@@ -612,14 +732,25 @@ export function TerminalPanel({
   useEffect(() => {
     searchVisibleRef.current = searchVisible;
   }, [searchVisible]);
-  // Re-run search when switching sessions (if search bar is open)
+  // Search belongs to the visible terminal; clear the prior session's marks.
   useEffect(() => {
-    if (!searchVisibleRef.current) return;
-    if (!visibleSessionId) return;
-    if (searchQuery.trim()) doSearch(searchQuery, 'next');
-    setTimeout(() => searchInputRef.current?.focus(), 80);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleSessionId]);
+    if (activeMainView !== 'terminal' || openedFile !== null || !visibleSessionId) {
+      closeSearch();
+      return;
+    }
+    if (searchVisibleRef.current) {
+      setSearchResults(null);
+      doSearch(searchQueryRef.current, 'next', true);
+      focusSearchInput();
+    }
+    return () => {
+      const handle = terminalRefs.current[visibleSessionId];
+      if (handle?.searchQuery) {
+        clearTerminalSearch(handle.term, handle.search);
+        handle.searchQuery = '';
+      }
+    };
+  }, [visibleSessionId, activeMainView, openedFile, closeSearch, doSearch, focusSearchInput]);
   const lastQuickSessionTime = useRef(0);
   const triggerQuickSession = useCallback(() => {
     const now = Date.now();
@@ -1019,21 +1150,34 @@ export function TerminalPanel({
   }, [activeMainView, openedFile, openTerminalCommandPopup]);
 
   useEffect(() => {
+    const onSearchKey = (event: KeyboardEvent) => {
+      const sessionId = visibleSessionIdRef.current;
+      const container = sessionId ? containerRefs.current[sessionId] : null;
+      const target = document.activeElement;
+      const inTerminal = !!container && target instanceof Node && container.contains(target);
+      const inSearch = target instanceof Node && !!searchContainerRef.current?.contains(target);
+      const editable = target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
+      handleTerminalSearchKey(event, {
+        enabled: activeMainView === 'terminal' && openedFile === null && !!sessionId && !!container,
+        editableElsewhere: editable && !inTerminal && !inSearch,
+        inSearchInput: target === searchInputRef.current,
+        searchVisible: searchVisibleRef.current,
+      }, {
+        open: openSearch,
+        next: () => { if (!searchVisibleRef.current) openSearch(); doSearch(searchQueryRef.current, 'next'); },
+        previous: () => { if (!searchVisibleRef.current) openSearch(); doSearch(searchQueryRef.current, 'prev'); },
+        close: () => { closeSearch(); if (sessionId) terminalRefs.current[sessionId]?.term.focus(); },
+      });
+    };
+    window.addEventListener('keydown', onSearchKey, true);
+    return () => window.removeEventListener('keydown', onSearchKey, true);
+  }, [activeMainView, openedFile, openSearch, closeSearch, doSearch]);
+
+  useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'N') {
         e.preventDefault();
         triggerQuickSession();
-      }
-      if (e.ctrlKey && e.key === 'f') {
-        // Only intercept Ctrl+F when a terminal session is visible and focus is not in a text input
-        const tag = (document.activeElement as HTMLElement | null)?.tagName ?? '';
-        if (!['INPUT', 'TEXTAREA'].includes(tag)) {
-          e.preventDefault();
-          openSearch();
-        }
-      }
-      if (e.key === 'Escape' && searchVisible) {
-        closeSearch();
       }
       // Close mention on Escape (global fallback)
       if (e.key === 'Escape' && mentionActive) {
@@ -1051,9 +1195,6 @@ export function TerminalPanel({
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [
     triggerQuickSession,
-    openSearch,
-    closeSearch,
-    searchVisible,
     mentionActive,
     closeMention,
     rgActive,
@@ -1250,27 +1391,36 @@ export function TerminalPanel({
     }, MOUNT_DELAY_MS);
   }, [createFreshMiniTerminal, scheduleMiniTerminalSync]);
 
-  const refreshMainTerminal = useCallback((sessionId: string) => {
-    const handle = terminalRefs.current[sessionId];
-    if (!handle) return;
-    const mountNode = containerRefs.current[sessionId];
-    if (!mountNode) return;
-
-    // Multiple timed fit+refresh passes to ensure proper layout without
-    // replaying raw ANSI/TUI history into the active terminal buffer.
-    const doRefresh = () => {
+  const fitTerminal = useCallback((sessionId: string): void => {
+    if (sessionId !== visibleSessionIdRef.current) return;
+    if (fitTimers.current[sessionId] !== undefined) window.clearTimeout(fitTimers.current[sessionId]);
+    // ResizeObserver and layout effects share one fit after the layout settles.
+    fitTimers.current[sessionId] = window.setTimeout(() => {
+      delete fitTimers.current[sessionId];
+      const handle = terminalRefs.current[sessionId];
+      const container = containerRefs.current[sessionId];
+      if (!handle || !container?.isConnected || sessionId !== visibleSessionIdRef.current) return;
+      if (window.getComputedStyle(container).visibility !== 'visible') return;
+      if (container.offsetWidth <= 10 || container.offsetHeight <= 10) return;
+      // Finish parsing the old grid and wait for the previous native resize
+      // before changing dimensions again during a drag or output burst.
+      if (handle.isWriting || handle.writeQueue.length || handle.resizeQueue.isResizing) {
+        fitTerminal(sessionId);
+        return;
+      }
       try {
         handle.fit.fit();
         handle.term.refresh(0, handle.term.rows - 1);
-        handle.term.scrollToBottom();
+        scheduleMiniTerminalSync(sessionId);
       } catch (_e) {}
-    };
+    }, TERMINAL_FIT_DELAY_MS);
+  }, [scheduleMiniTerminalSync]);
 
-    doRefresh();
-    setTimeout(doRefresh, MOUNT_DELAY_MS);
-    setTimeout(doRefresh, 150);
-    setTimeout(doRefresh, 300);
-  }, []);
+  const refreshMainTerminal = useCallback((sessionId: string) => {
+    fitTerminal(sessionId);
+    const handle = terminalRefs.current[sessionId];
+    handle?.term.refresh(0, handle.term.rows - 1);
+  }, [fitTerminal]);
 
   const handleSaveTag = useCallback(async () => {
     if (!visibleSessionId) return;
@@ -1285,22 +1435,6 @@ export function TerminalPanel({
 
     await onSaveTag(session.cliName, trimmed, session.workingDir);
   }, [visibleSessionId, sessions, onSaveTag]);
-
-  const fitTerminal = useCallback((sessionId: string) => {
-    if (sessionId !== visibleSessionId) {
-      return;
-    }
-    const handle = terminalRefs.current[sessionId];
-    if (handle) {
-      const container = containerRefs.current[sessionId];
-      if (container && container.offsetWidth > 10 && container.offsetHeight > 10) {
-        try {
-          handle.fit.fit();
-          handle.term.refresh(0, handle.term.rows - 1);
-        } catch (_e) {}
-      }
-    }
-  }, [visibleSessionId]);
 
   const getTerminalTheme = () => {
     if (theme === 'light') {
@@ -1373,6 +1507,9 @@ export function TerminalPanel({
       }
 
       const term = new Terminal({
+        ...INITIAL_TERMINAL_SIZE,
+        // SearchAddon highlights require xterm's decoration API.
+        allowProposedApi: true,
         cursorBlink: true,
         convertEol: false,
         scrollback: 2000,
@@ -1383,6 +1520,7 @@ export function TerminalPanel({
         scrollOnUserInput: false,
         theme: getTerminalTheme(),
       });
+      if (navigator.userAgent.includes('Windows')) term.loadAddon(new ConptyResizeAddon());
 
       term.attachCustomKeyEventHandler((event) => {
         // ── Ctrl+=, Ctrl+-, Ctrl+0 (zoom shortcuts) ──
@@ -1551,14 +1689,10 @@ export function TerminalPanel({
           // No selection: fall through so the underlying PTY can interpret
           // Ctrl+C as an interrupt signal.
         }
-        if (event.ctrlKey && event.key === 'v') {
-          if (event.type === 'keydown') {
-            void navigator.clipboard.readText().then((text) => {
-              if (text) {
-                onSendInput(session.id, text);
-              }
-            });
-          }
+        if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'v') {
+          // Leave the browser's paste event to xterm. Reading the clipboard
+          // here as well sends the same text twice once permission is granted.
+          // Skip xterm's Ctrl+V control character without preventing paste.
           return false;
         }
         if (event.shiftKey && event.key === 'Enter') {
@@ -1570,45 +1704,58 @@ export function TerminalPanel({
         if (event.ctrlKey && (event.key === 'p' || event.key === 'P')) {
           return false;
         }
-        if (event.ctrlKey && event.key === 'f') {
-          if (event.type === 'keydown') {
-            openSearch();
-          }
-          return false;
-        }
-        if (event.key === 'Escape') {
-          if (searchVisibleRef.current) {
-            closeSearch();
-            return false;
-          }
-        }
         return true;
       });
 
       const fit = new FitAddon();
       term.loadAddon(fit);
 
-      const search = new SearchAddon();
+      const search = new SearchAddon({ highlightLimit: TERMINAL_SEARCH_LIMIT });
       term.loadAddon(search);
+      const searchResultsListener = search.onDidChangeResults((results) => {
+        if (visibleSessionIdRef.current !== session.id || !searchVisibleRef.current || !searchQueryRef.current.length) return;
+        setSearchResults(results);
+      });
+      const cleanupSearchResize = preserveSearchSelectionOnResize(term, () => terminalRefs.current[session.id]?.searchQuery ?? '');
 
       terminalRefs.current[session.id] = {
         term,
         fit,
         search,
+        searchQuery: '',
+        cleanupSearch: () => { searchResultsListener.dispose(); cleanupSearchResize(); },
         miniTerm: null,
         writeQueue: [],
         writeQueueBytes: 0,
         isWriting: false,
         isAtBottom: true,
+        cleanupTitle: () => {},
         cleanupScroll: () => {},
         cleanupMiniScroll: () => {},
+        resizeQueue: new TerminalResizeQueue(
+          (dim) => invoke('resize_cli', { request: { sessionId: session.id, rows: dim.rows, cols: dim.cols } }),
+          console.error,
+        ),
       };
       handle = terminalRefs.current[session.id];
 
+      // Listen to the authoritative main terminal: agents set their own titles
+      // through OSC 0/2, while mini terminals only receive plain-text snapshots.
+      const titleListener = term.onTitleChange((value) => {
+        if (terminalRefs.current[session.id]?.term !== term) return;
+        const title = value.trim();
+        setSessionTitles((current) => {
+          if ((current[session.id] ?? '') === title) return current;
+          const next = { ...current };
+          if (title) next[session.id] = title;
+          else delete next[session.id];
+          return next;
+        });
+      });
+      handle.cleanupTitle = () => titleListener.dispose();
+
       term.onResize((dim) => {
-        invoke('resize_cli', {
-          request: { sessionId: session.id, rows: dim.rows, cols: dim.cols },
-        }).catch(console.error);
+        handle!.resizeQueue.enqueue(dim);
         // Keep the mini grid aligned, then mirror the authoritative parsed
         // main buffer instead of feeding it a partial ANSI/TUI stream.
         if (handle?.miniTerm) {
@@ -1646,9 +1793,11 @@ export function TerminalPanel({
 
       if (pendingTerminalWrites.current[session.id]?.length) {
         const pendingChunks = pendingTerminalWrites.current[session.id];
-        term.write(pendingChunks.join(''), () => scheduleMiniTerminalSync(session.id, 0));
+        handle.writeQueue.push(pendingChunks.join(''));
+        handle.writeQueueBytes += pendingTerminalWritesBytes.current[session.id] ?? 0;
         delete pendingTerminalWrites.current[session.id];
         delete pendingTerminalWritesBytes.current[session.id];
+        void processWriteQueue(session.id);
       }
 
       return handle;
@@ -1657,8 +1806,6 @@ export function TerminalPanel({
       flushInput,
       onSendInput,
       triggerQuickSession,
-      openSearch,
-      closeSearch,
       openMention,
       closeMention,
       sessions,
@@ -1676,9 +1823,9 @@ export function TerminalPanel({
       }
 
       const handle = initializeSessionTerminal(session);
-      const hasXterm = mountNode.querySelector('.xterm') !== null;
+      if (handle.term.element?.parentElement === mountNode) return;
 
-      if (handle.term.element !== mountNode || !hasXterm) {
+      if (!handle.term.element) {
         handle.cleanupScroll();
         handle.term.open(mountNode);
 
@@ -1718,13 +1865,12 @@ export function TerminalPanel({
           scrollDisposable.dispose();
         };
 
-        setTimeout(() => {
-          handle.fit.fit();
-          handle.term.refresh(0, handle.term.rows - 1);
-        }, MOUNT_DELAY_MS);
+      } else {
+        mountNode.appendChild(handle.term.element);
       }
+      fitTerminal(session.id);
     },
-    [initializeSessionTerminal],
+    [initializeSessionTerminal, fitTerminal],
   );
 
   const ensureMiniTerminal = useCallback(
@@ -1778,6 +1924,24 @@ export function TerminalPanel({
   );
 
   useEffect(() => {
+    if (!miniTerminalTitleOnly) return;
+    for (const [sessionId, handle] of Object.entries(terminalRefs.current)) {
+      handle.cleanupMiniScroll();
+      handle.cleanupMiniScroll = () => {};
+      try { handle.miniTerm?.dispose(); } catch { /* Ignore an already disposed preview. */ }
+      handle.miniTerm = null;
+      if (miniSyncTimers.current[sessionId] !== undefined) {
+        window.clearTimeout(miniSyncTimers.current[sessionId]);
+        delete miniSyncTimers.current[sessionId];
+      }
+      miniSyncGeneration.current[sessionId] = (miniSyncGeneration.current[sessionId] ?? 0) + 1;
+      miniSyncInFlight.current[sessionId] = false;
+      miniSyncDirty.current[sessionId] = false;
+      delete lastMiniMountNode.current[sessionId];
+    }
+  }, [miniTerminalTitleOnly]);
+
+  useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       sessions.forEach((session) => {
         const node = miniContainerRefs.current[session.id];
@@ -1809,8 +1973,15 @@ export function TerminalPanel({
     const existingIds = Object.keys(terminalRefs.current);
     existingIds.forEach((sessionId) => {
       if (!sessions.some((session) => session.id === sessionId)) {
+        terminalRefs.current[sessionId].cleanupTitle();
         terminalRefs.current[sessionId].cleanupScroll();
         terminalRefs.current[sessionId].cleanupMiniScroll();
+        terminalRefs.current[sessionId].cleanupSearch();
+        terminalRefs.current[sessionId].resizeQueue.dispose();
+        if (fitTimers.current[sessionId] !== undefined) {
+          window.clearTimeout(fitTimers.current[sessionId]);
+          delete fitTimers.current[sessionId];
+        }
         try { terminalRefs.current[sessionId].search.dispose(); } catch (_e) {}
         terminalRefs.current[sessionId].term.dispose();
         terminalRefs.current[sessionId].miniTerm?.dispose();
@@ -1837,6 +2008,16 @@ export function TerminalPanel({
           delete inputTimers.current[sessionId];
         }
       }
+    });
+    setSessionTitles((current) => {
+      const sessionIds = new Set(sessions.map((session) => session.id));
+      const next = Object.fromEntries(Object.entries(current).filter(([id]) => sessionIds.has(id)));
+      return Object.keys(next).length === Object.keys(current).length ? current : next;
+    });
+    setAgentSessionTitles((current) => {
+      const sessionIds = new Set(sessions.map((session) => session.id));
+      const next = Object.fromEntries(Object.entries(current).filter(([id]) => sessionIds.has(id)));
+      return Object.keys(next).length === Object.keys(current).length ? current : next;
     });
   }, [ensureTerminal, ensureMiniTerminal, rightPanelVisible, sessions]);
 
@@ -1948,41 +2129,6 @@ export function TerminalPanel({
     };
   }, [isActiveSessionSSH]);
 
-  useEffect(() => {
-    if (!visibleSessionId) {
-      return;
-    }
-
-    const handle = terminalRefs.current[visibleSessionId];
-    if (!handle) {
-      return;
-    }
-
-    const refreshTerm = () => {
-      const container = containerRefs.current[visibleSessionId];
-      if (container && container.offsetWidth > 10 && container.offsetHeight > 10) {
-        try {
-          handle.fit.fit();
-          handle.term.refresh(0, handle.term.rows - 1);
-        } catch (_e) {}
-      }
-    };
-
-    refreshTerm();
-    
-    const timer1 = window.setTimeout(refreshTerm, 0);
-    const timer2 = window.setTimeout(refreshTerm, MOUNT_DELAY_MS);
-    const timer3 = window.setTimeout(refreshTerm, 100);
-    const timer4 = window.setTimeout(refreshTerm, 250);
-
-    return () => {
-      window.clearTimeout(timer1);
-      window.clearTimeout(timer2);
-      window.clearTimeout(timer3);
-      window.clearTimeout(timer4);
-    };
-  }, [visibleSessionId]);
-
   // Re-fit terminal when file overlay is closed or main view switches back to terminal,
   // so xterm recalculates its dimensions after its container becomes visible again.
   useEffect(() => {
@@ -1990,36 +2136,14 @@ export function TerminalPanel({
     if (activeMainView !== 'terminal') return; // a different panel is showing, terminal hidden
     if (!visibleSessionId) return;
 
-    const handle = terminalRefs.current[visibleSessionId];
-    if (!handle) return;
-
-    const doRefresh = () => {
-      const container = containerRefs.current[visibleSessionId];
-      if (container && container.offsetWidth > 10 && container.offsetHeight > 10) {
-        try {
-          handle.fit.fit();
-          handle.term.refresh(0, handle.term.rows - 1);
-          handle.term.scrollToBottom();
-          if (handle.miniTerm) {
-            handle.miniTerm.scrollToBottom();
-          }
-        } catch (_e) {}
+    fitTerminal(visibleSessionId);
+    return () => {
+      if (fitTimers.current[visibleSessionId] !== undefined) {
+        window.clearTimeout(fitTimers.current[visibleSessionId]);
+        delete fitTimers.current[visibleSessionId];
       }
     };
-
-    // Multiple passes: DOM needs time to become visible before xterm can measure it
-    const t1 = window.setTimeout(doRefresh, 0);
-    const t2 = window.setTimeout(doRefresh, MOUNT_DELAY_MS);
-    const t3 = window.setTimeout(doRefresh, 150);
-    const t4 = window.setTimeout(doRefresh, 300);
-
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-      window.clearTimeout(t3);
-      window.clearTimeout(t4);
-    };
-  }, [activeMainView, openedFile, visibleSessionId]);
+  }, [activeMainView, openedFile, visibleSessionId, fitTerminal]);
   const fitTerminalRef = useRef(fitTerminal);
   useEffect(() => {
     fitTerminalRef.current = fitTerminal;
@@ -2054,10 +2178,15 @@ export function TerminalPanel({
   useEffect(() => {
     return () => {
       Object.values(inputTimers.current).forEach((timer) => window.clearTimeout(timer));
+      Object.values(fitTimers.current).forEach((timer) => window.clearTimeout(timer));
+      if (searchFocusFrameRef.current !== null) window.cancelAnimationFrame(searchFocusFrameRef.current);
       Object.values(miniSyncTimers.current).forEach((timer) => window.clearTimeout(timer));
       Object.values(terminalRefs.current).forEach((item) => {
+        item.cleanupTitle();
         item.cleanupScroll();
         item.cleanupMiniScroll();
+        item.cleanupSearch();
+        item.resizeQueue.dispose();
         try { item.search.dispose(); } catch (_e) {}
         item.term.dispose();
         item.miniTerm?.dispose();
@@ -2068,6 +2197,7 @@ export function TerminalPanel({
       terminalRefs.current = {};
       inputBuffers.current = {};
       inputTimers.current = {};
+      fitTimers.current = {};
       pendingTerminalWrites.current = {};
       pendingTerminalWritesBytes.current = {};
       miniSyncTimers.current = {};
@@ -2095,25 +2225,12 @@ export function TerminalPanel({
             handle.miniTerm.options.fontSize = fontSize;
             handle.miniTerm.options.fontFamily = fontFamily;
           }
-          try {
-            handle.fit.fit();
-            handle.term.refresh(0, handle.term.rows - 1);
-          } catch (_e) {}
         }
       }
+      if (visibleSessionIdRef.current) fitTerminal(visibleSessionIdRef.current);
     };
     const handleAppearanceChange = () => {
-      setTimeout(() => {
-        for (const id in terminalRefs.current) {
-          const handle = terminalRefs.current[id];
-          if (handle?.term) {
-            try {
-              handle.fit.fit();
-              handle.term.refresh(0, handle.term.rows - 1);
-            } catch (_e) {}
-          }
-        }
-      }, 50);
+      if (visibleSessionIdRef.current) fitTerminal(visibleSessionIdRef.current);
     };
     window.addEventListener('clx-terminal-font-changed', handleFontChange);
     window.addEventListener('clx-appearance-changed', handleAppearanceChange);
@@ -2121,7 +2238,7 @@ export function TerminalPanel({
       window.removeEventListener('clx-terminal-font-changed', handleFontChange);
       window.removeEventListener('clx-appearance-changed', handleAppearanceChange);
     };
-  }, []);
+  }, [fitTerminal]);
 
   const cliSessions = useMemo(
     () => sessions.filter(s => (s.panel ?? 'right') === 'right'),
@@ -2213,8 +2330,8 @@ export function TerminalPanel({
               }}
             >
               {/* ── Terminal Search Overlay ── */}
-              {searchVisible && !openedFile && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyber-accent/60 bg-[#0a0f1f]/95 shadow-2xl shadow-cyber-accent/20 backdrop-blur-sm select-none" style={{ minWidth: '320px' }}>
+              {searchVisible && !openedFile && activeMainView === 'terminal' && visibleSessionId && (
+                <div ref={searchContainerRef} data-terminal-search className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyber-accent/60 bg-[#0a0f1f]/95 shadow-2xl shadow-cyber-accent/20 backdrop-blur-sm select-none" style={{ minWidth: '320px' }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 text-cyber-muted shrink-0">
                     <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                   </svg>
@@ -2223,26 +2340,25 @@ export function TerminalPanel({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => {
+                      searchQueryRef.current = e.target.value;
                       setSearchQuery(e.target.value);
-                      doSearch(e.target.value, 'next');
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') { e.preventDefault(); doSearch(searchQuery, e.shiftKey ? 'prev' : 'next'); }
-                      if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+                      doSearch(e.target.value, 'next', true);
                     }}
                     placeholder={tr("Search terminal… (Enter=next, Shift+Enter=prev)")}
+                    aria-label={tr("Search terminal… (Enter=next, Shift+Enter=prev)")}
                     className="flex-1 bg-transparent text-cyber-text text-[12px] font-mono outline-none placeholder:text-cyber-muted/50 caret-cyber-accent"
                     style={{ minWidth: 0 }}
                   />
-                  {searchResultCount !== null && (
-                    <span className={`text-[10px] font-mono shrink-0 ${searchResultCount === 0 ? 'text-cyber-warn' : 'text-cyber-neon'}`}>
-                      {searchResultCount === 0 ? tr("No match") : tr("✓ Found")}
+                  {searchResults !== null && (
+                    <span data-terminal-search-results role="status" aria-live="polite" className={`text-[10px] font-mono shrink-0 ${searchResults.resultCount === 0 ? 'text-cyber-warn' : 'text-cyber-neon'}`}>
+                      {searchResults.resultCount === 0 ? tr("No match") : <>{searchResults.resultIndex < 0 ? '–' : searchResults.resultIndex + 1}/{searchResults.resultCount}{searchResults.resultCount === TERMINAL_SEARCH_LIMIT ? '+' : ''}</>}
                     </span>
                   )}
                   <div className="flex items-center gap-0.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => doSearch(searchQuery, 'prev')}
+                      onMouseDown={(event) => event.preventDefault()}
                       title={tr("Previous match (Shift+Enter)")}
                       className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-accent hover:bg-cyber-accent/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-accent/50"
                     >
@@ -2251,6 +2367,7 @@ export function TerminalPanel({
                     <button
                       type="button"
                       onClick={() => doSearch(searchQuery, 'next')}
+                      onMouseDown={(event) => event.preventDefault()}
                       title={tr("Next match (Enter)")}
                       className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-accent hover:bg-cyber-accent/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-accent/50"
                     >
@@ -2258,7 +2375,7 @@ export function TerminalPanel({
                     </button>
                     <button
                       type="button"
-                      onClick={closeSearch}
+                      onClick={() => { closeSearch(); if (visibleSessionId) terminalRefs.current[visibleSessionId]?.term.focus(); }}
                       title={tr("Close (Esc)")}
                       className="flex items-center justify-center w-6 h-6 rounded text-cyber-muted hover:text-cyber-warn hover:bg-cyber-warn/10 transition text-[10px] font-bold border border-cyber-line/40 hover:border-cyber-warn/50 ml-0.5"
                     >
@@ -2816,13 +2933,16 @@ export function TerminalPanel({
                     }
                   }
                 }}
-                style={{ height: sshSessions.length === 0 ? `${Math.round(110 * miniTerminalScale)}px` : `${thumbSizes.cardHeight + 60}px` }}
+                data-mini-terminal-panel="bottom"
+                style={{ height: miniTerminalTitleOnly ? '96px' : sshSessions.length === 0 ? `${Math.round(110 * miniTerminalScale)}px` : `${thumbSizes.cardHeight + 60}px` }}
                 className="shrink-0 border-t border-cyber-line/50 bg-[#070b16] p-3 flex flex-col gap-2 overflow-hidden select-none transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <h3 className="font-display text-[9px] uppercase tracking-[0.15em] text-cyber-electric font-bold">{tr("⚡ CMD (")}{sshSessions.length})
                     </h3>
+                    <MiniTerminalDisplayControl mode={miniTerminalDisplayMode} onChange={setMiniTerminalDisplayMode} />
+                    {!miniTerminalTitleOnly && (
                     <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-0.5 scale-90 select-none">
                       <span className="text-[7px] font-mono text-cyber-electric/70 font-semibold tabular-nums min-w-[22px] text-right">{Math.round(miniTerminalScale * 100)}%</span>
                       <input
@@ -2838,6 +2958,7 @@ export function TerminalPanel({
                         title={tr("Mini terminal scale")}
                       />
                     </div>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -2854,12 +2975,24 @@ export function TerminalPanel({
                     {sshSessions.map((session, idx) => {
                       const isActive = visibleSessionId === session.id;
                       const isDragging = activeDragId === session.id;
+                      const miniTitle = getMiniTerminalTitle(session, sessionTitles[session.id], agentSessionTitles[session.id]);
                       return (
                         <Fragment key={`ssh-thumb-${session.id}`}>
                         {idx > 0 && (
                           <div className="w-px self-stretch bg-gradient-to-b from-transparent via-cyber-electric/35 to-transparent shrink-0" aria-hidden="true" />
                         )}
                         <div
+                          data-mini-terminal-session={session.id}
+                          data-mini-terminal-mode={miniTerminalDisplayMode}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isActive}
+                          onKeyDown={(event) => {
+                            if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                              event.preventDefault();
+                              onSelectSession(session.id);
+                            }
+                          }}
                           onClick={() => onSelectSession(session.id)}
                           onContextMenu={(e) => handleContextMenu(e, session.id)}
                           onMouseDown={(e) => {
@@ -2871,10 +3004,10 @@ export function TerminalPanel({
                               onReorderSessions?.(activeDragId, session.id);
                             }
                           }}
-                          title={`${session.cliName} - ${session.workingDir || ''}`}
+                          title={miniTitle}
                           style={{ 
-                            width: `${thumbSizes.cardWidth}px`, 
-                            height: `${thumbSizes.cardHeight}px`,
+                            width: miniTerminalTitleOnly ? '220px' : `${thumbSizes.cardWidth}px`,
+                            height: miniTerminalTitleOnly ? '36px' : `${thumbSizes.cardHeight}px`,
                             userSelect: 'none',
                             WebkitUserDrag: 'none'
                           } as React.CSSProperties}
@@ -2886,14 +3019,18 @@ export function TerminalPanel({
                                 : 'border-cyber-line/50 hover:border-cyber-electric/80 bg-[#0a0f1f] hover:shadow-neon-blue-sm'
                           }`}
                         >
-                          {/* Full-path title bar — above the mini terminal */}
+                          {miniTerminalTitleOnly ? (
+                            <MiniTerminalTitleRow title={miniTitle} onStop={() => onStopSession(session.id)} />
+                          ) : (
+                          <>
+                          {/* Agent/session title bar — above the mini terminal */}
                           <div
                             className="shrink-0 flex items-center gap-1 bg-black/55 border-b border-cyber-electric/25 px-1.5 select-none"
                             style={{ height: '14px' }}
                           >
                             <span className="text-[7px] shrink-0">📁</span>
                             <MarqueeTitle
-                              text={session.workingDir ? `${session.cliName} — ${session.workingDir}` : session.cliName}
+                              text={miniTitle}
                               className="text-cyber-electric"
                               fontSizeClass="text-[7px]"
                             />
@@ -2949,11 +3086,13 @@ export function TerminalPanel({
                           {/* Info bar — below terminal, not overlay */}
                           {thumbSizes.cardHeight >= 70 && (
                             <div className="shrink-0 bg-[#0a0f1f]/90 border-t border-cyber-line/20 px-2 py-1 flex items-center justify-between text-[8px]">
-                              <MarqueeTitle text={`${session.cliName} - ${session.workingDir || ''}`} className="text-cyber-electric" />
+                              <MarqueeTitle text={`${session.cliName} - ${session.workingDir || ''}`} title={miniTitle} className="text-cyber-electric" />
                               <span className="font-mono text-[7px] px-1 rounded bg-[#0a0f1f]/80 border border-cyber-line text-slate-400 select-none">
                                 {session.id.substring(0, 4)}
                               </span>
                             </div>
+                          )}
+                          </>
                           )}
                         </div>
                         </Fragment>
@@ -2981,7 +3120,8 @@ export function TerminalPanel({
                 </button>
               )}
               <div 
-                style={{ width: rightPanelVisible ? `${thumbSizes.containerWidth}px` : '0px' }}
+                data-mini-terminal-panel="right"
+                style={{ width: rightPanelVisible ? (miniTerminalTitleOnly ? '252px' : `${thumbSizes.containerWidth}px`) : '0px' }}
                 onMouseEnter={() => {
                   if (activeDragId) {
                     const sess = sessions.find(s => s.id === activeDragId);
@@ -2999,6 +3139,7 @@ export function TerminalPanel({
                   <div className="flex items-center gap-1.5 min-w-0">
                     <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">{tr("AI AGENT (")}{cliSessions.length})
                     </h3>
+                  {!miniTerminalTitleOnly && (
                   <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-1 select-none shrink-0">
                     <span className="text-[7px] font-mono text-cyber-electric/70 font-semibold tabular-nums min-w-[22px] text-right">{Math.round(miniTerminalScale * 100)}%</span>
                     <input
@@ -3014,6 +3155,7 @@ export function TerminalPanel({
                       title={tr("Mini terminal scale")}
                     />
                   </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -3030,6 +3172,7 @@ export function TerminalPanel({
                   ▶
                 </button>
               </div>
+              <MiniTerminalDisplayControl mode={miniTerminalDisplayMode} onChange={setMiniTerminalDisplayMode} />
               
               {cliSessions.length === 0 ? (
                 <div className="flex-1 border-2 border-dashed border-cyber-neon/30 hover:border-cyber-neon/70 rounded-lg flex items-center justify-center text-[10px] text-cyber-neon/80 font-mono italic p-4 text-center animate-pulse transition-colors">{tr("👾 Drag here to dock AI Agents on the right")}</div>
@@ -3038,12 +3181,24 @@ export function TerminalPanel({
                   {cliSessions.map((session, idx) => {
                     const isActive = visibleSessionId === session.id;
                     const isDragging = activeDragId === session.id;
+                    const miniTitle = getMiniTerminalTitle(session, sessionTitles[session.id], agentSessionTitles[session.id]);
                     return (
                       <Fragment key={`thumb-${session.id}`}>
                       {idx > 0 && (
                         <div className="h-px w-full bg-gradient-to-r from-transparent via-cyber-neon/30 to-transparent shrink-0" aria-hidden="true" />
                       )}
                       <div
+                        data-mini-terminal-session={session.id}
+                        data-mini-terminal-mode={miniTerminalDisplayMode}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isActive}
+                        onKeyDown={(event) => {
+                          if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                            event.preventDefault();
+                            onSelectSession(session.id);
+                          }
+                        }}
                         onClick={() => onSelectSession(session.id)}
                         onContextMenu={(e) => handleContextMenu(e, session.id)}
                         onMouseDown={(e) => {
@@ -3055,10 +3210,10 @@ export function TerminalPanel({
                             onReorderSessions?.(activeDragId, session.id);
                           }
                         }}
-                        title={`${session.cliName} - ${session.workingDir || ''}`}
+                        title={miniTitle}
                         style={{ 
-                          width: `${thumbSizes.cardWidth}px`, 
-                          height: `${thumbSizes.cardHeight}px`,
+                          width: miniTerminalTitleOnly ? '100%' : `${thumbSizes.cardWidth}px`,
+                          height: miniTerminalTitleOnly ? '36px' : `${thumbSizes.cardHeight}px`,
                           userSelect: 'none',
                           WebkitUserDrag: 'none'
                         } as React.CSSProperties}
@@ -3070,14 +3225,18 @@ export function TerminalPanel({
                               : 'border-cyber-line/50 hover:border-cyber-electric/80 bg-[#0a0f1f] hover:shadow-neon-blue-sm'
                         }`}
                       >
-                        {/* Full-path title bar — above the mini terminal */}
+                        {miniTerminalTitleOnly ? (
+                          <MiniTerminalTitleRow title={miniTitle} onStop={() => onStopSession(session.id)} />
+                        ) : (
+                        <>
+                        {/* Agent/session title bar — above the mini terminal */}
                         <div
                           className="shrink-0 flex items-center gap-1 bg-black/55 border-b border-cyber-neon/25 px-1.5 select-none"
                           style={{ height: '14px' }}
                         >
                           <span className="text-[7px] shrink-0">📁</span>
                           <MarqueeTitle
-                            text={session.workingDir ? `${session.cliName} — ${session.workingDir}` : session.cliName}
+                            text={miniTitle}
                             className="text-slate-200"
                             fontSizeClass="text-[7px]"
                           />
@@ -3133,11 +3292,13 @@ export function TerminalPanel({
                         {/* Info bar — below terminal, not overlay */}
                         {thumbSizes.cardHeight >= 70 && (
                           <div className="shrink-0 bg-[#0a0f1f]/90 border-t border-cyber-line/20 px-2 py-1 flex items-center justify-between text-[8px]">
-                            <MarqueeTitle text={`${session.cliName} - ${session.workingDir || ''}`} className="text-slate-300" />
+                            <MarqueeTitle text={`${session.cliName} - ${session.workingDir || ''}`} title={miniTitle} className="text-slate-300" />
                             <span className="font-mono text-[7px] px-1 rounded bg-[#0a0f1f]/80 border border-cyber-line text-slate-400 select-none">
                               {session.id.substring(0, 4)}
                             </span>
                           </div>
+                        )}
+                        </>
                         )}
                       </div>
                       </Fragment>

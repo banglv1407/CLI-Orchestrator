@@ -6,6 +6,15 @@ import { invoke } from '@tauri-apps/api/core';
 import type { AppTheme, BuiltinLlmConfig, BuiltinLlmStatus, LlmConfig } from '../types';
 import { petInstallPack, pickFolder } from '../lib/tauri';
 import {
+  DEFAULT_SIDEBAR_ORDER as DEFAULT_ORDER,
+  DEFAULT_VISIBLE_SIDEBAR_TABS as DEFAULT_VISIBLE_TABS,
+  PINNED_SIDEBAR_TABS as PINNED_TABS,
+  loadSidebarOrder,
+  loadVisibleSidebarTabs,
+  normalizeSidebarOrder,
+  type SidebarTab,
+} from '../lib/sidebarNavigation';
+import {
   getActivePetId,
   setActivePetId,
   getPetDiagnostics,
@@ -1208,6 +1217,7 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
 const TAB_LABELS: Record<string, { label: string; icon: string; desc: string }> = {
   'cli-manager': { label: 'Terminal Orchestor', icon: '💻', desc: 'Quản lý terminal, agent CLI và tác vụ' },
   'agent-sessions': { label: 'Agent Sessions', icon: '🗂', desc: 'Lịch sử hội thoại & resume agent CLI' },
+  'ai-chat': { label: 'AI Companion', icon: '🤖', desc: 'Open AI Companion chat' },
   'dashboard': { label: 'Dashboard', icon: '📊', desc: 'Bảng điều khiển & giám sát hệ thống' },
   'quickapps': { label: 'Quick Apps', icon: '⚡', desc: 'Trình khởi chạy nhanh các ứng dụng ưa thích' },
   'buzz': { label: 'Buzz Workspace', icon: '💬', desc: 'Không gian làm việc cộng tác & chat P2P' },
@@ -1216,58 +1226,11 @@ const TAB_LABELS: Record<string, { label: string; icon: string; desc: string }> 
   'settings': { label: 'Settings', icon: '⚙️', desc: 'Cài đặt hệ thống (cố định thanh dưới)' },
 };
 
-const DEFAULT_ORDER = [
-  'cli-manager',
-  'agent-sessions',
-  'dashboard',
-  'quickapps',
-  'buzz',
-  'game',
-  'apiclient',
-  'settings',
-];
-const DEFAULT_VISIBLE_TABS = ['cli-manager', 'agent-sessions', 'settings'];
-const PINNED_TABS = new Set(['settings']);
-
-function normalizeSidebarOrder(order: string[]): string[] {
-  let list = order.filter((tab) => Boolean(TAB_LABELS[tab]));
-  for (const def of DEFAULT_ORDER) {
-    if (!list.includes(def)) {
-      list.push(def);
-    }
-  }
-  return [
-    ...list.filter((tab) => !PINNED_TABS.has(tab)),
-    ...list.filter((tab) => PINNED_TABS.has(tab)),
-  ];
-}
-
 function SidebarOrderEditor() {
-  const [order, setOrder] = useState<string[]>(() => {
-    const saved = localStorage.getItem('ai-cli-sidebar-tabs-order');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return normalizeSidebarOrder(parsed);
-      } catch { /* ignore */ }
-    }
-    return [...DEFAULT_ORDER];
-  });
+  const [order, setOrder] = useState<SidebarTab[]>(loadSidebarOrder);
+  const [visibleTabs, setVisibleTabs] = useState<SidebarTab[]>(loadVisibleSidebarTabs);
 
-  const [visibleTabs, setVisibleTabs] = useState<string[]>(() => {
-    const saved = localStorage.getItem('ai-cli-sidebar-visible-tabs');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter((t) => Boolean(TAB_LABELS[t]));
-        }
-      } catch { /* ignore */ }
-    }
-    return [...DEFAULT_VISIBLE_TABS];
-  });
-
-  const saveConfig = (newOrder: string[], newVisible: string[]) => {
+  const saveConfig = (newOrder: SidebarTab[], newVisible: SidebarTab[]) => {
     const normalizedOrder = normalizeSidebarOrder(newOrder);
     setOrder(normalizedOrder);
     setVisibleTabs(newVisible);
@@ -1277,7 +1240,7 @@ function SidebarOrderEditor() {
     window.dispatchEvent(new CustomEvent('sidebar-visibility-changed', { detail: newVisible }));
   };
 
-  const toggleVisibility = (tab: string) => {
+  const toggleVisibility = (tab: SidebarTab) => {
     if (visibleTabs.includes(tab) && visibleTabs.length <= 1) {
       return;
     }
@@ -1343,6 +1306,7 @@ function SidebarOrderEditor() {
           return (
             <div
               key={tab}
+              data-sidebar-tab={tab}
               className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs transition-all ${
                 isPinned && (idx === 0 || !PINNED_TABS.has(order[idx - 1])) ? 'mt-4' : ''
               } ${
@@ -1371,7 +1335,7 @@ function SidebarOrderEditor() {
                   {tab === 'cli-manager' && (
                     <span className="px-1.5 py-0.2 rounded text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">{tr("Mặc định")}</span>
                   )}
-                  {tab === 'agent-sessions' && (
+                  {(tab === 'agent-sessions' || tab === 'ai-chat') && (
                     <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">{tr("Mặc định")}</span>
                   )}
                 </div>

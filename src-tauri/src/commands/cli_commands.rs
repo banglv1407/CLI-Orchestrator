@@ -10,6 +10,7 @@ use crate::{
     core::{
         cli_registry::{CliDefinition, CliMode, DetectedCli},
         execution_engine::ExecutionEngine,
+        hermes_session_titles::TerminalAgentSessionTitle,
         project_store::ProjectTag,
     },
     terminal::session_manager::SessionInfo,
@@ -32,6 +33,7 @@ pub struct StopCliRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CreateTerminalSessionRequest {
     pub cli_name: String,
+    pub title: Option<String>,
     pub working_dir: Option<String>,
     pub project_tag: Option<String>,
     #[serde(default)]
@@ -151,6 +153,13 @@ pub async fn detect_installed_clis(state: State<'_, AppState>) -> Result<Vec<Det
 #[tauri::command]
 pub async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionInfo>, String> {
     Ok(state.session_manager.list_sessions().await)
+}
+
+#[tauri::command]
+pub async fn list_terminal_session_titles(
+    state: State<'_, AppState>,
+) -> Result<Vec<TerminalAgentSessionTitle>, String> {
+    Ok(state.session_manager.agent_session_titles().await)
 }
 
 #[tauri::command]
@@ -284,7 +293,14 @@ pub async fn create_terminal_session(
 
     let res = state
         .session_manager
-        .create_session(app, cli.name, working_dir, request.project_tag, command)
+        .create_session(
+            app,
+            cli.name,
+            working_dir,
+            request.project_tag,
+            request.title,
+            command,
+        )
         .await
         .map_err(|error| error.to_string());
 
@@ -955,6 +971,7 @@ pub async fn create_ssh_session(
             app,
             display_name,
             connection.working_dir.clone(),
+            None,
             None,
             command,
         )

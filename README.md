@@ -17,6 +17,8 @@ terminal behavior and long-running sessions.
 - **Multi-Session Interactive Terminal**: Run multiple interactive CLI sessions simultaneously using a robust XTerm.js-powered UI and a Rust-based PTY backend.
 - **Smart Ctrl+C / Ctrl+V Support**: Seamlessly copy selected terminal text or paste text from the system clipboard directly into PTY sessions.
 - **Built-in AI Companion**: 
+  - Open chat from the robot icon on the activity bar; click again to collapse.
+  - Hide, show, or reorder it in **Settings > Navigation**. Preferences persist.
   - Chat with a custom LLM right from the sidebar!
   - Fully customizable: support OpenAI-compatible custom endpoints, custom models, custom API keys, custom headers (e.g. customized `User-Agent`), custom System Prompt, and toggleable **Stream Mode**.
   - History is preserved locally across app restarts.
@@ -92,18 +94,22 @@ Reverse forwarding (`-R`) is not supported.
 > `admin` / `admin`. Change the password or use public keys before exposing it,
 > because anyone who can log in can reach every address your machine can reach.
 
-### Recent terminals
+### Terminal sessions
 
 
-Mini terminal headers display the session CLI name followed by its working
-folder. Explorer shows Workspace Files and Git Diff; Quick Config Files remains
+Mini terminal headers display the current agent session title, with the full
+title on hover. Choose **Title only** in either mini-panel display selector for
+compact session rows without terminal previews; the choice persists.
+Hermes names follow its current session metadata for new and
+resumed sessions, including Hermes launched in a local shell. Other agents use
+live terminal titles with saved resume titles as a fallback. Untitled sessions
+show the CLI name and working folder.
+Explorer shows Workspace Files and Git Diff; Quick Config Files remains
 available in its dedicated manager, without a duplicate Explorer panel.
 
-Open **Terminal Orchestrator > Recent** to see the last 50 CLI and working-folder
-pairs, newest first. Click a row to start a new terminal with the current CLI
-configuration in that folder. Successful reuse moves the pair to the top.
-History persists across restarts and begins recording with this version.
-Deleted CLIs remain visible as unavailable.
+The Terminal Orchestrator sidebar provides **CLIs**, **VM**, **Configs**, and
+**Explorer**. Use CLIs to start sessions and the mini-terminal panels to select
+running sessions.
 
 ### Copying a pet pack to another computer
 
@@ -177,6 +183,17 @@ Example configuration:
 
    The production build appends the local build date in `MMDD` format to both
    the window title and executable name, for example `CLX (0808).exe`.
+
+   To build a portable Windows executable:
+
+   ```bash
+   npm run build:production -- --no-bundle --ci
+   ```
+
+   Run or copy `src-tauri/target/release/CLX (MMDD).exe`. The production frontend
+   is embedded in the executable. The destination Windows x64 machine needs
+   WebView2, as listed in the prerequisites above. App configuration remains in
+   `~/.ai-cli-manager/`.
 
 ## 📂 Project Structure
 

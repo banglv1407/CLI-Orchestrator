@@ -28,8 +28,13 @@ and technical bindings. Run `npm run test:i18n` for language and persistence
 tests. After `npm run build`, `npm run test:i18n:ui` runs a production-browser
 smoke with a separate temporary profile and a simulated native bridge. It
 checks all nine Settings sections, workspace rendering, unsaved prompt
-preservation, and reload persistence. It defaults to Windows Edge; set
+preservation, reload persistence, and AI Companion activity navigation and
+visibility. It also checks both mini terminal display modes, live title/output
+updates, compact session selection, and saved display preferences.
+It defaults to Windows Edge; set
 `CLX_I18N_BROWSER` to a compatible Chromium executable for another installation.
+Restricted Windows test runners can set `CLX_I18N_BROWSER_NO_SANDBOX=1` for this
+isolated fixture profile if Chromium child processes fail to start.
 Screenshots and its report are written to `.temp/i18n-browser`.
 
 Browser fixtures do not prove the physical tray or native dialog. Desktop

@@ -11,7 +11,6 @@ import { SshConnectionModal } from '../components/SshConnectionModal';
 import { MythicalPet } from '../components/MythicalPet';
 import { Notepad } from '../components/Notepad';
 import { CommandPalette } from '../components/CommandPalette';
-import { recordRecent } from '../lib/terminal-recents';
 import {
   createTerminalSession,
   deleteCli,
@@ -738,7 +737,6 @@ export function Dashboard() {
         });
 
         if (session.workingDir) {
-          recordRecent(session.cliName, session.workingDir);
           addFolderToHistory(session.workingDir);
         }
 
@@ -833,7 +831,6 @@ export function Dashboard() {
 
       setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
       mergeCliIntoState({ ...session, panel });
-      recordRecent(session.cliName, session.workingDir);
       void refreshSidebarData();
       setAssistantState('Done');
       setAssistantText('Quick CLI session started.');
@@ -1031,11 +1028,6 @@ export function Dashboard() {
   return (
     <main className="flex h-full w-full bg-cyber-base bg-grid text-slate-100 overflow-hidden">
       <CliSidebar
-        onOpenRecent={async item => {
-          setActiveMainView('terminal');
-          const session = await createSessionForCli(item.cliName, { workingDir: item.workingDir });
-          if (!session) throw new Error('Could not reopen terminal. Check the CLI configuration and folder.');
-        }}
         clis={clis}
         sessions={displaySessions}
         activeCli={activeCli}

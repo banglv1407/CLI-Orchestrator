@@ -25,6 +25,22 @@ list for the active local project or SSH session.
   pinned to the bottom of the activity bar.
 - User ordering may change the order within either group but cannot move a
   pinned item into the primary group.
+- AI Companion is a primary activity item, visible by default. Selecting its
+  robot icon opens the resizable chat sidebar and highlights the item; selecting
+  it again collapses the panel. Enter and Space also activate the icon.
+- Settings > Navigation lists AI Companion alongside the other features and
+  supports hiding, showing, and reordering it. These choices survive restart.
+- Existing saved navigation gains the AI Companion item once on upgrade,
+  preserving the order and visibility of the other features. Later explicit
+  hides stay hidden. Reset/default and show-all actions include AI Companion.
+- Ctrl+P > View: AI Companion can still open chat while its activity icon is
+  hidden, without changing the saved visibility preference.
+
+## Terminal Orchestrator Menu
+
+- The left panel offers CLIs, VM, Configs, and Explorer, with CLIs selected
+  initially. There is no Recent terminal tab or CLI/folder-pair recording.
+- The working-directory picker retains its separate folder history.
 
 ## File Viewer Contract
 

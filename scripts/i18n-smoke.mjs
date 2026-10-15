@@ -25,7 +25,10 @@ try {
   vite.stderr.on('data', data => { viteLog += data; });
   await until(async () => { if (vite.exitCode !== null) throw new Error(viteLog); return (await fetch('http://127.0.0.1:5187')).ok; }, 'Vite');
   const browser = process.env.CLX_I18N_BROWSER ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-  const edge = spawn(browser, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--user-data-dir=' + profile, '--window-size=1440,1000', 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+  const browserArgs = ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--user-data-dir=' + profile, '--window-size=1440,1000', 'about:blank'];
+  // Restricted Windows runners may prevent Chromium's child sandbox from starting.
+  if (process.env.CLX_I18N_BROWSER_NO_SANDBOX === '1') browserArgs.push('--no-sandbox');
+  const edge = spawn(browser, browserArgs, { windowsHide: true, stdio: 'ignore' });
   processes.push(edge);
   const port = await until(async () => (await fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0], 'Edge DevTools');
   const target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(item => item.type === 'page');
@@ -57,16 +60,31 @@ try {
   }
   await call('Page.enable');
   await call('Runtime.enable');
+  await call('Emulation.setFocusEmulationEnabled', { enabled: true });
   await call('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.__languageSmokeCalls = [];
     window.isTauri = true;
-    let callbackId = 0;
-    window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
+    let callbackId = 0, listenerId = 0;
+    const callbacks = new Map(), listeners = new Map();
+    window.__smokeEmit = (event, payload) => {
+      for (const [id, listener] of listeners) {
+        if (listener.event === event) callbacks.get(listener.handler)?.({ event, id, payload });
+      }
+    };
+    window.__smokeTerminalSessions = JSON.parse(sessionStorage.getItem('clx-smoke-terminal-sessions') ?? '[]');
+    window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener(event, id) { listeners.delete(id); } };
     window.__TAURI_INTERNALS__ = {
       metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
-      transformCallback() { return ++callbackId; }, unregisterCallback() {},
+      transformCallback(callback) { const id = ++callbackId; callbacks.set(id, callback); return id; },
+      unregisterCallback(id) { callbacks.delete(id); },
       async invoke(command, args) {
         window.__languageSmokeCalls.push({ command, args });
+        if (command === 'list_sessions') return structuredClone(window.__smokeTerminalSessions);
+        if (command === 'stop_cli') {
+          window.__smokeTerminalSessions = window.__smokeTerminalSessions.filter(session => session.id !== args.request.sessionId);
+          sessionStorage.setItem('clx-smoke-terminal-sessions', JSON.stringify(window.__smokeTerminalSessions));
+          return null;
+        }
         const values = {
           list_clis: [{ name: 'CLI User 42', command: 'example-cli', mode: 'interactive', args: [], env: {}, savedDirectories: [] }],
           list_sessions: [], list_project_tags: [], load_ssh_connections: [], list_quickapps: [{ id: 'user-app', name: 'User App 42', command: 'example-app', args: [], workingDir: '', order: 0, iconMissing: true }],
@@ -85,6 +103,8 @@ try {
           get_ssh_server_config: { username: 'user-fixture', password: '', publicKeys: [] },
           get_local_ip: '127.0.0.1', get_public_ip: '127.0.0.1', plugin_event_listen: 1,
         };
+        if (command === 'plugin:event|listen') { const id = ++listenerId; listeners.set(id, args); return id; }
+        if (command === 'plugin:event|unlisten') { listeners.delete(args.eventId); return null; }
         if (command.startsWith('plugin:event|')) return 1;
         if (command === 'plugin:window|is_visible') return true;
         if (command === 'get_sysinfo') return { cpuUsage: 0, totalMemory: 1024, usedMemory: 0, disks: [] };
@@ -143,6 +163,20 @@ try {
       })()`);
     }
     report.locales[language] = { sections };
+    const companionLabel = catalog['AI Companion'][index];
+    assert.equal(await evaluate('document.querySelector("nav button[aria-expanded]")?.title'), companionLabel);
+    await evaluate('document.querySelector("nav button[aria-expanded]").click()');
+    await until(() => evaluate('document.querySelector("nav button[aria-expanded]")?.getAttribute("aria-expanded")==="true" && Boolean(document.querySelector("aside h2"))'), 'Companion activity panel');
+    assert.equal(await evaluate('document.querySelector("aside h2").textContent'), companionLabel);
+    await evaluate('document.querySelector("nav button[aria-expanded]").click()');
+    await until(() => evaluate('document.querySelector("nav button[aria-expanded]")?.getAttribute("aria-expanded")==="false" && !document.querySelector("aside")'), 'Companion collapse');
+    await evaluate('document.querySelector("nav button[aria-expanded]").focus()');
+    for (const type of ['keyDown', 'keyUp']) await call('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, ...(type === 'keyDown' ? { text: '\r', unmodifiedText: '\r' } : {}) });
+    await until(() => evaluate('Boolean(document.querySelector("aside h2"))'), 'Companion keyboard activation');
+    await evaluate('document.querySelector("nav button[aria-expanded]").focus()');
+    for (const type of ['keyDown', 'keyUp']) await call('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, ...(type === 'keyDown' ? { text: ' ', unmodifiedText: ' ' } : {}) });
+    await until(() => evaluate('!document.querySelector("aside")'), 'Companion keyboard collapse');
+    report.locales[language].companionActivity = { label: companionLabel, openCollapseAndKeyboard: true };
     console.log(language + ': all 9 Settings sections rendered');
   }
   await section('ai-companion');
@@ -157,6 +191,8 @@ try {
   }
   report.unsavedPromptPreserved = true;
   await fs.writeFile(path.join(directory, 'report.json'), JSON.stringify(report, null, 2));
+  await evaluate("window.dispatchEvent(new CustomEvent('open-sidebar-tab',{detail:'cli-manager'}))");
+  await until(() => evaluate('Boolean(document.querySelector("aside h1"))'), 'restored terminal sidebar');
   for (const language of ['vi', 'ko']) {
     await selectLanguage(language);
     const views = {};
@@ -178,7 +214,109 @@ try {
   await section('appearance');
   assert.equal(await evaluate('document.querySelector("#interface-language").value'), 'ko');
   report.restartPersistence = true;
+  const companionRow = '[data-sidebar-tab="ai-chat"]';
+  const toggleCompanion = () => evaluate(`document.querySelector('${companionRow} button').click()`);
+  const sidebarVisible = () => evaluate("JSON.parse(localStorage.getItem('ai-cli-sidebar-visible-tabs'))");
+  await section('navigation');
+  assert.ok(await evaluate(`Boolean(document.querySelector('${companionRow}'))`));
+  await toggleCompanion();
+  await until(() => evaluate('!document.querySelector("nav button[aria-expanded]")'), 'hidden Companion icon');
+  assert.ok(!(await sidebarVisible()).includes('ai-chat'));
+  await call('Page.reload');
+  await until(() => evaluate('document.querySelector("#root")?.innerText.length>100'), 'hidden Companion reload');
+  assert.ok(!(await sidebarVisible()).includes('ai-chat'));
+  assert.equal(await evaluate('Boolean(document.querySelector("nav button[aria-expanded]"))'), false);
+  await evaluate("window.dispatchEvent(new CustomEvent('open-sidebar-tab',{detail:'ai-chat'}))");
+  await until(() => evaluate('Boolean(document.querySelector("aside h2"))'), 'hidden Companion palette destination');
+  assert.ok(!(await sidebarVisible()).includes('ai-chat'));
+  await section('navigation');
+  await toggleCompanion();
+  await until(() => evaluate('Boolean(document.querySelector("nav button[aria-expanded]"))'), 'restored Companion icon');
+  await evaluate(`document.querySelectorAll('${companionRow} button')[1].click()`);
+  const reordered = await evaluate("JSON.parse(localStorage.getItem('ai-cli-sidebar-tabs-order'))");
+  assert.ok(reordered.indexOf('ai-chat') < reordered.indexOf('agent-sessions'));
+  await call('Page.reload');
+  await until(() => evaluate('Boolean(document.querySelector("nav button[aria-expanded]"))'), 'restored visible Companion reload');
+  assert.deepEqual(await evaluate("JSON.parse(localStorage.getItem('ai-cli-sidebar-tabs-order'))"), reordered);
+  await section('navigation');
+  for (const source of ['Chỉ hiện mặc định', 'Hiện tất cả', 'Reset to Default']) {
+    const label = catalog[source][2];
+    await evaluate(`Array.from(document.querySelectorAll('button')).find(button=>button.textContent===${JSON.stringify(label)}).click()`);
+    await until(() => evaluate('Boolean(document.querySelector("nav button[aria-expanded]"))'), 'Companion navigation preset');
+    assert.ok((await sidebarVisible()).includes('ai-chat'));
+  }
+  await evaluate(`(() => {
+    localStorage.setItem('ai-cli-sidebar-tabs-order', JSON.stringify(['buzz','cli-manager','agent-sessions','settings']));
+    localStorage.setItem('ai-cli-sidebar-visible-tabs', JSON.stringify(['buzz','cli-manager','settings']));
+    localStorage.removeItem('ai-cli-sidebar-ai-chat-added');
+  })()`);
+  await call('Page.reload');
+  await until(() => evaluate('Boolean(document.querySelector("nav button[aria-expanded]"))'), 'legacy Companion upgrade');
+  assert.deepEqual(await sidebarVisible(), ['buzz', 'cli-manager', 'settings', 'ai-chat']);
+  assert.deepEqual((await evaluate("JSON.parse(localStorage.getItem('ai-cli-sidebar-tabs-order'))")).slice(0, 3), ['buzz', 'cli-manager', 'agent-sessions']);
+  report.companionNavigation = { hideShow: true, restartPersistence: true, reordered: true, presets: true, hiddenPaletteDestination: true, legacyUpgrade: true };
+  const terminalSessions = [
+    { id: 'mini-right-a', cliName: 'Codex', title: 'Agent Alpha - long title Tiếng Việt 한국어 42', workingDir: 'D:/fixture', status: 'running' },
+    { id: 'mini-right-b', cliName: 'Codex', title: 'Agent Beta 42', workingDir: 'D:/fixture', status: 'running' },
+    { id: 'mini-bottom', cliName: 'Quick - shell', title: 'Shell session 42', workingDir: 'D:/fixture', status: 'running' },
+  ];
+  await evaluate(`(() => {
+    sessionStorage.setItem('clx-smoke-terminal-sessions', ${JSON.stringify(JSON.stringify(terminalSessions))});
+    localStorage.setItem('ai-cli-right-panel-visible', 'true');
+    localStorage.setItem('clx-mini-terminal-display-mode', 'invalid-mode');
+  })()`);
+  await call('Page.reload');
+  await until(() => evaluate('document.querySelectorAll("[data-mini-terminal-session] .xterm").length===3'), 'mini terminal previews');
+  assert.equal(await evaluate("localStorage.getItem('clx-mini-terminal-display-mode')"), 'preview');
+  const setMiniMode = async (panel, mode) => {
+    await evaluate(`(() => {const select=document.querySelector('[data-mini-terminal-panel="${panel}"] select');select.value=${JSON.stringify(mode)};select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await until(() => evaluate(`Array.from(document.querySelectorAll('[data-mini-terminal-display]')).every(select=>select.value===${JSON.stringify(mode)})`), 'shared mini display mode');
+  };
+  await evaluate("window.__smokeEmit('cli-output',{sessionId:'mini-right-a',cliName:'Codex',chunk:'OUTPUT_BEFORE_MODE\\r\\n',stream:'stdout'})");
+  await until(() => evaluate('document.querySelector("section .xterm")?.textContent.includes("OUTPUT_BEFORE_MODE")'), 'main terminal output before mode change');
+  await until(() => evaluate('(() => {const panel=document.querySelector("[data-mini-terminal-panel=bottom]");return Math.abs(panel.getBoundingClientRect().height-parseFloat(panel.style.height))<1;})()'), 'preview tray height settled');
+  const previewHeight = await evaluate('document.querySelector("[data-mini-terminal-panel=bottom]").getBoundingClientRect().height');
+  await setMiniMode('right', 'title-only');
+  await until(() => evaluate('document.querySelectorAll("[data-mini-terminal-session] .xterm").length===0'), 'title-only removes previews');
+  assert.equal(await evaluate('document.querySelectorAll("section .xterm").length'), 3, 'main terminals stay mounted');
+  assert.ok(await evaluate('document.querySelector("section .xterm").textContent.includes("OUTPUT_BEFORE_MODE")'));
+  await until(() => evaluate(`document.querySelector('[data-mini-terminal-panel=bottom]').getBoundingClientRect().height<${previewHeight}`), 'compact tray height');
+  assert.equal(await evaluate('document.querySelectorAll("[data-mini-terminal-panel] input[type=range]").length'), 0);
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-mini-terminal-session]"),row=>row.title)'), [terminalSessions[2].title, terminalSessions[0].title, terminalSessions[1].title]);
+  await evaluate("window.__smokeEmit('cli-output',{sessionId:'mini-right-a',cliName:'Codex',chunk:'\\u001b]2;Agent Alpha renamed Tiếng Việt 한국어\\u0007OUTPUT_IN_TITLE_MODE\\r\\n',stream:'stdout'})");
+  await until(() => evaluate('document.querySelector("[data-mini-terminal-session=mini-right-a]")?.title==="Agent Alpha renamed Tiếng Việt 한국어"'), 'live title in compact mode');
+  await evaluate('document.querySelector("[data-mini-terminal-session=mini-bottom]").click()');
+  await until(() => evaluate('document.querySelector("[data-mini-terminal-session=mini-bottom]")?.getAttribute("aria-pressed")==="true"'), 'title row session selection');
+  await evaluate('document.querySelector("[data-mini-terminal-session=mini-right-b]").focus()');
+  for (const type of ['keyDown', 'keyUp']) await call('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, ...(type === 'keyDown' ? { text: '\r', unmodifiedText: '\r' } : {}) });
+  await until(() => evaluate('document.querySelector("[data-mini-terminal-session=mini-right-b]")?.getAttribute("aria-pressed")==="true"'), 'title row keyboard selection');
+  for (let index = 0; index < 3; index++) {
+    await selectLanguage(['en', 'vi', 'ko'][index]);
+    await evaluate("window.dispatchEvent(new CustomEvent('switch-main-view',{detail:'terminal'}))");
+    assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-mini-terminal-display]"),select=>Array.from(select.options,option=>option.text))'), Array(2).fill([catalog['Mini terminal'][index], catalog['Title only'][index]]));
+    assert.equal(await evaluate('document.querySelector("[data-mini-terminal-session=mini-right-a]").title'), 'Agent Alpha renamed Tiếng Việt 한국어');
+  }
+  await fs.writeFile(path.join(directory, 'terminal-title-only-ko.png'), Buffer.from((await call('Page.captureScreenshot')).data, 'base64'));
+  await setMiniMode('bottom', 'preview');
+  await until(() => evaluate('document.querySelectorAll("[data-mini-terminal-session] .xterm").length===3'), 'previews restored');
+  await until(() => evaluate('Array.from(document.querySelectorAll("[data-mini-terminal-session=mini-right-a] .xterm"),node=>node.textContent).some(text=>text.includes("OUTPUT_IN_TITLE_MODE"))'), 'restored preview uses current main buffer');
+  assert.equal(await evaluate('document.querySelectorAll("section .xterm").length'), 6);
+  for (let index = 0; index < 2; index++) {
+    await setMiniMode('right', 'title-only');
+    await setMiniMode('bottom', 'preview');
+  }
+  await setMiniMode('bottom', 'title-only');
+  await call('Page.reload');
+  await until(() => evaluate('document.querySelectorAll("[data-mini-terminal-mode=title-only]").length===3'), 'saved title-only mode reload');
+  assert.equal(await evaluate('document.querySelectorAll("[data-mini-terminal-session] .xterm").length'), 0);
+  assert.equal(await evaluate('document.querySelectorAll("section .xterm").length'), 3);
+  await evaluate('document.querySelector("[data-mini-terminal-session=mini-right-b] button").click()');
+  await until(() => evaluate('!document.querySelector("[data-mini-terminal-session=mini-right-b]")'), 'compact row closes matching session');
+  assert.deepEqual(await evaluate("window.__languageSmokeCalls.filter(call=>call.command==='stop_cli').map(call=>call.args.request.sessionId)"), ['mini-right-b']);
+  report.miniTerminalDisplay = { titleOnlyBothPanels: true, liveTitles: true, bufferPreserved: true, restoredPreviews: true, repeatSwitches: true, mouseAndKeyboardSelection: true, locales: true, savedMode: true, closeMatchingSession: true };
   await fs.writeFile(path.join(directory, 'report.json'), JSON.stringify(report, null, 2));
+  console.log('Mini terminal title-only mode, current buffers, selection, close, locales, and persistence passed');
+  console.log('AI Companion activity, visibility, order, presets, palette destination, and legacy upgrade passed');
   console.log('Unsaved prompt and reload persistence passed; runtime exceptions: ' + exceptions.length);
   for (const [language, data] of Object.entries(report.locales)) {
     const leftovers = Object.entries(data.sections).filter(([,data])=>data.untranslated.length);

@@ -22,10 +22,19 @@ export interface CliDefinition {
 export interface SessionInfo {
   id: string;
   cliName: string;
+  title?: string;
+  agent?: string;
   status: string;
   workingDir?: string;
   projectTag?: string;
   panel?: 'bottom' | 'right';
+}
+
+export interface TerminalAgentSessionTitle {
+  sessionId: string;
+  agent: string;
+  agentSessionId: string | null;
+  title: string | null;
 }
 
 export interface ProjectTag {
@@ -50,6 +59,7 @@ export interface CliStatusEvent {
 
 export interface CreateSessionRequest {
   cliName: string;
+  title?: string;
   workingDir?: string;
   projectTag?: string;
   customArgs?: string[];

@@ -6,6 +6,7 @@ pub mod buzz_types;
 pub mod cli_registry;
 pub mod events;
 pub mod execution_engine;
+pub mod hermes_session_titles;
 pub mod icon_extractor;
 pub mod monitoring;
 pub mod nes_client;

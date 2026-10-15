@@ -165,6 +165,7 @@ export function AgentSessionPanel() {
 
       await createTerminalSession({
         cliName: targetCliName,
+        title: session.title || undefined,
         workingDir: session.cwd || undefined,
         customArgs: resumeInfo.customArgs,
       });

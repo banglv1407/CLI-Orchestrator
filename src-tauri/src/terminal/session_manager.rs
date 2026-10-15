@@ -15,6 +15,7 @@ use crate::{
     core::{
         events::{emit_status, CliStatusEvent},
         execution_engine::ResolvedCommand,
+        hermes_session_titles::{self, HermesTitleTarget, TerminalAgentSessionTitle},
     },
     runners::interactive_runner,
 };
@@ -24,6 +25,8 @@ use crate::{
 pub struct SessionInfo {
     pub id: String,
     pub cli_name: String,
+    pub title: Option<String>,
+    pub agent: Option<String>,
     pub status: String,
     pub working_dir: Option<String>,
     pub project_tag: Option<String>,
@@ -41,10 +44,12 @@ pub struct SessionRuntimeInfo {
 struct Session {
     id: String,
     cli_name: String,
+    title: Option<String>,
     working_dir: Option<String>,
     project_tag: Option<String>,
     launch_command: String,
     launch_args: Vec<String>,
+    hermes_title_target: HermesTitleTarget,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Arc<Mutex<Box<dyn portable_pty::Child + Send>>>,
     status: Arc<Mutex<String>>,
@@ -100,14 +105,22 @@ impl SessionManager {
         cli_name: String,
         working_dir: Option<String>,
         project_tag: Option<String>,
-        command: ResolvedCommand,
+        title: Option<String>,
+        mut command: ResolvedCommand,
     ) -> Result<SessionInfo, SessionError> {
         let session_id = format!("{}-{}", cli_name, Uuid::new_v4().as_simple());
+        hermes_session_titles::assign_terminal_identity(&session_id, &mut command);
+        let title = title
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
         // Preserve the requested executable for feature-level environment
         // detection. Windows may wrap it in cmd.exe solely to keep interactive
         // CLI processes attached; that wrapper is not the user's actual shell.
         let launch_command = command.command.clone();
         let launch_args = command.args.clone();
+        let mut hermes_title_target =
+            HermesTitleTarget::new(session_id.clone(), &cli_name, &command);
+        let agent = hermes_title_target.is_hermes.then(|| "hermes".to_string());
         let (spawn_command, startup_input) = prepare_interactive_spawn_command(&cli_name, command);
 
         let log_cwd = spawn_command.cwd.clone();
@@ -118,6 +131,11 @@ impl SessionManager {
             spawn_command,
         )
         .map_err(|error| SessionError::Runner(error.to_string()))?;
+        hermes_title_target.root_pid = handle
+            .child
+            .lock()
+            .ok()
+            .and_then(|child| child.process_id());
 
         let mut log_file = open_session_log(&cli_name, &session_id);
         if let Some(ref mut file) = log_file {
@@ -143,10 +161,12 @@ impl SessionManager {
         let session = Arc::new(Session {
             id: session_id.clone(),
             cli_name: cli_name.clone(),
+            title: title.clone(),
             working_dir: working_dir.clone(),
             project_tag: project_tag.clone(),
             launch_command,
             launch_args,
+            hermes_title_target,
             writer: handle.writer,
             child: handle.child,
             status: handle.status,
@@ -174,6 +194,8 @@ impl SessionManager {
         Ok(SessionInfo {
             id: session_id,
             cli_name,
+            title,
+            agent,
             status: "running".to_string(),
             working_dir,
             project_tag,
@@ -318,12 +340,42 @@ impl SessionManager {
                 SessionInfo {
                     id: session.id.clone(),
                     cli_name: session.cli_name.clone(),
+                    title: session.title.clone(),
+                    agent: session
+                        .hermes_title_target
+                        .is_hermes
+                        .then(|| "hermes".to_string()),
                     status,
                     working_dir: session.working_dir.clone(),
                     project_tag: session.project_tag.clone(),
                 }
             })
             .collect()
+    }
+
+    pub async fn agent_session_titles(&self) -> Vec<TerminalAgentSessionTitle> {
+        let targets = {
+            let sessions = self.sessions.read().await;
+            sessions
+                .values()
+                .filter(|session| {
+                    session
+                        .status
+                        .lock()
+                        .map(|status| status.as_str() == "running")
+                        .unwrap_or(false)
+                })
+                .map(|session| session.hermes_title_target.clone())
+                .collect::<Vec<_>>()
+        };
+        if targets.is_empty() {
+            return Vec::new();
+        }
+        // SQLite and process snapshots must not block the async runtime or hold
+        // the session map while terminal input/output is being handled.
+        tokio::task::spawn_blocking(move || hermes_session_titles::resolve_titles(targets))
+            .await
+            .unwrap_or_default()
     }
 
     pub async fn runtime_info(&self, session_id: &str) -> Result<SessionRuntimeInfo, SessionError> {

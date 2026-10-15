@@ -488,7 +488,7 @@ impl Handler for SshHandler {
                             env: std::collections::HashMap::new(),
                         };
                         match session_manager
-                            .create_session(app, "shell".to_string(), None, None, cmd)
+                            .create_session(app, "shell".to_string(), None, None, None, cmd)
                             .await
                         {
                             Ok(sess_info) => {

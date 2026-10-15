@@ -7,8 +7,7 @@ import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled 
 import { getContextMenuPosition } from '../lib/contextMenu';
 import { ProxyPanel } from './ProxyPanel';
 import { AIChatPanel } from './AIChatPanel';
-import { RecentTerminals } from './RecentTerminals';
-import type { RecentTerminal } from '../lib/terminal-recents';
+import { loadSidebarOrder, loadVisibleSidebarTabs, PINNED_SIDEBAR_TABS, type SidebarTab } from '../lib/sidebarNavigation';
 import { loadSpecialConfigFiles, saveSpecialConfigFile, deleteSpecialConfigFile, getSpecialConfigDisplay } from '../lib/configFiles';
 import { SpecialConfigModal } from './SpecialConfigModal';
 
@@ -184,7 +183,6 @@ function SwitchIcon() {
 // --- Component Interfaces ---
 
 interface CliSidebarProps {
-  onOpenRecent: (item: RecentTerminal) => Promise<void>;
   clis: CliDefinition[];
   sessions: SessionInfo[];
   activeCli: string;
@@ -219,11 +217,6 @@ interface CliSidebarProps {
   onProxyTabChange?: (isActive: boolean) => void;
   onLogsTabChange?: (isActive: boolean) => void;
 }
-
-type SidebarTab = 'cli-manager' | 'quickapps' | 'buzz' | 'game' | 'settings' | 'ai-chat' | 'apiclient' | 'dashboard' | 'agent-sessions';
-
-const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['settings']);
-const DEFAULT_VISIBLE_SIDEBAR_TABS: SidebarTab[] = ['cli-manager', 'agent-sessions', 'settings'];
 
 interface FileContextTarget {
   path: string;
@@ -356,7 +349,6 @@ export function CliSidebar({
   activeSessionId,
   onSelectCli,
   onOpenCliInteraction,
-  onOpenRecent,
   onSelectSession,
   onAddCli,
   onEditCli,
@@ -387,7 +379,7 @@ export function CliSidebar({
 }: CliSidebarProps) {
   const locale = useLocale();
   const [activeTab, setActiveTab] = useState<SidebarTab>('cli-manager');
-  const [cliSubTab, setCliSubTab] = useState<'clis' | 'recent' | 'operator' | 'configs' | 'explorer'>('clis');
+  const [cliSubTab, setCliSubTab] = useState<'clis' | 'operator' | 'configs' | 'explorer'>('clis');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('ai-cli-sidebar-collapsed') === 'true';
   });
@@ -470,59 +462,8 @@ export function CliSidebar({
   }, [activeTab, isSidebarCollapsed, onQuickAppsTabChange, onApiClientTabChange, onProxyTabChange, onLogsTabChange]);
 
   // --- Sidebar Tabs Visibility & Reordering (Dynamic Icons) ---
-  const [visibleTabs, setVisibleTabs] = useState<SidebarTab[]>(() => {
-    const saved = localStorage.getItem('ai-cli-sidebar-visible-tabs');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed as SidebarTab[];
-        }
-      } catch { /* ignore */ }
-    }
-    return [...DEFAULT_VISIBLE_SIDEBAR_TABS];
-  });
-
-  const [tabsOrder, setTabsOrder] = useState<SidebarTab[]>(() => {
-    const saved = localStorage.getItem('ai-cli-sidebar-tabs-order');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          let list = [...parsed].filter((t) => t !== 'explorer' && t !== 'operator' && t !== 'web-ai' && t !== 'logs' && t !== 'remote' && t !== 'proxy' && t !== 'harness');
-          if (!list.includes('cli-manager')) {
-            list.unshift('cli-manager');
-          }
-          if (!list.includes('agent-sessions')) {
-            const cliIdx = list.indexOf('cli-manager');
-            list.splice(cliIdx >= 0 ? cliIdx + 1 : list.length, 0, 'agent-sessions');
-          }
-          if (!list.includes('dashboard')) {
-            list.push('dashboard');
-          }
-          if (!list.includes('buzz')) {
-            const quickIdx = list.indexOf('quickapps');
-            list.splice(quickIdx >= 0 ? quickIdx + 1 : list.length, 0, 'buzz');
-          }
-          if (!list.includes('game')) {
-            const buzzIdx = list.indexOf('buzz');
-            list.splice(buzzIdx >= 0 ? buzzIdx + 1 : list.length, 0, 'game');
-          }
-          const finalOrder = [
-            ...list.filter((t) => !PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
-            ...list.filter((t) => PINNED_SIDEBAR_TABS.has(t as SidebarTab)),
-          ] as SidebarTab[];
-          try {
-            localStorage.setItem('ai-cli-sidebar-tabs-order', JSON.stringify(finalOrder));
-          } catch { /* ignore */ }
-          return finalOrder;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return ['cli-manager', 'agent-sessions', 'dashboard', 'quickapps', 'buzz', 'game', 'apiclient', 'settings'];
-  });
+  const [visibleTabs, setVisibleTabs] = useState<SidebarTab[]>(loadVisibleSidebarTabs);
+  const [tabsOrder, setTabsOrder] = useState<SidebarTab[]>(loadSidebarOrder);
 
   const handleTabDragStart = (e: React.DragEvent, tab: SidebarTab) => {
     e.dataTransfer.setData('text/plain', tab);
@@ -672,6 +613,38 @@ export function CliSidebar({
               <QuickAppsIcon />
             </div>
           </div>
+        );
+      case 'ai-chat':
+        return (
+          <button
+            key="ai-chat"
+            type="button"
+            draggable
+            onDragStart={(e) => handleTabDragStart(e, 'ai-chat')}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleTabDrop(e, 'ai-chat')}
+            onClick={() => handleSetActiveTab('ai-chat')}
+            title={tr("AI Companion")}
+            aria-label={tr("AI Companion")}
+            aria-pressed={activeTab === 'ai-chat' && !isSidebarCollapsed}
+            aria-expanded={activeTab === 'ai-chat' && !isSidebarCollapsed}
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-all cursor-grab active:cursor-grabbing select-none focus-visible:ring-2 focus-visible:ring-cyber-neon ${
+              activeTab === 'ai-chat'
+                ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm'
+                : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'
+            }`}
+          >
+            <div className="pointer-events-none flex items-center justify-center w-full h-full relative">
+              {activeTab === 'ai-chat' && (
+                <span className="absolute left-0 top-2 bottom-2 w-1 rounded bg-cyber-neon" />
+              )}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m-3-3h6M5 10H3v6h2m14-6h2v6h-2" />
+                <rect x="5" y="6" width="14" height="14" rx="3" />
+                <path strokeLinecap="round" d="M9 11v2m6-2v2m-6 4h6" />
+              </svg>
+            </div>
+          </button>
         );
       case 'apiclient':
         return (
@@ -2153,8 +2126,6 @@ export function CliSidebar({
 
               {/* Sub-Navigation Pills */}
               <div className="flex items-center gap-1 px-3 pb-2.5">
-                <button type="button" onClick={() => setCliSubTab('recent')}
-                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold transition ${cliSubTab === 'recent' ? 'bg-cyber-electric/20 text-cyber-electric border border-cyber-electric/40' : 'text-slate-400 hover:text-slate-200 hover:bg-cyber-base/40'}`}>{tr("Recent")}</button>
                 <button
                   type="button"
                   onClick={() => setCliSubTab('clis')}
@@ -2195,7 +2166,6 @@ export function CliSidebar({
             </div>
 
             {/* Sub-view 1: CLIs & Sessions */}
-            {cliSubTab === 'recent' && <RecentTerminals clis={clis} onOpen={onOpenRecent} />}
             {cliSubTab === 'clis' && (
               <div className="flex flex-1 flex-col overflow-hidden">
                 {/* Action bar */}

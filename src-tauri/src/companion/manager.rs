@@ -744,7 +744,7 @@ impl CompanionManager {
                 let sm = sm.as_ref().ok_or("Session manager unavailable")?;
                 let info = sm.create_session(
                     app.clone(), cli.name, Some(working_dir.to_string()),
-                    project_tag.filter(|s| !s.is_empty()).map(String::from), command,
+                    project_tag.filter(|s| !s.is_empty()).map(String::from), None, command,
                 ).await.map_err(|e| e.to_string())?;
 
                 self.emit(CompanionEvent::UiEffect {

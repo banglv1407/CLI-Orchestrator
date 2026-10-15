@@ -18,14 +18,18 @@
     "test:rogue-assets": "node scripts/validate-rogue-assets.mjs",
     "check:i18n": "node scripts/check-localization.mjs",
     "test:i18n": "node --test scripts/i18n.test.mjs",
-    "test:i18n:ui": "node scripts/i18n-smoke.mjs"
+    "test:i18n:ui": "node scripts/i18n-smoke.mjs",
+    "test:terminal-titles": "node --test scripts/terminal-titles.test.mjs",
+    "test:terminal-resize": "node --test scripts/terminal-resize.test.mjs",
+    "test:terminal-search": "node --test scripts/terminal-search.test.mjs",
+    "test:terminal-search:ui": "node scripts/terminal-search-smoke.mjs"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.1.0",
-    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
-    "@xterm/xterm": "^6.0.0",
+    "@xterm/xterm": "6.0.0",
     "jsnes": "2.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

@@ -1264,11 +1264,6 @@
     "CLI, điều khiển, cấu hình và tệp",
     "CLI, 제어, 설정 및 탐색기"
   ],
-  "Recent": [
-    "Recent",
-    "Gần đây",
-    "최근"
-  ],
   "💻 CLIs": [
     "💻 CLIs",
     "💻 CLI",
@@ -4069,26 +4064,6 @@
     "Xóa bộ lọc",
     "필터 지우기"
   ],
-  "Recent CLI & folders · newest first": [
-    "Recent CLI & folders · newest first",
-    "CLI và thư mục gần đây · mới nhất trước",
-    "최근 CLI 및 폴더 · 최신순"
-  ],
-  "No recent terminals yet. Start a CLI in a folder to see it here.": [
-    "No recent terminals yet. Start a CLI in a folder to see it here.",
-    "Chưa có terminal gần đây. Mở CLI trong một thư mục để thấy tại đây.",
-    "최근 터미널이 없습니다. 폴더에서 CLI를 시작하면 여기에 표시됩니다."
-  ],
-  "· Opening...": [
-    "· Opening...",
-    "· Đang mở...",
-    "· 여는 중..."
-  ],
-  "CLI unavailable": [
-    "CLI unavailable",
-    "CLI không khả dụng",
-    "CLI를 사용할 수 없습니다"
-  ],
   "⚠ Connection failed": [
     "⚠ Connection failed",
     "⚠ Kết nối thất bại",
@@ -6529,16 +6504,6 @@
     "{v0}{v1}\nNhấp một lần để mở\nDi chuột để xem tùy chọn",
     "{v0}{v1}\n한 번 클릭하여 실행\n마우스를 올려 옵션 표시"
   ],
-  "Open {v0} in {v1}": [
-    "Open {v0} in {v1}",
-    "Mở {v0} trong {v1}",
-    "{v1}에서 {v0} 열기"
-  ],
-  "CLI is no longer available": [
-    "CLI is no longer available",
-    "CLI không còn khả dụng",
-    "CLI를 더 이상 사용할 수 없습니다"
-  ],
   "State your reasoning...": [
     "State your reasoning...",
     "Nêu lập luận của bạn...",
@@ -7119,11 +7084,6 @@
     "Khôi phục trạng thái SNES thất bại",
     "SNES 상태 복원 실패"
   ],
-  "Could not reopen terminal. Check the CLI configuration and folder.": [
-    "Could not reopen terminal. Check the CLI configuration and folder.",
-    "Không mở lại được terminal. Hãy kiểm tra cấu hình CLI và thư mục.",
-    "터미널을 다시 열 수 없습니다. CLI 설정과 폴더를 확인하세요."
-  ],
   "Inline command assistance is disabled for CLI and nested TUI sessions": [
     "Inline command assistance is disabled for CLI and nested TUI sessions",
     "Trợ giúp lệnh được tắt cho phiên CLI và TUI lồng nhau",
@@ -7528,6 +7488,21 @@
     "Bash validation is supported only for local, WSL, and SSH sessions",
     "Kiểm tra Bash chỉ hỗ trợ phiên cục bộ, WSL và SSH",
     "Bash 검증은 로컬, WSL 및 SSH 세션에서만 지원됩니다"
+  ],
+  "Mini terminal display": [
+    "Mini terminal display",
+    "Kiểu hiển thị mini terminal",
+    "미니 터미널 표시 방식"
+  ],
+  "Mini terminal": [
+    "Mini terminal",
+    "Mini terminal",
+    "미니 터미널"
+  ],
+  "Title only": [
+    "Title only",
+    "Chỉ tiêu đề",
+    "제목만"
   ],
   "Uncategorized": [
     "Uncategorized",

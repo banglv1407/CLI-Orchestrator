@@ -11,6 +11,7 @@ import type {
   ProjectTag,
   SafeAppContext,
   SessionInfo,
+  TerminalAgentSessionTitle,
   StopCliRequest,
   UpsertCliRequest,
   FileEntry,
@@ -51,6 +52,10 @@ export function deleteCli(name: string): Promise<void> {
 
 export function listSessions(): Promise<SessionInfo[]> {
   return invoke('list_sessions');
+}
+
+export function listTerminalSessionTitles(): Promise<TerminalAgentSessionTitle[]> {
+  return invoke('list_terminal_session_titles');
 }
 
 export function listProjectTags(): Promise<ProjectTag[]> {

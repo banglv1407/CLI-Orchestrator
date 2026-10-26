@@ -1,0 +1,178 @@
+<svg width="1024" height="1024" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Gradient: Deep Obsidian & Carbon -->
+    <radialGradient id="bgObsidian" cx="50%" cy="25%" r="75%">
+      <stop offset="0%" stop-color="#151d2c"/>
+      <stop offset="55%" stop-color="#0b1019"/>
+      <stop offset="100%" stop-color="#04060a"/>
+    </radialGradient>
+
+    <!-- Neon Accents -->
+    <linearGradient id="neonCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f5ff"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+
+    <linearGradient id="neonPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0abfc"/>
+      <stop offset="50%" stop-color="#d946ef"/>
+      <stop offset="100%" stop-color="#9333ea"/>
+    </linearGradient>
+
+    <!-- Metallic Titanium Facet Shading (High Contrast) -->
+    <!-- Lit Facets (Top-Left Key Light) -->
+    <linearGradient id="facetHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+
+    <linearGradient id="facetMid" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+
+    <!-- Shadow Facets -->
+    <linearGradient id="facetDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <linearGradient id="facetDeep" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#070b12"/>
+    </linearGradient>
+
+    <!-- Border Glow -->
+    <linearGradient id="borderGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f5ff" stop-opacity="0.9"/>
+      <stop offset="35%" stop-color="#38bdf8" stop-opacity="0.4"/>
+      <stop offset="70%" stop-color="#c084fc" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.8"/>
+    </linearGradient>
+
+    <!-- Neon Glow Filters -->
+    <filter id="glowCyan" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="glowPurple" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 1. SQUIRCLE FRAME -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgObsidian)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" stroke="url(#borderGlow)" stroke-width="3.5" fill="none"/>
+
+  <!-- 2. BACKGROUND TECH ACCENTS: Subtle Precision Watermark -->
+  <g opacity="0.08" stroke="#38bdf8" stroke-width="1.5">
+    <circle cx="256" cy="256" r="190" stroke-dasharray="12 8"/>
+    <circle cx="256" cy="256" r="140" stroke-dasharray="6 6"/>
+  </g>
+
+  <!-- 3. MECHA FOX / KITSUNE GEOMETRY -->
+
+  <!-- === EARS (Sharp, Upright, Kitsune Radar Antennas) === -->
+  <!-- Left Outer Ear Base & Tip -->
+  <polygon points="172,175 92,48 218,118" fill="url(#facetHighlight)" stroke="#475569" stroke-width="1.5"/>
+  <polygon points="172,175 125,188 92,48" fill="url(#facetDark)"/>
+  <!-- Left Inner Ear Cavity & Purple Vents -->
+  <polygon points="166,164 112,74 200,122" fill="#080d16" stroke="#1e293b" stroke-width="1"/>
+  <path d="M 128,98 L 182,134" stroke="url(#neonPurple)" stroke-width="3.5" stroke-linecap="round" filter="url(#glowPurple)"/>
+  <path d="M 142,120 L 178,144" stroke="url(#neonPurple)" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Left Ear Leading Edge Neon -->
+  <line x1="92" y1="48" x2="218" y2="118" stroke="#00f5ff" stroke-width="2.5" stroke-linecap="round" filter="url(#glowCyan)"/>
+
+  <!-- Right Outer Ear Base & Tip -->
+  <polygon points="340,175 420,48 294,118" fill="url(#facetMid)" stroke="#334155" stroke-width="1.5"/>
+  <polygon points="340,175 387,188 420,48" fill="url(#facetDeep)"/>
+  <!-- Right Inner Ear Cavity & Purple Vents -->
+  <polygon points="346,164 400,74 312,122" fill="#080d16" stroke="#1e293b" stroke-width="1"/>
+  <path d="M 384,98 L 330,134" stroke="url(#neonPurple)" stroke-width="3.5" stroke-linecap="round" filter="url(#glowPurple)"/>
+  <path d="M 370,120 L 334,144" stroke="url(#neonPurple)" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Right Ear Leading Edge Neon -->
+  <line x1="420" y1="48" x2="294" y2="118" stroke="#00f5ff" stroke-width="2.5" stroke-linecap="round" filter="url(#glowCyan)"/>
+
+  <!-- === FOREHEAD & CROWN PLATES === -->
+  <!-- Top Center Diamond Plate (Lit from top) -->
+  <polygon points="256,108 208,154 256,196 304,154" fill="url(#facetHighlight)" stroke="#64748b" stroke-width="1.5"/>
+  <!-- Left Forehead Plate -->
+  <polygon points="208,154 156,188 214,212 256,196" fill="url(#facetMid)" stroke="#334155" stroke-width="1.2"/>
+  <!-- Right Forehead Plate (Shadowed) -->
+  <polygon points="304,154 356,188 298,212 256,196" fill="url(#facetDark)" stroke="#1e293b" stroke-width="1.2"/>
+
+  <!-- === KITSUNE CHEEK WINGS (Sharpened Poly Spikes) === -->
+  <!-- Left Side Upper Wing -->
+  <polygon points="156,188 84,244 148,266 200,238" fill="url(#facetHighlight)" stroke="#475569" stroke-width="1.2"/>
+  <!-- Left Side Lower Wing -->
+  <polygon points="148,266 102,328 172,320 202,284" fill="url(#facetMid)" stroke="#334155" stroke-width="1.2"/>
+  <!-- Left Wing Accent Lines -->
+  <polyline points="84,244 148,266 102,328" stroke="#00f5ff" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Right Side Upper Wing -->
+  <polygon points="356,188 428,244 364,266 312,238" fill="url(#facetDark)" stroke="#1e293b" stroke-width="1.2"/>
+  <!-- Right Side Lower Wing -->
+  <polygon points="364,266 410,328 340,320 310,284" fill="url(#facetDeep)" stroke="#1e293b" stroke-width="1.2"/>
+  <!-- Right Wing Accent Lines -->
+  <polyline points="428,244 364,266 410,328" stroke="#00f5ff" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- === BROW & NOSE BRIDGE (Elongated Muzzle Form) === -->
+  <!-- Center Brow Core -->
+  <polygon points="256,196 222,238 256,274 290,238" fill="url(#facetDark)" stroke="#475569" stroke-width="1.5"/>
+
+  <!-- Elongated Snout Ridge -->
+  <polygon points="256,274 226,346 256,380 286,346" fill="url(#facetMid)" stroke="#64748b" stroke-width="1.5"/>
+  <!-- Left Snout Flank (Lit) -->
+  <polygon points="222,238 226,346 190,344 198,260" fill="url(#facetHighlight)" stroke="#334155" stroke-width="1.2"/>
+  <!-- Right Snout Flank (Shadow) -->
+  <polygon points="290,238 286,346 322,344 314,260" fill="url(#facetDeep)" stroke="#1e293b" stroke-width="1.2"/>
+
+  <!-- === CYBERNETIC VISOR / EYES (Fox Slit Optics `> <`) === -->
+  <!-- Left Fox Eye: Slicing upward-inward -->
+  <g filter="url(#glowCyan)">
+    <polygon points="168,228 228,236 214,254 158,240" fill="url(#neonCyan)"/>
+    <polygon points="174,232 216,238 206,248 168,239" fill="#ffffff"/>
+  </g>
+
+  <!-- Right Fox Eye: Mirror slice -->
+  <g filter="url(#glowCyan)">
+    <polygon points="344,228 284,236 298,254 354,240" fill="url(#neonCyan)"/>
+    <polygon points="338,232 296,238 306,248 344,239" fill="#ffffff"/>
+  </g>
+
+  <!-- === CYBER NOSE & SHARP KITSUNE JAW === -->
+  <!-- Nose Intake (Inverted Triangle) -->
+  <polygon points="248,368 264,368 256,380" fill="#00f5ff" filter="url(#glowCyan)"/>
+
+  <!-- Sleek Elongated Chin/Mandible -->
+  <polygon points="256,380 238,422 256,448 274,422" fill="url(#facetDark)" stroke="#00f5ff" stroke-width="2" filter="url(#glowCyan)"/>
+  <polygon points="238,422 212,398 226,346 256,380" fill="url(#facetMid)" stroke="#334155" stroke-width="1.2"/>
+  <polygon points="274,422 300,398 286,346 256,380" fill="url(#facetDeep)" stroke="#1e293b" stroke-width="1.2"/>
+
+  <!-- === LOWER CHASSIS / COLLAR BRACKET (Chamfered Hex Armor, No Circles!) === -->
+  <polyline points="152,416 196,448 238,448" stroke="url(#neonCyan)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  <polyline points="360,416 316,448 274,448" stroke="url(#neonPurple)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  <!-- Sub-chin Micro LED Indicator -->
+  <polygon points="256,458 250,466 262,466" fill="#00f5ff" filter="url(#glowCyan)"/>
+
+  <!-- === ICONIC FOREHEAD TERMINAL PROMPT `>_` === -->
+  <g transform="translate(256, 155) scale(0.85)" filter="url(#glowCyan)">
+    <!-- Prompt `>` -->
+    <path d="M -22 -11 L -5 0 L -22 11" stroke="#00f5ff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- Cursor `_` -->
+    <line x1="3" y1="11" x2="22" y2="11" stroke="#00f5ff" stroke-width="4.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Crown Node LEDs -->
+  <circle cx="208" cy="154" r="3" fill="#00f5ff" filter="url(#glowCyan)"/>
+  <circle cx="304" cy="154" r="3" fill="#f0abfc" filter="url(#glowPurple)"/>
+
+</svg>

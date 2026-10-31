@@ -357,7 +357,7 @@ export function ProxyPanel({ isInSidebar }: { isInSidebar?: boolean }) {
                         </span>
                       </label>
                     </div>
-                    <ProxyHopEditor value={nHop} onChange={setNHop} />
+                    <ProxyHopEditor key={editingIdx === null ? 'new' : editingIdx} value={nHop} onChange={setNHop} />
                     <div className="flex gap-2 justify-end">
                       <button onClick={resetForm} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 uppercase tracking-wider">{tr("Cancel")}</button>
                       <button onClick={addBackend} disabled={!nName||!nUrl||!nKey||!nModel} className="px-3 py-1.5 text-xs bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/30 rounded hover:bg-cyber-neon/30 uppercase tracking-wider disabled:opacity-40">{editingIdx !== null ? tr("Update") : tr("Save Backend")}</button>

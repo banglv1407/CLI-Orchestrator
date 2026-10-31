@@ -35,6 +35,7 @@ import {
   createFileContent,
 } from '../lib/tauri';
 import { zoomIn, zoomOut, resetZoom } from '../lib/appearance';
+import { NEW_TERMINAL_EVENT } from '../lib/terminalShortcuts';
 import type {
   AssistantState,
   CliDefinition,
@@ -76,6 +77,8 @@ export function Dashboard() {
   const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'buzz' | 'game' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote' | 'dashboard' | 'agent-sessions'>('terminal');
   const [showNotepad, setShowNotepad] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [terminalShortcutOrigin, setTerminalShortcutOrigin] = useState<{ view: typeof activeMainView; focus: HTMLElement | null } | null>(null);
+  const sshGroups = useMemo(() => Array.from(new Set(sshConnections.map(connection => connection.group || 'Default'))), [sshConnections]);
 
   // ── Global right-click context menu ──
   const [contextMenu, setContextMenu] = useState<{
@@ -113,6 +116,7 @@ export function Dashboard() {
   }, []);
 
   const handleOptimizeSelection = async (type: 'rewrite' | 'suggest' | 'summarize' | 'title') => {
+    setTerminalShortcutOrigin(null);
     const text = selectedText.trim();
     setContextMenu(null);
     setRewriteModal({
@@ -254,6 +258,7 @@ export function Dashboard() {
   }, []);
 
   const handleNewFile = useCallback(() => {
+    setTerminalShortcutOrigin(null);
     if (!contextMenu?.workingDir) return;
     setNewFileModal({ open: true, type: 'file', basePath: contextMenu.workingDir });
     setNewFileName('');
@@ -263,6 +268,7 @@ export function Dashboard() {
   }, [contextMenu]);
 
   const handleNewDirectory = useCallback(() => {
+    setTerminalShortcutOrigin(null);
     if (!contextMenu?.workingDir) return;
     setNewFileModal({ open: true, type: 'directory', basePath: contextMenu.workingDir });
     setNewFileName('');
@@ -308,10 +314,12 @@ export function Dashboard() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault();
+        setTerminalShortcutOrigin(null);
         setPaletteOpen((v) => !v);
       }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
+        setTerminalShortcutOrigin(null);
         setShowNotepad((v) => !v);
       }
       if ((e.ctrlKey || e.metaKey) && (e.code === 'Space' || e.key === ' ' || e.key === 'Space')) {
@@ -322,6 +330,7 @@ export function Dashboard() {
     };
     
     const customPaletteHandler = () => {
+      setTerminalShortcutOrigin(null);
       setPaletteOpen((v) => !v);
     };
 
@@ -461,6 +470,7 @@ export function Dashboard() {
         if (!payload.sessionId) {
           return;
         }
+        const sessionId = payload.sessionId;
 
         setPendingSessions((current) => current.filter((item) => item.id !== payload.sessionId));
         void refreshSidebarData();
@@ -468,21 +478,15 @@ export function Dashboard() {
         if (payload.status === 'started') {
           setAssistantState('Running CLI');
           setAssistantText(`Session started for ${payload.cliName}`);
-          if (activeSessionId === null) {
-            setActiveSessionId(payload.sessionId);
-          }
+          setActiveSessionId(current => current ?? sessionId);
         } else if (payload.status === 'stopped' || payload.status === 'completed') {
           setAssistantState('Done');
           setAssistantText(`Session ${payload.cliName} exited cleanly.`);
-          if (activeSessionId === payload.sessionId) {
-            setActiveSessionId(null);
-          }
+          setActiveSessionId(current => current === payload.sessionId ? null : current);
         } else if (payload.status === 'error') {
           setAssistantState('Error');
           setAssistantText(`Session error on ${payload.cliName}: ${payload.message ?? 'Unknown'}`);
-          if (activeSessionId === payload.sessionId) {
-            setActiveSessionId(null);
-          }
+          setActiveSessionId(current => current === payload.sessionId ? null : current);
         }
       });
     };
@@ -491,7 +495,7 @@ export function Dashboard() {
     return () => {
       if (unlistenStatus) unlistenStatus();
     };
-  }, [activeSessionId, refreshSidebarData]);
+  }, [refreshSidebarData]);
 
   useEffect(() => {
     const loadTags = async () => {
@@ -597,6 +601,8 @@ export function Dashboard() {
 
   // Click file inside tree
   const handleFileClick = useCallback(async (entry: { path: string; name: string }, rootPath: string | null) => {
+    setTerminalShortcutOrigin(null);
+    if (openedFile?.path === entry.path) return;
     setSelectedFilePath(entry.path);
     setOpenedFile({ path: entry.path, name: entry.name });
     setOpenedFileRootPath(rootPath);
@@ -646,9 +652,10 @@ export function Dashboard() {
         setIsDiffLoading(false);
       }
     }
-  }, [gitStatusList, getRelativePath, isSshSession, activeSshConnection]);
+  }, [gitStatusList, getRelativePath, isSshSession, activeSshConnection, openedFile]);
 
   const handleCloseFile = useCallback(() => {
+    setTerminalShortcutOrigin(null);
     setOpenedFile(null);
     setOpenedFileRootPath(null);
     setFileContent('');
@@ -786,9 +793,7 @@ export function Dashboard() {
       try {
         await stopCli({ sessionId });
         await refreshSidebarData();
-        if (activeSessionId === sessionId) {
-          setActiveSessionId(null);
-        }
+        setActiveSessionId(current => current === sessionId ? null : current);
         setAssistantState('Done');
         setAssistantText('Session stopped.');
       } catch (error) {
@@ -797,14 +802,14 @@ export function Dashboard() {
         setAssistantText(`Stop failed: ${message}`);
       }
     },
-    [activeSessionId, refreshSidebarData]
+    [refreshSidebarData]
   );
 
   const handleQuickSession = useCallback(async (panel: 'bottom' | 'right' = 'right') => {
     let workingDir: string | undefined;
     if (activeSessionId) {
       const activeSess = sessions.find((s) => s.id === activeSessionId);
-      if (activeSess && activeSess.workingDir) {
+      if (activeSess && !activeSess.cliName.startsWith('SSH: ') && activeSess.workingDir) {
         workingDir = activeSess.workingDir;
       }
     }
@@ -834,6 +839,7 @@ export function Dashboard() {
       void refreshSidebarData();
       setAssistantState('Done');
       setAssistantText('Quick CLI session started.');
+      return session;
     } catch (error) {
       setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
       setActiveSessionId(null);
@@ -843,12 +849,29 @@ export function Dashboard() {
     }
   }, [activeSessionId, sessions, refreshSidebarData, mergeCliIntoState]);
 
+  useEffect(() => {
+    const openTerminal = async () => {
+      if (activeMainView !== 'terminal' || openedFile || paletteOpen || showNotepad || cliEditorOpen || cliStartModalOpen || sshModalOpen || newFileModal || rewriteModal) {
+        const focus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        setTerminalShortcutOrigin(current => current ?? { view: activeMainView, focus });
+      }
+      setContextMenu(null);
+      setActiveMainView('terminal');
+      const session = await handleQuickSession('right');
+      if (session) window.dispatchEvent(new CustomEvent('focus-active-terminal', { detail: { sessionId: session.id } }));
+    };
+    window.addEventListener(NEW_TERMINAL_EVENT, openTerminal);
+    return () => window.removeEventListener(NEW_TERMINAL_EVENT, openTerminal);
+  }, [activeMainView, openedFile, paletteOpen, showNotepad, cliEditorOpen, cliStartModalOpen, sshModalOpen, newFileModal, rewriteModal, handleQuickSession]);
+
   const handleAddCli = useCallback(() => {
+    setTerminalShortcutOrigin(null);
     setEditingCli(null);
     setCliEditorOpen(true);
   }, []);
 
   const handleEditCli = useCallback((cli: CliDefinition) => {
+    setTerminalShortcutOrigin(null);
     setEditingCli(cli);
     setCliEditorOpen(true);
   }, []);
@@ -972,11 +995,13 @@ export function Dashboard() {
   );
 
   const handleAddSsh = useCallback(() => {
+    setTerminalShortcutOrigin(null);
     setEditingSsh(null);
     setSshModalOpen(true);
   }, []);
 
   const handleEditSsh = useCallback((connection: SshConnection) => {
+    setTerminalShortcutOrigin(null);
     setEditingSsh(connection);
     setSshModalOpen(true);
   }, []);
@@ -1006,6 +1031,7 @@ export function Dashboard() {
 
   const handleOpenCliInteraction = useCallback(
     async (cli: CliDefinition) => {
+      setTerminalShortcutOrigin(null);
       const savedDirs = cli.savedDirectories ?? [];
       const pathToUse = savedDirs.length > 0
         ? savedDirs[0].path
@@ -1069,6 +1095,17 @@ export function Dashboard() {
       />
 
       <section className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
+        {terminalShortcutOrigin && (
+          <div className="shrink-0 border-b border-cyber-line/50 px-3 py-1.5 text-[11px]">
+            <button type="button" data-terminal-shortcut-return onClick={() => {
+              const origin = terminalShortcutOrigin;
+              setTerminalShortcutOrigin(null);
+              setActiveMainView(origin.view);
+              requestAnimationFrame(() => { if (origin.focus?.isConnected) origin.focus.focus(); });
+            }} className="text-cyber-electric hover:underline">{tr("Return to previous view")}</button>
+          </div>
+        )}
+        <div className="min-h-0 flex-1">
         <TerminalPanel
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -1083,7 +1120,7 @@ export function Dashboard() {
           sshConnections={sshConnections}
           onQuickSession={handleQuickSession}
 
-          openedFile={openedFile}
+          openedFile={terminalShortcutOrigin ? null : openedFile}
           openedFileRootPath={openedFileRootPath}
           fileContent={fileContent}
           setFileContent={setFileContent}
@@ -1107,8 +1144,10 @@ export function Dashboard() {
           contextMenu={contextMenu}
           setContextMenu={setContextMenu}
         />
+        </div>
       </section>
 
+      <div data-terminal-shortcut-dialogs className={terminalShortcutOrigin ? 'hidden' : 'contents'}>
       <CliEditorModal
         isOpen={cliEditorOpen}
         initialCli={editingCli}
@@ -1127,13 +1166,10 @@ export function Dashboard() {
       <SshConnectionModal
         isOpen={sshModalOpen}
         connection={editingSsh}
-        existingGroups={Array.from(new Set(sshConnections.map((c) => c.group || 'Default')))}
+        existingGroups={sshGroups}
         onClose={() => setSshModalOpen(false)}
         onSave={handleSaveSshConnection}
       />
-      {/* Mythical Pet — flies across the entire app window */}
-      <MythicalPet />
-
       {/* Notepad modal */}
       {showNotepad && <Notepad onClose={() => setShowNotepad(false)} />}
 
@@ -1306,6 +1342,9 @@ export function Dashboard() {
           </div>
         </div>
       )}
+      </div>
+      {/* Mythical Pet — flies across the entire app window */}
+      <MythicalPet />
     </main>
   );
 }

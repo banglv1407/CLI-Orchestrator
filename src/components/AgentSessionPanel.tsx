@@ -80,6 +80,14 @@ function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + '…' : s;
 }
 
+function isIgnoredSession(s: AgentSessionEntry): boolean {
+  if (s.agent.toLowerCase() === 'codex') {
+    const t = (s.title || '').trim().toLowerCase();
+    if (t === 'guardian review' || t.startsWith('guardian review')) return true;
+  }
+  return false;
+}
+
 export function AgentSessionPanel() {
   const locale = useLocale();
   const [sessions, setSessions] = useState<AgentSessionEntry[]>([]);
@@ -112,7 +120,7 @@ export function AgentSessionPanel() {
         agentListSessions(),
         listClis().catch(() => [] as CliDefinition[]),
       ]);
-      setSessions(sessList);
+      setSessions(sessList.filter((s) => !isIgnoredSession(s)));
       setAvailableClis(clis);
     } catch (e) {
       console.error('agentListSessions', e);

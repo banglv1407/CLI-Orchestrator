@@ -1,6 +1,6 @@
 use crate::terminal::session_manager::SessionManager;
 use russh::{
-    keys::{decode_secret_key, parse_public_key_base64, PublicKey},
+    keys::{parse_public_key_base64, PublicKey},
     server::{Auth, Handler, Session},
     ChannelId,
 };
@@ -661,25 +661,7 @@ impl SshServerManager {
             ));
         }
 
-        let host_key_path = root_dir.join("ssh_host_key.pem");
-        let keypair = if host_key_path.exists() {
-            let pem_data = std::fs::read_to_string(&host_key_path)
-                .map_err(|e| format!("Failed to read host key file: {}", e))?;
-            decode_secret_key(&pem_data, None)
-                .map_err(|e| format!("Failed to decode host key: {}", e))?
-        } else {
-            let mut rng = rand::rng();
-            let generated =
-                russh::keys::PrivateKey::random(&mut rng, russh::keys::Algorithm::Ed25519)
-                    .map_err(|e| format!("Failed to generate host key: {}", e))?;
-            let openssh_pem = generated
-                .to_openssh(russh_keys::ssh_key::LineEnding::LF)
-                .map_err(|e| format!("Failed to serialize host key to OpenSSH PEM: {}", e))?;
-            let _ = std::fs::create_dir_all(&root_dir);
-            std::fs::write(&host_key_path, openssh_pem)
-                .map_err(|e| format!("Failed to write host key file: {}", e))?;
-            generated
-        };
+        let keypair = super::ssh_fingerprint::load_or_create_host_key(&root_dir)?;
 
         let mut config_server = russh::server::Config::default();
         config_server.keys.push(keypair);

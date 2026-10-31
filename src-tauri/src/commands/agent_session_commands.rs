@@ -398,6 +398,12 @@ fn codex_history_db_path() -> Option<PathBuf> {
     }
 }
 
+fn is_ignored_codex_session_title(title: Option<&str>) -> bool {
+    let Some(t) = title else { return false; };
+    let lower = t.trim().to_lowercase();
+    lower == "guardian review" || lower.starts_with("guardian review")
+}
+
 fn load_codex_sessions() -> Vec<AgentSessionEntry> {
     let mut entries = Vec::new();
     let Some(index_path) = codex_index_path() else {
@@ -424,6 +430,10 @@ fn load_codex_sessions() -> Vec<AgentSessionEntry> {
         };
 
         let title = v.get("thread_name").and_then(|s| s.as_str()).map(|s| s.to_string());
+        if is_ignored_codex_session_title(title.as_deref()) {
+            continue;
+        }
+
         let updated_at = v.get("updated_at").and_then(|s| s.as_str()).unwrap_or("");
         let started_at = parse_iso_or_rfc3339(updated_at).unwrap_or(0.0);
 
@@ -451,7 +461,11 @@ fn load_codex_sessions() -> Vec<AgentSessionEntry> {
         }
     }
 
-    entries.extend(by_id.into_values());
+    entries.extend(
+        by_id
+            .into_values()
+            .filter(|e| !is_ignored_codex_session_title(e.title.as_deref())),
+    );
     entries
 }
 
@@ -1064,6 +1078,15 @@ mod tests {
         assert!(!h.is_empty(), "H empty");
         assert!(!c.is_empty(), "C empty");
         assert!(!x.is_empty(), "X empty");
+        for item in &x {
+            if let Some(ref t) = item.title {
+                assert!(
+                    !t.to_lowercase().contains("guardian review"),
+                    "Found unwanted Guardian review session: {}",
+                    t
+                );
+            }
+        }
         assert!(!a.is_empty(), "A empty");
         assert!(!o.is_empty(), "O empty");
         let first = &o[0];

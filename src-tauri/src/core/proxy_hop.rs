@@ -44,7 +44,7 @@ mod tests {
         assert!(value.validate().is_err());
         value.kind = "ssh".into();
         assert!(value.validate().is_err());
-        value.host_key = format!("SHA256:{}", "a".repeat(43));
+        value.host_key = format!("SHA256:{}", "A".repeat(43));
         assert!(value.validate().is_ok());
     }
     #[tokio::test]
@@ -287,10 +287,13 @@ mod tests {
         let mut value = hop("ssh", listener.local_addr().unwrap().port());
         value.username = "user".into();
         value.secret = "pass".into();
-        value.host_key = fingerprint;
         let task = tokio::spawn(async move {
             SshFixture.run_on_socket(config, &listener).await.unwrap();
         });
+        value.host_key = super::super::ssh_fingerprint::probe_ssh_fingerprint(&value.host, value.port)
+            .await
+            .unwrap();
+        assert_eq!(value.host_key, fingerprint);
         let target = "http://provider.invalid:8081/v1/chat/completions";
         let file = std::env::temp_dir().join(format!("clx-hop-key-{}", uuid::Uuid::new_v4()));
         key.write_openssh_file(&file, russh::keys::ssh_key::LineEnding::LF)
@@ -316,7 +319,7 @@ mod tests {
                 .is_err());
         }
         std::fs::remove_file(file).unwrap();
-        value.host_key = format!("SHA256:{}", "a".repeat(43));
+        value.host_key = format!("SHA256:{}", "A".repeat(43));
         assert!(transport(Some(&value), target).await.is_err());
         task.abort();
     }
@@ -376,11 +379,8 @@ impl ProxyHop {
                 "key" if !self.key_path.is_empty() => {}
                 _ => return Err("SSH requires a password or private key path".into()),
             }
-            if !self.host_key.starts_with("SHA256:") || self.host_key.len() != 50 {
-                return Err(
-                    "SSH server SHA256 fingerprint is required (from your server administrator)"
-                        .into(),
-                );
+            if !super::ssh_fingerprint::is_sha256_fingerprint(&self.host_key) {
+                return Err("A valid SSH server SHA256 fingerprint is required.".into());
             }
         } else if self.kind == "socks4" && (!self.username.is_empty() || !self.secret.is_empty()) {
             return Err(
@@ -533,6 +533,7 @@ pub async fn transport(hop: Option<&ProxyHop>, target: &str) -> Result<Transport
                     .map_err(|_| "Invalid outbound proxy configuration")?,
             );
         } else {
+            let ssh_host = super::ssh_fingerprint::validate_address(&hop.host, hop.port)?;
             let target = Url::parse(target).map_err(|_| "Invalid upstream URL")?;
             if !["http", "https"].contains(&target.scheme()) {
                 return Err("SSH upstream must use HTTP or HTTPS".into());
@@ -552,7 +553,7 @@ pub async fn transport(hop: Option<&ProxyHop>, target: &str) -> Result<Transport
             let connect = async {
                 let mut ssh = client::connect(
                     ssh_config,
-                    (hop.host.as_str(), hop.port),
+                    (ssh_host, hop.port),
                     PinnedKey(hop.host_key.clone()),
                 )
                 .await

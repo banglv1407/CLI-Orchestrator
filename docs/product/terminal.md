@@ -3,6 +3,23 @@
 The terminal surface is a PTY-backed xterm.js renderer for interactive CLI
 sessions.
 
+## New Terminal Shortcut
+
+- Ctrl+` creates a local Quick shell, docks it on the right, switches to the
+  terminal view and focuses its xterm after mounting. It works from every main
+  view, sidebar, editable field, app modal, palette and game, including when no
+  terminals exist. Ctrl+Shift+N is no longer bound to creation.
+- Install one window capture owner before React. Match the physical Backquote
+  key across layouts, with a literal fallback when code is unavailable. Consume
+  both key phases and ignore repeat/composition/extra modifiers. The gesture
+  must not reach the child CLI, text editor or game key mapper.
+- Keep the current file/notepad/form draft when showing a terminal from an
+  editor or modal. Return to previous view restores that surface. Switching
+  away disables hidden game key mapping; unrelated shortcuts remain available.
+- New terminals inherit the active local working directory. From remote SSH
+  sessions, use the local shell default instead of a remote-only path.
+- Creating a new terminal clears the temporary mini-terminal input group.
+
 ## Rendering Contract
 
 - PTY output owns the terminal buffer. App status, session metadata, and helper
@@ -112,6 +129,36 @@ sessions.
   Removing a session disposes its title listener and removes its live title.
 - Do not infer a title from the latest agent history entry or folder alone:
   another running session can share both the agent and working directory.
+
+## Mini Terminal Group Input
+
+- Ctrl-click mini terminals (Cmd-click on macOS) to add/remove recipients across
+  both the bottom tray and right panel. The first modifier click includes the
+  active running session. Ctrl/Cmd+Enter or Space also toggles a focused card.
+- Selected cards have a highlighted border and checkmark; a separate ring marks
+  the active main terminal. The group and count work in both preview and Title
+  only modes. Modifier selection must not drag, reorder, or dock sessions.
+- With two or more running sessions selected, typing in a selected main
+  terminal sends the same input to all group members. Enter, Shift+Enter,
+  editing/control keys, and Unicode/IME input follow the same path. There is no
+  separate composer and no automatic submission after paste.
+- Pasting in the main terminal or its Paste menu sends the text once to each
+  selected session. Normalize pasted newlines and apply each recipient's own
+  bracketed-paste mode, independently of the source's mode. The ordinary
+  single-terminal native clipboard path retains ownership when no group is active.
+- Show the selected count and a clear-selection control outside the xterm
+  buffer. Plain click or unmodified Enter/Space replaces the group with one
+  session. The group survives display changes; session close/exit removes that
+  recipient, and closing the active group member selects a surviving member.
+  Opening an unselected main session clears the group. Selection is temporary
+  and is not restored on app reload.
+- Snapshot recipients when user input arrives, before its per-session batching
+  timer. A later selection change must not redirect already typed input.
+- Terminal protocol replies, focus/mouse reports, and background/unselected
+  source terminals retain their own PTY. Search, copy, and other app controls
+  must not produce group input. The xterm 6 internal user-input signal is confined
+  to `src/lib/terminalBroadcast.ts`; upgrades require the classification and
+  browser regression checks. Terminal disposal releases these listeners.
 
 ## Inline Command Assistant
 

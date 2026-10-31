@@ -21,6 +21,7 @@ pub mod proxy_usage_db;
 pub mod quickapp_registry;
 pub mod rtk_sanitizer;
 pub mod ssh_server;
+pub mod ssh_fingerprint;
 pub mod stream_assembler;
 pub mod system_log;
 

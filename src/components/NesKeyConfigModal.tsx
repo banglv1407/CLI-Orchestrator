@@ -11,6 +11,7 @@ import {
 interface NesKeyConfigModalProps {
   role?: NesRole;
   isOpen: boolean;
+  active?: boolean;
   onClose: () => void;
   onSaved?: (mapping: NesKeyMapping) => void;
 }
@@ -42,6 +43,7 @@ const SNES_KEY_LABELS: Partial<Record<BindableKey, { label: string; desc: string
 export function NesKeyConfigModal({
   role = "host",
   isOpen,
+  active = true,
   onClose,
   onSaved,
 }: NesKeyConfigModalProps) {
@@ -56,7 +58,7 @@ export function NesKeyConfigModal({
   }, [isOpen, role]);
 
   useEffect(() => {
-    if (!listeningKey) return;
+    if (!listeningKey || !active) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
@@ -85,7 +87,7 @@ export function NesKeyConfigModal({
     return () => {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
     };
-  }, [listeningKey]);
+  }, [listeningKey, active]);
 
   if (!isOpen) return null;
 

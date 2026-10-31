@@ -691,6 +691,7 @@ export function NesWorkspacePanel({ isVisible = true }: { isVisible?: boolean })
       <NesKeyConfigModal
         role={activeBundle?.role === "guest" ? "guest" : "host"}
         isOpen={showKeyConfig}
+        active={isVisible}
         onClose={() => setShowKeyConfig(false)}
         onSaved={(newMapping) => {
           inputRef.current?.setMapping(newMapping);

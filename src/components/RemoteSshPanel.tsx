@@ -1,5 +1,6 @@
 import { t as tr } from '../i18n';
 import { showMessage } from '../lib/dialogs';
+import { SshFingerprintField } from './SshFingerprintField';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   startSshServer,
@@ -23,6 +24,7 @@ export function RemoteSshPanel() {
     publicKeys: [],
   });
   const [newPublicKey, setNewPublicKey] = useState('');
+  const [fingerprint, setFingerprint] = useState('');
 
   const fetchSshServerStatus = useCallback(async () => {
     try {
@@ -135,6 +137,10 @@ export function RemoteSshPanel() {
                   />
                 </label>
               </div>
+            </div>
+
+            <div className="rounded-xl border border-cyber-line/50 bg-cyber-panel/40 p-4">
+              <SshFingerprintField local value={fingerprint} onChange={setFingerprint} />
             </div>
 
             {/* Server Configuration Card */}

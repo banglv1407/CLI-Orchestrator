@@ -3060,6 +3060,7 @@ export function CliSidebar({
       <SpecialConfigModal
         isOpen={specialModalOpen}
         initialConfig={editingSpecialConfig}
+        rootPath={rootPath}
         onClose={() => setSpecialModalOpen(false)}
         onSave={(entry) => {
           saveSpecialConfigFile(entry);

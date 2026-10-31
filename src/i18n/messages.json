@@ -5677,12 +5677,12 @@
   "Previous match (Shift+Enter)": [
     "Previous match (Shift+Enter)",
     "Kết quả trước (Shift+Enter)",
-    "이전 결과(Shift+Enter)"
+    "이전 일치 항목 (Shift+Enter)"
   ],
   "Next match (Enter)": [
     "Next match (Enter)",
-    "Kết quả tiếp (Enter)",
-    "다음 결과(Enter)"
+    "Kết quả tiếp theo (Enter)",
+    "다음 일치 항목 (Enter)"
   ],
   "⚡ MENTION FILE/FOLDER": [
     "⚡ MENTION FILE/FOLDER",
@@ -7504,9 +7504,274 @@
     "Chỉ tiêu đề",
     "제목만"
   ],
+  "Ctrl+click to select multiple terminals": [
+    "Ctrl+click to select multiple terminals",
+    "Giữ Ctrl + nhấp để chọn nhiều terminal",
+    "Ctrl+클릭으로 여러 터미널 선택"
+  ],
+  "{count} terminals selected": [
+    "{count} terminals selected",
+    "Đã chọn {count} terminal",
+    "터미널 {count}개 선택됨"
+  ],
+  "Clear selection": [
+    "Clear selection",
+    "Bỏ chọn nhóm",
+    "선택 해제"
+  ],
+  "Return to previous view": [
+    "Return to previous view",
+    "Quay lại màn hình trước",
+    "이전 화면으로 돌아가기"
+  ],
+  "Typing and pasting are sent to all selected terminals": [
+    "Typing and pasting are sent to all selected terminals",
+    "Nội dung gõ và dán được gửi đến tất cả terminal đã chọn",
+    "입력하거나 붙여넣는 내용이 선택한 모든 터미널로 전송됩니다"
+  ],
   "Uncategorized": [
     "Uncategorized",
     "Chưa phân nhóm",
     "미분류"
+  ],
+  "Find": [
+    "Find",
+    "Tìm kiếm",
+    "찾기"
+  ],
+  "Search notes (Ctrl+F)": [
+    "Search notes (Ctrl+F)",
+    "Tìm kiếm ghi chú (Ctrl+F)",
+    "메모 검색 (Ctrl+F)"
+  ],
+  "Find in note... (Enter = next, Shift+Enter = prev, Esc = close)": [
+    "Find in note... (Enter = next, Shift+Enter = prev, Esc = close)",
+    "Tìm trong ghi chú... (Enter = tiếp, Shift+Enter = trước, Esc = đóng)",
+    "메모에서 찾기... (Enter = 다음, Shift+Enter = 이전, Esc = 닫기)"
+  ],
+  "Close search": [
+    "Close search",
+    "Đóng tìm kiếm",
+    "검색 닫기"
+  ],
+  "No matches": [
+    "No matches",
+    "Không tìm thấy",
+    "일치 항목 없음"
+  ],
+  "matches found": [
+    "matches found",
+    "kết quả tìm thấy",
+    "개 일치 항목 찾음"
+  ],
+  "Clear all text in this note?": [
+    "Clear all text in this note?",
+    "Bạn có chắc muốn xóa toàn bộ nội dung ghi chú này?",
+    "이 메모의 모든 내용을 지우시겠습니까?"
+  ],
+  "Clear Note": [
+    "Clear Note",
+    "Xóa ghi chú",
+    "메모 지우기"
+  ],
+  "Format text / clean whitespace": [
+    "Format text / clean whitespace",
+    "Định dạng văn bản / dọn khoảng trắng",
+    "텍스트 서식 지정 / 공백 정리"
+  ],
+  "Clear note text": [
+    "Clear note text",
+    "Xóa nội dung ghi chú",
+    "메모 내용 지우기"
+  ],
+  "Ctrl+F Find · Double-click tab to rename · Ctrl+Enter Preview · Tab Indent · Esc Close": [
+    "Ctrl+F Find · Double-click tab to rename · Ctrl+Enter Preview · Tab Indent · Esc Close",
+    "Ctrl+F Tìm kiếm · Nhấp đúp đổi tên tab · Ctrl+Enter Xem trước · Tab Thụt đầu dòng · Esc Đóng",
+    "Ctrl+F 찾기 · 탭 더블클릭 이름 변경 · Ctrl+Enter 미리보기 · Tab 들여쓰기 · Esc 닫기"
+  ],
+  "Hide Folder Tree": [
+    "Hide Folder Tree",
+    "Ẩn cây thư mục",
+    "폴더 트리 숨기기"
+  ],
+  "UI Folder Tree": [
+    "UI Folder Tree",
+    "Cây thư mục UI",
+    "UI 폴더 트리"
+  ],
+  "Pick File": [
+    "Pick File",
+    "Chọn file",
+    "파일 선택"
+  ],
+  "Pick Folder": [
+    "Pick Folder",
+    "Chọn thư mục",
+    "폴더 선택"
+  ],
+  "Pick file from system": [
+    "Pick file from system",
+    "Chọn file từ hệ thống",
+    "시스템에서 파일 선택"
+  ],
+  "Pick folder from system": [
+    "Pick folder from system",
+    "Chọn thư mục từ hệ thống",
+    "시스템에서 폴더 선택"
+  ],
+  "Select Folder for Config": [
+    "Select Folder for Config",
+    "Chọn thư mục cấu hình",
+    "구성용 폴더 선택"
+  ],
+  "Select Config File": [
+    "Select Config File",
+    "Chọn file cấu hình",
+    "구성 파일 선택"
+  ],
+  "Click item to pick path": [
+    "Click item to pick path",
+    "Click chọn file/thư mục",
+    "경로를 선택하려면 항목 클릭"
+  ],
+  "Filter folder files...": [
+    "Filter folder files...",
+    "Lọc nhanh file trong thư mục...",
+    "폴더 파일 필터링..."
+  ],
+  "Search in file (Ctrl+F)": [
+    "Search in file (Ctrl+F)",
+    "Tìm kiếm trong file (Ctrl+F)",
+    "파일에서 검색 (Ctrl+F)"
+  ],
+  "Find in file... (Enter = next, Shift+Enter = prev, Esc = close)": [
+    "Find in file... (Enter = next, Shift+Enter = prev, Esc = close)",
+    "Tìm trong file... (Enter = tiếp, Shift+Enter = trước, Esc = đóng)",
+    "파일에서 찾기... (Enter = 다음, Shift+Enter = 이전, Esc = 닫기)"
+  ],
+  "Toggle word wrapping": [
+    "Toggle word wrapping",
+    "Bật/tắt tự động xuống dòng",
+    "자동 줄 바꿈 전환"
+  ],
+  "↩ Wrap: On": [
+    "↩ Wrap: On",
+    "↩ Wrap: Bật",
+    "↩ 줄바꿈: 켬"
+  ],
+  "➡ Wrap: Off": [
+    "➡ Wrap: Off",
+    "➡ Wrap: Tắt",
+    "➡ 줄바꿈: 끔"
+  ],
+  "Format & clean indentation": [
+    "Format & clean indentation",
+    "Định dạng & dọn thụt lề",
+    "서식 지정 및 들여쓰기 정리"
+  ],
+  "Formatted": [
+    "Formatted",
+    "Đã định dạng",
+    "서식 지정됨"
+  ],
+  "Clean": [
+    "Clean",
+    "Đã chuẩn",
+    "정리됨"
+  ],
+  "lines": [
+    "lines",
+    "dòng",
+    "줄"
+  ],
+  "Get fingerprint": [
+    "Get fingerprint",
+    "Lấy fingerprint",
+    "지문 가져오기"
+  ],
+  "Fetching fingerprint...": [
+    "Fetching fingerprint...",
+    "Đang lấy fingerprint...",
+    "지문을 가져오는 중..."
+  ],
+  "Copy fingerprint": [
+    "Copy fingerprint",
+    "Sao chép fingerprint",
+    "지문 복사"
+  ],
+  "Share this fingerprint with clients connecting to this SSH server.": [
+    "Share this fingerprint with clients connecting to this SSH server.",
+    "Chia sẻ fingerprint này cho máy khách kết nối tới máy chủ SSH này.",
+    "이 SSH 서버에 연결하는 클라이언트와 이 지문을 공유하세요."
+  ],
+  "Compare the fetched fingerprint with your administrator before saving.": [
+    "Compare the fetched fingerprint with your administrator before saving.",
+    "Đối chiếu fingerprint vừa lấy với quản trị viên trước khi lưu.",
+    "저장하기 전에 가져온 지문을 관리자와 대조하세요."
+  ],
+  "Cannot copy the SSH fingerprint.": [
+    "Cannot copy the SSH fingerprint.",
+    "Không thể sao chép fingerprint SSH.",
+    "SSH 지문을 복사할 수 없습니다."
+  ],
+  "Enter a valid SSH host and port.": [
+    "Enter a valid SSH host and port.",
+    "Nhập địa chỉ máy chủ SSH và cổng hợp lệ.",
+    "올바른 SSH 호스트와 포트를 입력하세요."
+  ],
+  "SSH fingerprint lookup timed out. Check the host and port.": [
+    "SSH fingerprint lookup timed out. Check the host and port.",
+    "Lấy fingerprint SSH quá thời gian chờ. Kiểm tra địa chỉ và cổng.",
+    "SSH 지문 조회 시간이 초과되었습니다. 호스트와 포트를 확인하세요."
+  ],
+  "Cannot read the SSH fingerprint. Check the host, port and SSH service.": [
+    "Cannot read the SSH fingerprint. Check the host, port and SSH service.",
+    "Không thể đọc fingerprint SSH. Kiểm tra địa chỉ, cổng và dịch vụ SSH.",
+    "SSH 지문을 읽을 수 없습니다. 호스트, 포트 및 SSH 서비스를 확인하세요."
+  ],
+  "Cannot read the SSH fingerprint.": [
+    "Cannot read the SSH fingerprint.",
+    "Không thể đọc fingerprint SSH.",
+    "SSH 지문을 읽을 수 없습니다."
+  ],
+  "Cannot read the SSH server host key.": [
+    "Cannot read the SSH server host key.",
+    "Không thể đọc host key của máy chủ SSH.",
+    "SSH 서버 호스트 키를 읽을 수 없습니다."
+  ],
+  "Cannot decode the SSH server host key.": [
+    "Cannot decode the SSH server host key.",
+    "Không thể giải mã host key của máy chủ SSH.",
+    "SSH 서버 호스트 키를 해독할 수 없습니다."
+  ],
+  "Cannot access the SSH server host key.": [
+    "Cannot access the SSH server host key.",
+    "Không thể truy cập host key của máy chủ SSH.",
+    "SSH 서버 호스트 키에 접근할 수 없습니다."
+  ],
+  "Cannot generate the SSH server host key.": [
+    "Cannot generate the SSH server host key.",
+    "Không thể tạo host key cho máy chủ SSH.",
+    "SSH 서버 호스트 키를 생성할 수 없습니다."
+  ],
+  "Cannot encode the SSH server host key.": [
+    "Cannot encode the SSH server host key.",
+    "Không thể mã hóa host key của máy chủ SSH.",
+    "SSH 서버 호스트 키를 인코딩할 수 없습니다."
+  ],
+  "Cannot create the SSH server key directory.": [
+    "Cannot create the SSH server key directory.",
+    "Không thể tạo thư mục chứa khóa máy chủ SSH.",
+    "SSH 서버 키 디렉터리를 만들 수 없습니다."
+  ],
+  "Cannot save the SSH server host key.": [
+    "Cannot save the SSH server host key.",
+    "Không thể lưu host key của máy chủ SSH.",
+    "SSH 서버 호스트 키를 저장할 수 없습니다."
+  ],
+  "A valid SSH server SHA256 fingerprint is required.": [
+    "A valid SSH server SHA256 fingerprint is required.",
+    "Cần fingerprint SHA256 hợp lệ của máy chủ SSH.",
+    "유효한 SSH 서버 SHA256 지문이 필요합니다."
   ]
 }

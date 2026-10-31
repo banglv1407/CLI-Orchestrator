@@ -49,3 +49,12 @@ Tradeoffs:
 
 - Exercise HTTP/SOCKS and SSH fixtures on supported desktop platforms.
 - Implementation and proof are tracked as US-055 (US-052 was already assigned).
+
+## Fingerprint discovery (US-068)
+
+Backend editors can discover the actual negotiated SHA256 host-key fingerprint
+through a separate, credential-free russh connection. The user can compare and
+save this first-use value. Discovery never changes the transport handler or
+bypasses the saved pin. The same native library and default negotiation are used
+for discovery and actual tunnels, avoiding a dependency on OS ssh-keyscan.
+The built-in server fingerprint uses the same stable key loader as server startup.

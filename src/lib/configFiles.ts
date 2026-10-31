@@ -115,9 +115,13 @@ export function formatConfigContent(
     }
   }
 
-  // For YAML / TOML / ENV / INI: Trim trailing whitespaces and normalize line endings
-  const lines = content.split(/\r?\n/);
-  const cleaned = lines.map((l) => l.trimEnd()).join('\n');
+  // For all code and text files: Trim trailing whitespaces on each line, normalize line endings to \n, collapse excessive blank lines
+  const lines = content.replace(/\r/g, '').split('\n');
+  const cleanedLines = lines.map((l) => l.trimEnd());
+  let cleaned = cleanedLines.join('\n').replace(/\n{3,}/g, '\n\n');
+  if (cleaned.length > 0 && !cleaned.endsWith('\n')) {
+    cleaned += '\n';
+  }
   return { formatted: cleaned, changed: cleaned !== content };
 }
 

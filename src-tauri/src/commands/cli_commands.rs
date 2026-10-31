@@ -1508,6 +1508,18 @@ pub async fn stop_ssh_server(
 }
 
 #[tauri::command]
+pub async fn get_ssh_server_fingerprint(
+    state: tauri::State<'_, crate::app_state::AppState>,
+) -> Result<String, String> {
+    let root_dir = state.registry.data_dirs().root_dir;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::core::ssh_fingerprint::server_fingerprint(&root_dir)
+    })
+    .await
+    .map_err(|_| "Cannot access the SSH server host key.")?
+}
+
+#[tauri::command]
 pub async fn get_ssh_server_status(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<SshStatusResponse, String> {

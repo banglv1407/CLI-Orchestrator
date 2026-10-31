@@ -9,6 +9,11 @@ use crate::{
 };
 
 #[tauri::command]
+pub async fn probe_ssh_fingerprint(host: String, port: u16) -> Result<String, String> {
+    crate::core::ssh_fingerprint::probe_ssh_fingerprint(&host, port).await
+}
+
+#[tauri::command]
 pub async fn proxy_status(state: State<'_, AppState>) -> Result<ProxyStatus, String> {
     Ok(state.proxy_server.status().await)
 }

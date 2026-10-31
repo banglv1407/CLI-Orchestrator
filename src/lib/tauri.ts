@@ -299,6 +299,14 @@ export function apiProxyAbort(requestId: string): Promise<void> {
 
 // ── CliProxyAI ────────────────────────────────────────────
 
+export function probeSshFingerprint(host: string, port: number): Promise<string> {
+  return invoke('probe_ssh_fingerprint', { host, port });
+}
+
+export function getSshServerFingerprint(): Promise<string> {
+  return invoke('get_ssh_server_fingerprint');
+}
+
 export function proxyStatus(): Promise<ProxyStatus> {
   return invoke('proxy_status');
 }

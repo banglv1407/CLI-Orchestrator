@@ -1,5 +1,6 @@
 import { t as tr } from '../i18n';
 import type { ProxyHop } from '../types';
+import { SshFingerprintField } from './SshFingerprintField';
 
 export function ProxyHopEditor({ value, onChange }: { value?: ProxyHop; onChange: (value?: ProxyHop) => void }) {
   const input = 'w-full bg-cyber-base border border-cyber-line rounded px-3 py-2 text-sm text-slate-200';
@@ -24,9 +25,9 @@ export function ProxyHopEditor({ value, onChange }: { value?: ProxyHop; onChange
       </label>
       {value && <>
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs text-slate-400">{tr("Host")}<input className={input} value={value.host} placeholder="proxy.example.com" onChange={e => change({ host: e.target.value })} />
+          <label className="text-xs text-slate-400">{tr("Host")}<input className={input} value={value.host} placeholder="proxy.example.com" onChange={e => change({ host: e.target.value, ...(value.kind === 'ssh' ? { hostKey: '' } : {}) })} />
           </label>
-          <label className="text-xs text-slate-400">{tr("Port")}<input className={input} type="number" min={1} max={65535} value={value.port} onChange={e => change({ port: Number(e.target.value) })} />
+          <label className="text-xs text-slate-400">{tr("Port")}<input className={input} type="number" min={1} max={65535} value={value.port} onChange={e => change({ port: Number(e.target.value), ...(value.kind === 'ssh' ? { hostKey: '' } : {}) })} />
           </label>
         </div>
         {value.kind !== 'socks4' && <>
@@ -40,9 +41,13 @@ export function ProxyHopEditor({ value, onChange }: { value?: ProxyHop; onChange
             </label>
             {value.authMode === 'key' && <label className="block text-xs text-slate-400">{tr("Private key path")}<input className={input} value={value.keyPath} onChange={e => change({ keyPath: e.target.value })} />
             </label>}
-            <label className="block text-xs text-slate-400">{tr("Server fingerprint (SHA256)")}<input className={input} placeholder="SHA256:..." value={value.hostKey} onChange={e => change({ hostKey: e.target.value.trim() })} />
-            </label>
-            <p className="text-xs text-slate-400">{tr("Get the server fingerprint from your administrator.")}</p>
+            <SshFingerprintField
+              key={JSON.stringify([value.host, value.port])}
+              host={value.host}
+              port={value.port}
+              value={value.hostKey}
+              onChange={hostKey => change({ hostKey })}
+            />
           </>}
           <label className="block text-xs text-slate-400">{value.kind === 'ssh' && value.authMode === 'key' ? tr("Key passphrase (optional)") : tr("Password")}
             <input className={input} type="password" autoComplete="new-password" value={value.secret} onChange={e => change({ secret: e.target.value })} />

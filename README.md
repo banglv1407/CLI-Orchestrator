@@ -67,7 +67,10 @@ SOCKS5 supports username/password and remote DNS. HTTPS encrypts the connection
 to the proxy; HTTP proxies also support HTTPS destinations using CONNECT.
 
 SSH accepts password or private key/passphrase and requires the server's SHA256
-fingerprint from your administrator. Hop credentials are saved in the local
+fingerprint. Enter its host and port, then click **Get fingerprint** to fetch
+and fill the correct value without logging in. Compare it with your
+administrator before saving. **Copy fingerprint** copies the value. Changing
+host or port clears the old fingerprint. Hop credentials are saved in the local
 proxy configuration alongside API keys. A failed hop will not silently connect
 directly to that backend; ordinary fallback to other configured backends remains.
 
@@ -90,16 +93,29 @@ Connections are opened from the CLX machine to any reachable host and port, with
 a 10 second connect timeout. Each tunnel is recorded in the SSH server log.
 Reverse forwarding (`-R`) is not supported.
 
+**Remote Access > SSH Server > Get fingerprint** displays this CLX server's
+SHA256 fingerprint for connecting clients. **Copy fingerprint** copies it. The
+existing host key is reused; if absent, it is created once and also used when
+the server starts. Fetching a fingerprint never rotates an existing host key.
+
 > The SSH server listens on all interfaces and the default login is
 > `admin` / `admin`. Change the password or use public keys before exposing it,
 > because anyone who can log in can reach every address your machine can reach.
 
 ### Terminal sessions
 
+Press **Ctrl + `** anywhere in CLX to create and focus a new local terminal.
+This replaces Ctrl+Shift+N. Editors and dialogs keep their drafts; use
+**Return to previous view** to resume them after opening a terminal.
 
 Mini terminal headers display the current agent session title, with the full
 title on hover. Choose **Title only** in either mini-panel display selector for
 compact session rows without terminal previews; the choice persists.
+Hold **Ctrl** and click mini terminals to add/remove sessions from a group,
+including sessions in both panels. Typing or pasting in a selected main terminal
+sends the same input to the group. Click a single terminal normally or choose
+**Clear selection** to return to one session. Both mini-terminal display modes
+support group input.
 Hermes names follow its current session metadata for new and
 resumed sessions, including Hermes launched in a local shell. Other agents use
 live terminal titles with saved resume titles as a fallback. Untitled sessions

@@ -20,9 +20,14 @@
     "test:i18n": "node --test scripts/i18n.test.mjs",
     "test:i18n:ui": "node scripts/i18n-smoke.mjs",
     "test:terminal-titles": "node --test scripts/terminal-titles.test.mjs",
+    "test:terminal-broadcast": "node --test scripts/terminal-broadcast.test.mjs",
+    "test:terminal-broadcast:ui": "node scripts/terminal-broadcast-smoke.mjs",
     "test:terminal-resize": "node --test scripts/terminal-resize.test.mjs",
     "test:terminal-search": "node --test scripts/terminal-search.test.mjs",
-    "test:terminal-search:ui": "node scripts/terminal-search-smoke.mjs"
+    "test:terminal-search:ui": "node scripts/terminal-search-smoke.mjs",
+    "test:terminal-shortcuts": "node --test scripts/terminal-shortcuts.test.mjs",
+    "test:terminal-shortcuts:ui": "node scripts/terminal-shortcuts-smoke.mjs",
+    "test:ssh-fingerprint:ui": "node scripts/ssh-fingerprint-smoke.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

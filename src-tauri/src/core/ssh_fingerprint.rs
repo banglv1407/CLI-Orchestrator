@@ -61,6 +61,18 @@ pub async fn probe_ssh_fingerprint(host: &str, port: u16) -> Result<String, Stri
     probe_with_timeout(host, port, PROBE_TIMEOUT).await
 }
 
+pub(crate) async fn probe_ssh_stream<S>(stream: S) -> Result<String, String>
+where S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static {
+    let fingerprint = Arc::new(Mutex::new(None));
+    let config = Arc::new(client::Config { inactivity_timeout: Some(PROBE_TIMEOUT + Duration::from_secs(1)), ..Default::default() });
+    let connection = tokio::time::timeout(PROBE_TIMEOUT, client::connect_stream(config, stream, ProbeKey(fingerprint.clone())))
+        .await.map_err(|_| "SSH fingerprint lookup timed out. Check the host and port.")?
+        .map_err(|_| "Cannot read the SSH fingerprint. Check the host, port and SSH service.")?;
+    let result = fingerprint.lock().map_err(|_| "Cannot read the SSH fingerprint.")?.clone().ok_or("Cannot read the SSH fingerprint.")?;
+    let _ = tokio::time::timeout(Duration::from_millis(500), connection.disconnect(Disconnect::ByApplication, "", "en")).await;
+    Ok(result)
+}
+
 async fn probe_with_timeout(host: &str, port: u16, timeout: Duration) -> Result<String, String> {
     let host = validate_address(host, port)?;
     let fingerprint = Arc::new(Mutex::new(None));

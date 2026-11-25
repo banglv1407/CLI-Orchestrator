@@ -627,72 +627,293 @@ fn create_silent_command(program: &str) -> std::process::Command {
     cmd
 }
 
-#[derive(serde::Serialize, Debug)]
+#[derive(serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GitStatusEntry {
     pub path: String,
     pub status: String,
     pub staged: bool,
+    pub additions: Option<u32>,
+    pub deletions: Option<u32>,
+}
+
+#[derive(serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRepoDetail {
+    pub is_repo: bool,
+    pub branch: String,
+    pub upstream: Option<String>,
+    pub ahead: u32,
+    pub behind: u32,
+    pub last_commit_hash: Option<String>,
+    pub last_commit_message: Option<String>,
+    pub last_commit_author: Option<String>,
+    pub last_commit_relative_time: Option<String>,
+    pub total_additions: u32,
+    pub total_deletions: u32,
+    pub entries: Vec<GitStatusEntry>,
+}
+
+fn parse_porcelain_branch_header(header_line: &str) -> (String, Option<String>, u32, u32) {
+    let raw = header_line.strip_prefix("## ").unwrap_or(header_line).trim();
+    if let Some(rest) = raw
+        .strip_prefix("No commits yet on ")
+        .or_else(|| raw.strip_prefix("Initial commit on "))
+    {
+        return (rest.trim().to_string(), None, 0, 0);
+    }
+
+    let (branch_part, bracket_part) = if let Some(bracket_start) = raw.find(" [") {
+        let end = raw.rfind(']').unwrap_or(raw.len());
+        (&raw[..bracket_start], Some(&raw[bracket_start + 2..end]))
+    } else {
+        (raw, None)
+    };
+
+    let mut ahead = 0u32;
+    let mut behind = 0u32;
+    if let Some(meta) = bracket_part {
+        for piece in meta.split(',') {
+            let p = piece.trim();
+            if let Some(n) = p.strip_prefix("ahead ") {
+                ahead = n.trim().parse::<u32>().unwrap_or(0);
+            } else if let Some(n) = p.strip_prefix("behind ") {
+                behind = n.trim().parse::<u32>().unwrap_or(0);
+            }
+        }
+    }
+
+    let (branch, upstream) = if let Some((b, u)) = branch_part.split_once("...") {
+        (b.trim().to_string(), Some(u.trim().to_string()))
+    } else {
+        (branch_part.trim().to_string(), None)
+    };
+
+    (branch, upstream, ahead, behind)
+}
+
+fn normalize_porcelain_path(raw_path: &str) -> String {
+    let target = if let Some((_, new_path)) = raw_path.split_once(" -> ") {
+        new_path.trim()
+    } else {
+        raw_path.trim()
+    };
+    let unquoted = target
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(target);
+    unquoted.replace('\\', "/")
+}
+
+#[tauri::command]
+pub async fn get_git_detail(repo_path: String) -> Result<GitRepoDetail, String> {
+    use std::fs;
+    use std::path::Path;
+
+    let check = create_silent_command("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .current_dir(&repo_path)
+        .output();
+
+    let is_inside = matches!(check, Ok(ref out) if out.status.success());
+    if !is_inside {
+        return Ok(GitRepoDetail {
+            is_repo: false,
+            branch: String::new(),
+            upstream: None,
+            ahead: 0,
+            behind: 0,
+            last_commit_hash: None,
+            last_commit_message: None,
+            last_commit_author: None,
+            last_commit_relative_time: None,
+            total_additions: 0,
+            total_deletions: 0,
+            entries: Vec::new(),
+        });
+    }
+
+    let status_out = create_silent_command("git")
+        .args(["status", "--porcelain=v1", "-b"])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to run git status: {}", e))?;
+
+    let stdout_str = String::from_utf8_lossy(&status_out.stdout);
+    let mut branch = String::from("HEAD");
+    let mut upstream = None;
+    let mut ahead = 0u32;
+    let mut behind = 0u32;
+    let mut entries = Vec::new();
+
+    for line in stdout_str.lines() {
+        if line.starts_with("## ") {
+            let parsed = parse_porcelain_branch_header(line);
+            branch = parsed.0;
+            upstream = parsed.1;
+            ahead = parsed.2;
+            behind = parsed.3;
+            continue;
+        }
+        if line.len() > 3 {
+            let index_status = &line[..1];
+            let worktree_status = &line[1..2];
+            let file_path = normalize_porcelain_path(&line[3..]);
+
+            let status_str = if worktree_status != " " {
+                match worktree_status {
+                    "M" => "modified",
+                    "A" => "added",
+                    "D" => "deleted",
+                    "?" => "untracked",
+                    _ => "modified",
+                }
+            } else {
+                match index_status {
+                    "M" | "R" | "C" => "modified",
+                    "A" => "added",
+                    "D" => "deleted",
+                    _ => "modified",
+                }
+            };
+
+            let is_staged = index_status != " " && index_status != "?";
+            entries.push(GitStatusEntry {
+                path: file_path,
+                status: status_str.to_string(),
+                staged: is_staged,
+                additions: None,
+                deletions: None,
+            });
+        }
+    }
+
+    // Collect per-file line additions/deletions against HEAD (fallback to index/worktree on unborn HEAD)
+    let mut numstat_map: HashMap<String, (u32, u32)> = HashMap::new();
+    let numstat_head = create_silent_command("git")
+        .args(["diff", "HEAD", "--numstat"])
+        .current_dir(&repo_path)
+        .output();
+
+    let numstat_stdout = match numstat_head {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).into_owned(),
+        _ => {
+            let mut combined = String::new();
+            if let Ok(out) = create_silent_command("git")
+                .args(["diff", "--cached", "--numstat"])
+                .current_dir(&repo_path)
+                .output()
+            {
+                if out.status.success() {
+                    combined.push_str(&String::from_utf8_lossy(&out.stdout));
+                }
+            }
+            if let Ok(out) = create_silent_command("git")
+                .args(["diff", "--numstat"])
+                .current_dir(&repo_path)
+                .output()
+            {
+                if out.status.success() {
+                    combined.push_str(&String::from_utf8_lossy(&out.stdout));
+                }
+            }
+            combined
+        }
+    };
+
+    for line in numstat_stdout.lines() {
+        let mut parts = line.splitn(3, '\t');
+        let (Some(add_s), Some(del_s), Some(raw_p)) = (parts.next(), parts.next(), parts.next()) else {
+            continue;
+        };
+        let add = add_s.parse::<u32>().unwrap_or(0);
+        let del = del_s.parse::<u32>().unwrap_or(0);
+        let norm_p = if let Some(brace_start) = raw_p.find('{') {
+            if let (Some(arrow), Some(brace_end)) = (raw_p[brace_start..].find(" => "), raw_p[brace_start..].find('}')) {
+                let prefix = &raw_p[..brace_start];
+                let new_mid = &raw_p[brace_start + arrow + 4..brace_start + brace_end];
+                let suffix = &raw_p[brace_start + brace_end + 1..];
+                format!("{}{}{}", prefix, new_mid, suffix).replace('\\', "/")
+            } else {
+                normalize_porcelain_path(raw_p)
+            }
+        } else {
+            normalize_porcelain_path(raw_p)
+        };
+        let slot = numstat_map.entry(norm_p).or_insert((0, 0));
+        slot.0 += add;
+        slot.1 += del;
+    }
+
+    let mut total_additions = 0u32;
+    let mut total_deletions = 0u32;
+    for entry in &mut entries {
+        if let Some(&(add, del)) = numstat_map.get(&entry.path) {
+            entry.additions = Some(add);
+            entry.deletions = Some(del);
+            total_additions += add;
+            total_deletions += del;
+        } else if entry.status == "untracked" {
+            let full = Path::new(&repo_path).join(&entry.path);
+            if let Ok(meta) = fs::metadata(&full) {
+                if meta.is_file() && meta.len() <= 512 * 1024 {
+                    if let Ok(content) = fs::read_to_string(&full) {
+                        let lines = content.lines().count() as u32;
+                        entry.additions = Some(lines);
+                        entry.deletions = Some(0);
+                        total_additions += lines;
+                    }
+                }
+            }
+        }
+    }
+
+    let mut last_commit_hash = None;
+    let mut last_commit_message = None;
+    let mut last_commit_author = None;
+    let mut last_commit_relative_time = None;
+
+    if let Ok(log_out) = create_silent_command("git")
+        .args(["log", "-1", "--format=%h%x1f%s%x1f%an%x1f%cr"])
+        .current_dir(&repo_path)
+        .output()
+    {
+        if log_out.status.success() {
+            let log_line = String::from_utf8_lossy(&log_out.stdout);
+            let trimmed = log_line.trim();
+            if !trimmed.is_empty() {
+                let mut fields = trimmed.splitn(4, '\x1f');
+                last_commit_hash = fields.next().map(|s| s.to_string()).filter(|s| !s.is_empty());
+                last_commit_message = fields.next().map(|s| s.to_string()).filter(|s| !s.is_empty());
+                last_commit_author = fields.next().map(|s| s.to_string()).filter(|s| !s.is_empty());
+                last_commit_relative_time = fields.next().map(|s| s.to_string()).filter(|s| !s.is_empty());
+            }
+        }
+    }
+
+    if (branch == "HEAD (no branch)" || branch == "HEAD") && last_commit_hash.is_some() {
+        branch = format!("HEAD @ {}", last_commit_hash.as_deref().unwrap_or("detached"));
+    }
+
+    Ok(GitRepoDetail {
+        is_repo: true,
+        branch,
+        upstream,
+        ahead,
+        behind,
+        last_commit_hash,
+        last_commit_message,
+        last_commit_author,
+        last_commit_relative_time,
+        total_additions,
+        total_deletions,
+        entries,
+    })
 }
 
 #[tauri::command]
 pub async fn get_git_status(repo_path: String) -> Result<Vec<GitStatusEntry>, String> {
-    let output = create_silent_command("git")
-        .arg("rev-parse")
-        .arg("--is-inside-work-tree")
-        .current_dir(&repo_path)
-        .output();
-
-    match output {
-        Ok(out) if out.status.success() => {
-            let status_out = create_silent_command("git")
-                .arg("status")
-                .arg("--porcelain")
-                .current_dir(&repo_path)
-                .output()
-                .map_err(|e| format!("Failed to run git status: {}", e))?;
-
-            let stdout_str = String::from_utf8_lossy(&status_out.stdout);
-            let mut entries = Vec::new();
-
-            for line in stdout_str.lines() {
-                if line.len() > 3 {
-                    let index_status = &line[..1]; // staging area
-                    let worktree_status = &line[1..2]; // working tree
-                    let file_path = line[3..].trim().to_string();
-
-                    // Determine file status from the more "interesting" column
-                    let status_str = if worktree_status != " " {
-                        match worktree_status {
-                            "M" => "modified",
-                            "A" => "added",
-                            "D" => "deleted",
-                            "?" => "untracked",
-                            _ => "modified",
-                        }
-                    } else {
-                        match index_status {
-                            "M" => "modified",
-                            "A" => "added",
-                            "D" => "deleted",
-                            _ => "modified",
-                        }
-                    };
-
-                    // Staged if index_status is not ' ' or '?'
-                    let is_staged = index_status != " " && index_status != "?";
-
-                    entries.push(GitStatusEntry {
-                        path: file_path,
-                        status: status_str.to_string(),
-                        staged: is_staged,
-                    });
-                }
-            }
-            Ok(entries)
-        }
-        _ => Ok(Vec::new()),
-    }
+    Ok(get_git_detail(repo_path).await?.entries)
 }
 
 #[tauri::command]
@@ -730,6 +951,14 @@ pub async fn get_git_diff(
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
     if !output.status.success() {
+        let fallback = create_silent_command("git")
+            .args(["diff", "--cached", "--", &file_path])
+            .current_dir(&repo_path)
+            .output()
+            .map_err(|e| format!("Failed to run git diff fallback: {}", e))?;
+        if fallback.status.success() {
+            return Ok(String::from_utf8_lossy(&fallback.stdout).to_string());
+        }
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
     }
 
@@ -1824,5 +2053,50 @@ mod delete_tests {
         let command = remote_delete_command("/srv/app/a'b", "/srv/app");
         assert!(command.contains("rm -rf -- '/srv/app/a'\"'\"'b'"));
         assert!(command.contains("realpath -m -- '/srv/app'"));
+    }
+
+    #[test]
+    fn parses_git_porcelain_branch_headers_and_paths() {
+        assert_eq!(
+            super::parse_porcelain_branch_header("## dev...origin/dev [ahead 2, behind 1]"),
+            ("dev".into(), Some("origin/dev".into()), 2, 1)
+        );
+        assert_eq!(
+            super::parse_porcelain_branch_header("## No commits yet on main"),
+            ("main".into(), None, 0, 0)
+        );
+        assert_eq!(
+            super::normalize_porcelain_path("old\\file.ts -> \"src\\new file.ts\""),
+            "src/new file.ts"
+        );
+    }
+
+    #[tokio::test]
+    async fn git_detail_reports_branch_commit_and_non_repo() {
+        let non_repo = std::env::temp_dir().join(format!(
+            "clx-non-repo-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&non_repo).unwrap();
+        let empty = super::get_git_detail(non_repo.to_string_lossy().into_owned())
+            .await
+            .unwrap();
+        std::fs::remove_dir_all(&non_repo).unwrap();
+        assert!(!empty.is_repo);
+        assert!(empty.entries.is_empty());
+
+        let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let detail = super::get_git_detail(repo_root.to_string_lossy().into_owned())
+            .await
+            .unwrap();
+        assert!(detail.is_repo);
+        assert!(!detail.branch.is_empty());
+        assert!(detail.last_commit_hash.is_some());
     }
 }

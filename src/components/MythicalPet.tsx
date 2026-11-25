@@ -1181,6 +1181,7 @@ export function MythicalPet() {
       <button
         ref={hitboxRef}
         type="button"
+        data-native-web-nonblocking
         className="fixed left-0 top-0 pointer-events-auto cursor-pointer rounded-full bg-transparent border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-neon"
         onClick={handleClick}
         aria-label={tr("Play an action with {v0}", { v0: getPetDisplayName(pet) })}

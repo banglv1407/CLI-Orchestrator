@@ -29,15 +29,17 @@ import {
   terminalCommandDetectEnvironment,
   terminalCommandSuggest,
   listTerminalSessionTitles,
+  openInVSCode,
 } from '../lib/tauri';
 import { RemoteMonitorWidget } from './RemoteMonitorWidget';
 import { SshFileTransferDialog } from './SshFileTransferDialog';
 import {
   getTerminalFontSize,
   getTerminalFontFamily,
-  zoomIn,
-  zoomOut,
-  resetZoom,
+  getMiniTerminalDisplayMode,
+  setMiniTerminalDisplayMode as saveMiniTerminalDisplayMode,
+  getMiniTerminalScale,
+  type MiniTerminalDisplayMode,
 } from '../lib/appearance';
 import { save } from '@tauri-apps/plugin-dialog';
 import { QuickAppsPanel } from './QuickAppsPanel';
@@ -50,34 +52,23 @@ import { SettingsPanel } from './SettingsPanel';
 import { RemoteSshPanel } from './RemoteSshPanel';
 import { DashboardPanel } from './DashboardPanel';
 import { AgentSessionPanel } from './AgentSessionPanel';
+import { WebBrowserPanel } from './WebBrowserPanel';
+import { WebMiniPanel } from './WebMiniPanel';
+import { TerminalGraph } from './TerminalGraph';
+import type { TerminalLinks } from '../lib/terminalLinks';
+import { readWebMiniPreferences, writeWebMiniPreferences, webMiniVisible, type WebBrowserController, type WebMiniTab } from '../lib/webMini';
 import { useUiActive } from '../hooks/useUiActive';
 import { copyTerminalSelection, getTerminalSelectionText, type TerminalCopyMode } from '../lib/terminalClipboard';
 import { getContextMenuPosition } from '../lib/contextMenu';
 import { getMiniTerminalTitle } from '../lib/terminalTitles';
 import { buildTerminalPasteInput, selectMiniTerminals, terminalInputTargets, TerminalInputAddon } from '../lib/terminalBroadcast';
-import { NEW_TERMINAL_EVENT } from '../lib/terminalShortcuts';
-import { ConptyResizeAddon, INITIAL_TERMINAL_SIZE, TerminalResizeQueue } from '../lib/terminalResize';
+import { NEW_TERMINAL_EVENT, CYCLE_TERMINAL_EVENT } from '../lib/terminalShortcuts';
+import { ConptyResizeAddon, INITIAL_TERMINAL_SIZE, TerminalMouseZoomAddon, TerminalResizeQueue } from '../lib/terminalResize';
 import { clearTerminalSearch, findTerminalText, handleTerminalSearchKey, preserveSearchSelectionOnResize, TERMINAL_SEARCH_LIMIT } from '../lib/terminalSearch';
-import { isConfigFile, validateConfigSyntax, formatConfigContent } from '../lib/configFiles';
 import {
   TerminalCommandPopup,
   type TerminalCommandPopupPhase,
 } from './TerminalCommandPopup';
-
-function FileIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 shrink-0 text-slate-400">
-      <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Z" clipRule="evenodd" />
-      <path d="M12.938 5.437c.07.38.37.68.75.75h3.562c-.105-.372-.309-.706-.59-1.002l-2.72-2.72a3.75 3.75 0 0 0-.991-.59v3.562Z" />
-    </svg>
-  );
-}
-
-const getRelativePath = (fullPath: string, root: string) => {
-  let rel = fullPath.replace(root, '');
-  rel = rel.replace(/^[/\\]+/, '');
-  return rel.replace(/\\/g, '/');
-};
 
 function MarqueeTitle({ text, title = text, className = "text-slate-300", fontSizeClass = "text-[8px]" }: { text: string; title?: string; className?: string; fontSizeClass?: string }) {
   const isLong = text.length > 25;
@@ -96,23 +87,6 @@ function MarqueeTitle({ text, title = text, className = "text-slate-300", fontSi
         <span style={{ paddingLeft: '24px' }}></span>
       </div>
     </div>
-  );
-}
-
-type MiniTerminalDisplayMode = 'preview' | 'title-only';
-
-function MiniTerminalDisplayControl({ mode, onChange }: { mode: MiniTerminalDisplayMode; onChange: (mode: MiniTerminalDisplayMode) => void }) {
-  return (
-    <select
-      value={mode}
-      onChange={(event) => onChange(event.target.value === 'title-only' ? 'title-only' : 'preview')}
-      aria-label={tr("Mini terminal display")}
-      data-mini-terminal-display
-      className="min-w-0 rounded border border-cyber-line/55 bg-[#0a0f1f] px-1.5 py-1 text-[10px] text-slate-300 outline-none focus:border-cyber-electric"
-    >
-      <option value="preview">{tr("Mini terminal")}</option>
-      <option value="title-only">{tr("Title only")}</option>
-    </select>
   );
 }
 
@@ -141,33 +115,19 @@ interface TerminalPanelProps {
   onStopSession: (sessionId: string) => void;
   onSaveTag: (cliName: string, tag: string, directory: string) => Promise<void>;
   sshConnections: SshConnection[];
-  onQuickSession?: (panel?: 'bottom' | 'right') => void;
-
-  openedFile: { path: string; name: string } | null;
-  openedFileRootPath: string | null;
-  fileContent: string;
-  setFileContent: (val: string) => void;
-  fileOriginalContent: string;
-  isSavingFile: boolean;
-  fileLoadError: string | null;
-  isFileLoading: boolean;
-  viewMode: 'edit' | 'diff';
-  setViewMode: (val: 'edit' | 'diff') => void;
-  gitDiffContent: string;
-  isDiffLoading: boolean;
-  gitStatusList: { path: string; status: 'modified' | 'added' | 'deleted' | 'untracked' }[];
-  onSaveFile: () => Promise<void>;
-  onCloseFile: () => void;
+  terminalLinks: TerminalLinks;
+  onLinkTerminal: (child: string, parent: string | null) => void;
 
   onReorderSessions: (draggedId: string, targetId: string) => void;
   onMoveSessionToPanel: (sessionId: string, panel: 'bottom' | 'right') => void;
   activeMainView: string;
+  nativeBrowserSuspended?: boolean;
   theme?: AppTheme;
   setTheme?: (theme: AppTheme) => void;
 
   // Global context menu state lifted to Dashboard
-  contextMenu: { x: number; y: number; sessionId: string | null; workingDir: string | null } | null;
-  setContextMenu: (menu: { x: number; y: number; sessionId: string | null; workingDir: string | null } | null) => void;
+  contextMenu: { x: number; y: number; sessionId: string | null; workingDir: string | null; source?: 'main' | 'mini'; panel?: 'right' | 'bottom' } | null;
+  setContextMenu: (menu: { x: number; y: number; sessionId: string | null; workingDir: string | null; source?: 'main' | 'mini'; panel?: 'right' | 'bottom' } | null) => void;
 }
 
 interface TerminalHandle {
@@ -188,6 +148,7 @@ interface TerminalHandle {
 }
 
 const INPUT_FLUSH_MS = 16;
+const LINKED_TERMINAL_PANELS = ['right', 'bottom'] as const;
 const MOUNT_DELAY_MS = 50;
 const TERMINAL_FIT_DELAY_MS = 80;
 const MAX_TERMINAL_WRITE_QUEUE_BYTES = 2 * 1024 * 1024;
@@ -333,27 +294,13 @@ export function TerminalPanel({
   onStopSession,
   onSaveTag,
   sshConnections,
-  onQuickSession,
-
-  openedFile,
-  openedFileRootPath,
-  fileContent,
-  setFileContent,
-  fileOriginalContent,
-  isSavingFile,
-  fileLoadError,
-  isFileLoading,
-  viewMode,
-  setViewMode,
-  gitDiffContent,
-  isDiffLoading,
-  gitStatusList,
-  onSaveFile,
-  onCloseFile,
+  terminalLinks,
+  onLinkTerminal,
 
   onReorderSessions,
   onMoveSessionToPanel,
   activeMainView,
+  nativeBrowserSuspended = false,
   theme,
   setTheme,
   contextMenu,
@@ -361,6 +308,21 @@ export function TerminalPanel({
 }: TerminalPanelProps) {
   const locale = useLocale();
   const uiActive = useUiActive();
+  const [webMiniPreferences, setWebMiniPreferences] = useState(readWebMiniPreferences);
+  const [webMiniTabs, setWebMiniTabs] = useState<WebMiniTab[]>([]);
+  const webBrowserController = useRef<WebBrowserController>(null);
+  useEffect(() => { writeWebMiniPreferences(webMiniPreferences); }, [webMiniPreferences]);
+  const activateWebTab = (id: string) => {
+    webBrowserController.current?.activate(id);
+    window.dispatchEvent(new CustomEvent('open-sidebar-tab', { detail: 'web' }));
+  };
+  const addWebTab = () => {
+    webBrowserController.current?.add();
+    window.dispatchEvent(new CustomEvent('open-sidebar-tab', { detail: 'web' }));
+  };
+  const webMiniPanel = (panel: 'right' | 'bottom') => <WebMiniPanel panel={panel} tabs={webMiniTabs} preferences={webMiniPreferences} onPreferences={setWebMiniPreferences} onActivate={activateWebTab} onClose={id => webBrowserController.current?.close(id)} onAdd={addWebTab} />;
+  const miniWebBottom = webMiniVisible(webMiniPreferences.placement, 'bottom') ? webMiniPanel('bottom') : null;
+  const miniWebRight = webMiniVisible(webMiniPreferences.placement, 'right') ? webMiniPanel('right') : null;
   // Search state
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -385,9 +347,7 @@ export function TerminalPanel({
     localStorage.setItem('ai-cli-right-panel-visible', String(rightPanelVisible));
   }, [rightPanelVisible]);
 
-  const [miniTerminalDisplayMode, setMiniTerminalDisplayMode] = useState<MiniTerminalDisplayMode>(() => {
-    return localStorage.getItem('clx-mini-terminal-display-mode') === 'title-only' ? 'title-only' : 'preview';
-  });
+  const [miniTerminalDisplayMode, setMiniTerminalDisplayMode] = useState<MiniTerminalDisplayMode>(getMiniTerminalDisplayMode);
   const miniTerminalTitleOnly = miniTerminalDisplayMode === 'title-only';
   useEffect(() => {
     try { localStorage.setItem('clx-mini-terminal-display-mode', miniTerminalDisplayMode); } catch { /* Keep the display choice usable. */ }
@@ -426,102 +386,6 @@ export function TerminalPanel({
   const terminalCommandActiveRef = useRef(false);
   const terminalCommandInputRef = useRef<HTMLInputElement | null>(null);
   const terminalCommandEpochRef = useRef(0);
-  const fileEditorRef = useRef<HTMLTextAreaElement | null>(null);
-  const fileDiffScrollRef = useRef<HTMLDivElement | null>(null);
-  const lineNumbersRef = useRef<HTMLDivElement | null>(null);
-
-  // ── File Editor States (Explorer File View) ──
-  const [fileSearchOpen, setFileSearchOpen] = useState(false);
-  const [fileSearchQuery, setFileSearchQuery] = useState('');
-  const [fileSearchMatchIdx, setFileSearchMatchIdx] = useState(0);
-  const [fileWordWrap, setFileWordWrap] = useState(false);
-  const [fileCursorPos, setFileCursorPos] = useState({ line: 1, col: 1 });
-  const [fileFormatToast, setFileFormatToast] = useState<string | null>(null);
-  const fileSearchInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    setFileSearchOpen(false);
-    setFileSearchQuery('');
-    setFileSearchMatchIdx(0);
-    setFileCursorPos({ line: 1, col: 1 });
-    setFileFormatToast(null);
-  }, [openedFile?.path]);
-
-  const fileMatches = useMemo(() => {
-    if (!fileSearchQuery.trim() || !fileContent) return [];
-    const q = fileSearchQuery.toLowerCase();
-    const text = fileContent.toLowerCase();
-    const matches: { start: number; end: number }[] = [];
-    let idx = 0;
-    while ((idx = text.indexOf(q, idx)) !== -1) {
-      matches.push({ start: idx, end: idx + q.length });
-      idx += q.length;
-    }
-    return matches;
-  }, [fileSearchQuery, fileContent]);
-
-  const scrollToFileMatch = useCallback((index: number) => {
-    if (!fileMatches.length || !fileEditorRef.current) return;
-    const bounded = (index + fileMatches.length) % fileMatches.length;
-    setFileSearchMatchIdx(bounded);
-    const match = fileMatches[bounded];
-    fileEditorRef.current.focus();
-    fileEditorRef.current.setSelectionRange(match.start, match.end);
-    const textBefore = fileContent.substring(0, match.start);
-    const lineIdx = (textBefore.match(/\n/g) || []).length;
-    const lineHeight = 19.5;
-    const targetScroll = Math.max(0, lineIdx * lineHeight - 100);
-    fileEditorRef.current.scrollTop = targetScroll;
-    if (lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = targetScroll;
-    }
-  }, [fileMatches, fileContent]);
-
-  useEffect(() => {
-    if (fileMatches.length > 0) {
-      scrollToFileMatch(0);
-    } else {
-      setFileSearchMatchIdx(0);
-    }
-  }, [fileSearchQuery]);
-
-  const updateFileCursorPos = useCallback(() => {
-    if (!fileEditorRef.current) return;
-    const { selectionStart } = fileEditorRef.current;
-    const textBefore = fileContent.substring(0, selectionStart);
-    const lines = textBefore.split('\n');
-    setFileCursorPos({
-      line: lines.length,
-      col: lines[lines.length - 1].length + 1,
-    });
-  }, [fileContent]);
-
-  useEffect(() => {
-    if (!openedFile) return;
-    const handleFileEditorKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        setFileSearchOpen(true);
-        setTimeout(() => fileSearchInputRef.current?.focus(), 50);
-      }
-    };
-    window.addEventListener('keydown', handleFileEditorKeyDown);
-    return () => window.removeEventListener('keydown', handleFileEditorKeyDown);
-  }, [openedFile]);
-
-  const fileValidation = useMemo(() => {
-    if (!openedFile) return { valid: true };
-    return validateConfigSyntax(openedFile.name, fileContent);
-  }, [openedFile, fileContent]);
-
-  useEffect(() => {
-    if (!openedFile || isFileLoading) return;
-    const frame = requestAnimationFrame(() => {
-      fileEditorRef.current?.scrollTo({ top: 0, left: 0 });
-      fileDiffScrollRef.current?.scrollTo({ top: 0, left: 0 });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [isFileLoading, openedFile?.path]);
 
   // ── SSH File Transfer & Drag-Drop State ──
   const [transferDialog, setTransferDialog] = useState<{
@@ -720,7 +584,6 @@ export function TerminalPanel({
     // default copy/select context menu so users can still copy text from
     // tables, JSON panels, and the like.
     if (activeMainView !== 'terminal') return;
-    if (openedFile) return;
     if (!visibleSessionIdRef.current) return;
     // Only treat the click as a terminal-context invocation if the right
     // click landed on a session we actually own. Without this guard a
@@ -734,6 +597,25 @@ export function TerminalPanel({
       y: e.clientY,
       sessionId,
       workingDir: activeSess?.workingDir ?? null,
+      source: 'main',
+    });
+  };
+
+  const handleMiniContextMenu = (
+    e: React.MouseEvent,
+    sessionId: string | null,
+    panel: 'right' | 'bottom',
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const targetSess = sessionId ? sessions.find((s) => s.id === sessionId) : null;
+    setContextMenu?.({
+      x: e.clientX,
+      y: e.clientY,
+      sessionId,
+      workingDir: targetSess?.workingDir ?? null,
+      source: 'mini',
+      panel,
     });
   };
 
@@ -839,7 +721,11 @@ export function TerminalPanel({
       setSelectedMiniSessionIds([]);
     };
     window.addEventListener(NEW_TERMINAL_EVENT, resetGroupForNewTerminal);
-    return () => window.removeEventListener(NEW_TERMINAL_EVENT, resetGroupForNewTerminal);
+    window.addEventListener(CYCLE_TERMINAL_EVENT, resetGroupForNewTerminal);
+    return () => {
+      window.removeEventListener(NEW_TERMINAL_EVENT, resetGroupForNewTerminal);
+      window.removeEventListener(CYCLE_TERMINAL_EVENT, resetGroupForNewTerminal);
+    };
   }, []);
 
   useEffect(() => {
@@ -848,12 +734,12 @@ export function TerminalPanel({
       setSelectedMiniSessionIds([]);
       return;
     }
-    if (activeMainView === 'terminal' && !openedFile && visibleSessionId && next.includes(visibleSessionId) && activeSessionId !== visibleSessionId) {
+    if (activeMainView === 'terminal' && visibleSessionId && next.includes(visibleSessionId) && activeSessionId !== visibleSessionId) {
       // Keep parent navigation on the same surviving group member as the canvas.
       onSelectSession(visibleSessionId);
     }
     if (next.length !== selectedMiniSessionIds.length) setSelectedMiniSessionIds(next);
-  }, [runningSessionIds, visibleSessionId, activeSessionId, selectedMiniSessionIds, onSelectSession, activeMainView, openedFile]);
+  }, [runningSessionIds, visibleSessionId, activeSessionId, selectedMiniSessionIds, onSelectSession, activeMainView]);
 
   const selectMiniSession = (sessionId: string, additive: boolean) => {
     if (additive && !runningSessionIds.has(sessionId)) return;
@@ -873,7 +759,7 @@ export function TerminalPanel({
   }, [searchVisible]);
   // Search belongs to the visible terminal; clear the prior session's marks.
   useEffect(() => {
-    if (activeMainView !== 'terminal' || openedFile !== null || !visibleSessionId) {
+    if (activeMainView !== 'terminal' || !visibleSessionId) {
       closeSearch();
       return;
     }
@@ -889,7 +775,7 @@ export function TerminalPanel({
         handle.searchQuery = '';
       }
     };
-  }, [visibleSessionId, activeMainView, openedFile, closeSearch, doSearch, focusSearchInput]);
+  }, [visibleSessionId, activeMainView, closeSearch, doSearch, focusSearchInput]);
 
   // ── @ Mention Refs Sync ──
   useEffect(() => {
@@ -1249,8 +1135,7 @@ export function TerminalPanel({
         searchVisibleRef.current ||
         rgActiveRef.current ||
         mentionActiveRef.current ||
-        activeMainView !== 'terminal' ||
-        openedFile !== null
+        activeMainView !== 'terminal'
       ) {
         return;
       }
@@ -1277,7 +1162,7 @@ export function TerminalPanel({
     // reliable on Windows layouts where Ctrl+Alt is reported as AltGraph.
     window.addEventListener('keydown', handleTerminalCommandShortcut, true);
     return () => window.removeEventListener('keydown', handleTerminalCommandShortcut, true);
-  }, [activeMainView, openedFile, openTerminalCommandPopup]);
+  }, [activeMainView, openTerminalCommandPopup]);
 
   useEffect(() => {
     const onSearchKey = (event: KeyboardEvent) => {
@@ -1286,9 +1171,15 @@ export function TerminalPanel({
       const target = document.activeElement;
       const inTerminal = !!container && target instanceof Node && container.contains(target);
       const inSearch = target instanceof Node && !!searchContainerRef.current?.contains(target);
+      const inSideOrModalPanel =
+        (target instanceof HTMLElement &&
+          !!target.closest('[data-file-editor-panel], [data-notepad-pinned], [data-terminal-shortcut-dialogs]')) ||
+        !!document.querySelector(
+          '[data-terminal-shortcut-dialogs]:not(.hidden) [data-file-editor-panel], [data-terminal-shortcut-dialogs]:not(.hidden) [data-notepad-pinned="false"]',
+        );
       const editable = target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
       handleTerminalSearchKey(event, {
-        enabled: activeMainView === 'terminal' && openedFile === null && !!sessionId && !!container,
+        enabled: activeMainView === 'terminal' && !inSideOrModalPanel && !!sessionId && !!container,
         editableElsewhere: editable && !inTerminal && !inSearch,
         inSearchInput: target === searchInputRef.current,
         searchVisible: searchVisibleRef.current,
@@ -1301,7 +1192,7 @@ export function TerminalPanel({
     };
     window.addEventListener('keydown', onSearchKey, true);
     return () => window.removeEventListener('keydown', onSearchKey, true);
-  }, [activeMainView, openedFile, openSearch, closeSearch, doSearch]);
+  }, [activeMainView, openSearch, closeSearch, doSearch]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -1332,7 +1223,6 @@ export function TerminalPanel({
     if (
       terminalCommandPopup &&
       (activeMainView !== 'terminal' ||
-        openedFile !== null ||
         terminalCommandPopup.sessionId !== visibleSessionId)
     ) {
       closeTerminalCommandPopup();
@@ -1340,7 +1230,6 @@ export function TerminalPanel({
   }, [
     activeMainView,
     closeTerminalCommandPopup,
-    openedFile,
     terminalCommandPopup,
     visibleSessionId,
   ]);
@@ -1674,20 +1563,19 @@ export function TerminalPanel({
         theme: getTerminalTheme(),
       });
       if (navigator.userAgent.includes('Windows')) term.loadAddon(new ConptyResizeAddon());
+      term.loadAddon(new TerminalMouseZoomAddon());
 
       term.attachCustomKeyEventHandler((event) => {
-        // ── Ctrl+=, Ctrl+-, Ctrl+0 (zoom shortcuts) ──
+        // ── Ctrl+=, Ctrl+-, Ctrl+0, Ctrl+N (let Dashboard's global handlers own these without PTY input) ──
         if ((event.ctrlKey || event.metaKey) && !event.altKey) {
-          if (event.key === '=' || event.key === '+') {
-            if (event.type === 'keydown') zoomIn();
-            return false;
-          }
-          if (event.key === '-' || event.key === '_') {
-            if (event.type === 'keydown') zoomOut();
-            return false;
-          }
-          if (event.key === '0') {
-            if (event.type === 'keydown') resetZoom();
+          if (
+            event.key === '=' ||
+            event.key === '+' ||
+            event.key === '-' ||
+            event.key === '_' ||
+            event.key === '0' ||
+            (!event.shiftKey && event.key.toLowerCase() === 'n')
+          ) {
             return false;
           }
         }
@@ -2278,10 +2166,9 @@ export function TerminalPanel({
     };
   }, [isActiveSessionSSH]);
 
-  // Re-fit terminal when file overlay is closed or main view switches back to terminal,
+  // Re-fit terminal when main view switches back to terminal,
   // so xterm recalculates its dimensions after its container becomes visible again.
   useEffect(() => {
-    if (openedFile !== null) return; // file is open, terminals are hidden
     if (activeMainView !== 'terminal') return; // a different panel is showing, terminal hidden
     if (!visibleSessionId) return;
 
@@ -2292,7 +2179,7 @@ export function TerminalPanel({
         delete fitTimers.current[visibleSessionId];
       }
     };
-  }, [activeMainView, openedFile, visibleSessionId, fitTerminal]);
+  }, [activeMainView, visibleSessionId, fitTerminal]);
   const fitTerminalRef = useRef(fitTerminal);
   useEffect(() => {
     fitTerminalRef.current = fitTerminal;
@@ -2381,11 +2268,17 @@ export function TerminalPanel({
     const handleAppearanceChange = () => {
       if (visibleSessionIdRef.current) fitTerminal(visibleSessionIdRef.current);
     };
+    const handleMiniConfigChange = () => {
+      setMiniTerminalDisplayMode(getMiniTerminalDisplayMode());
+      setMiniTerminalScale(getMiniTerminalScale());
+    };
     window.addEventListener('clx-terminal-font-changed', handleFontChange);
     window.addEventListener('clx-appearance-changed', handleAppearanceChange);
+    window.addEventListener('clx-mini-terminal-config-changed', handleMiniConfigChange);
     return () => {
       window.removeEventListener('clx-terminal-font-changed', handleFontChange);
       window.removeEventListener('clx-appearance-changed', handleAppearanceChange);
+      window.removeEventListener('clx-mini-terminal-config-changed', handleMiniConfigChange);
     };
   }, [fitTerminal]);
 
@@ -2401,10 +2294,7 @@ export function TerminalPanel({
   const activeSession = sessions.find((s) => s.id === visibleSessionId);
   const activeSessionUsesNestedTui = isNestedTuiCli(activeSession);
 
-  const [miniTerminalScale, setMiniTerminalScale] = useState<number>(() => {
-    const saved = localStorage.getItem('clx-mini-terminal-scale');
-    return saved ? parseFloat(saved) : 1.0;
-  });
+  const [miniTerminalScale, setMiniTerminalScale] = useState<number>(getMiniTerminalScale);
 
   // Dynamic height and scale calculation to ensure up to 10 sessions fit on a single screen without scrolling!
   const thumbSizes = useMemo(() => {
@@ -2420,9 +2310,6 @@ export function TerminalPanel({
     };
   }, [miniTerminalScale]);
 
-  const fileDirty = openedFile !== null && fileContent !== fileOriginalContent;
-  const relPath = openedFileRootPath && openedFile ? getRelativePath(openedFile.path, openedFileRootPath) : '';
-  const fileHasChanges = gitStatusList.some((g) => g.path === relPath);
   const canInsertTerminalCommand = (() => {
     if (!terminalCommandPopup?.suggestion) return false;
     const handle = terminalRefs.current[terminalCommandPopup.sessionId];
@@ -2434,9 +2321,6 @@ export function TerminalPanel({
 
   return (
     <section className="flex h-full w-full rounded-xl border border-cyber-line bg-cyber-panel/70 overflow-hidden relative">
-      {sessions.length === 0 && !openedFile && activeMainView === 'terminal' ? (
-        <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">{tr("No interactive sessions. Create one from the sidebar.")}</div>
-      ) : (
         <div className="flex h-full w-full overflow-hidden select-none">
           {/* Main active terminal center panel */}
           <div 
@@ -2488,7 +2372,7 @@ export function TerminalPanel({
               }}
             >
               {/* ── Terminal Search Overlay ── */}
-              {searchVisible && !openedFile && activeMainView === 'terminal' && visibleSessionId && (
+              {searchVisible && activeMainView === 'terminal' && visibleSessionId && (
                 <div ref={searchContainerRef} data-terminal-search className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyber-accent/60 bg-[#0a0f1f]/95 shadow-2xl shadow-cyber-accent/20 backdrop-blur-sm select-none" style={{ minWidth: '320px' }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 text-cyber-muted shrink-0">
                     <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -2543,7 +2427,7 @@ export function TerminalPanel({
                 </div>
               )}
 
-              {terminalCommandPopup && !openedFile && activeMainView === 'terminal' && (
+              {terminalCommandPopup && activeMainView === 'terminal' && (
                 <TerminalCommandPopup
                   phase={terminalCommandPopup.phase}
                   position={terminalCommandPopup.position}
@@ -2774,17 +2658,19 @@ export function TerminalPanel({
 
               {/* Active terminal canvas viewport — terminals always mounted, sub-views overlay */}
               <div className="flex-1 w-full h-full min-h-0 relative">
+                {sessions.length === 0 && activeMainView === 'terminal' && <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">{tr("No interactive sessions. Create one from the sidebar.")}</div>}
                 {/* Terminals: always in DOM, hidden by visibility */}
                 {sessions.map((session) => (
                   <div
                     key={`main-${session.id}`}
+                    data-terminal-main-session={session.id}
                     style={{
                       position: 'absolute',
-                      left: (!openedFile && activeMainView === 'terminal' && visibleSessionId === session.id) ? 0 : '-9999px',
+                      left: (activeMainView === 'terminal' && visibleSessionId === session.id) ? 0 : '-9999px',
                       top: 0,
                       width: '100%',
                       height: '100%',
-                      visibility: (!openedFile && activeMainView === 'terminal' && visibleSessionId === session.id) ? 'visible' : 'hidden',
+                      visibility: (activeMainView === 'terminal' && visibleSessionId === session.id) ? 'visible' : 'hidden',
                     }}
                   >
                     <div
@@ -2801,6 +2687,9 @@ export function TerminalPanel({
                   </div>
                 ))}
                 {/* Sub-view overlays */}
+                <div className={`absolute inset-0 z-[5] ${activeMainView === 'web' ? 'block' : 'hidden'}`}>
+                  <WebBrowserPanel isVisible={activeMainView === 'web' && uiActive && !nativeBrowserSuspended} controllerRef={webBrowserController} onTabsChange={setWebMiniTabs} miniPreferences={webMiniPreferences} onMiniPreferencesChange={setWebMiniPreferences} />
+                </div>
                 {activeMainView === 'quickapps' && <QuickAppsPanel />}
                 <div
                   className={`absolute inset-0 z-[4] ${
@@ -2841,7 +2730,7 @@ export function TerminalPanel({
                 )}
 
                 {/* Remote server monitoring widget — bottom right, only for SSH sessions */}
-                {activeMainView === 'terminal' && !openedFile && (
+                {activeMainView === 'terminal' && (
                   <RemoteMonitorWidget
                     connection={getActiveSSHConnection()}
                     visible={isActiveSessionSSH()}
@@ -2859,407 +2748,10 @@ export function TerminalPanel({
                     onClose={() => setTransferDialog(null)}
                   />
                 )}
-
-                {/* File viewer overlay — rendered on top of terminals when a file is open */}
-                {openedFile && (
-                  <div className="absolute inset-0 flex flex-col overflow-hidden bg-[#0a0f1f] z-10">
-                    {/* Editor toolbar */}
-                    <div className="flex shrink-0 items-center justify-between gap-1 border-b border-cyber-line bg-cyber-base/50 px-4 py-2.5">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <FileIcon />
-                        <span
-                          className="truncate font-mono text-xs text-slate-200 font-semibold"
-                          title={openedFile.path}
-                        >
-                          {openedFile.name}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-mono truncate max-w-[200px] ml-1">
-                          ({openedFile.path})
-                        </span>
-                        {fileDirty && (
-                          <span className="ml-1 h-2 w-2 shrink-0 rounded-full bg-cyber-warn animate-pulse shadow-neon-sm" title={tr("Unsaved changes")} />
-                        )}
-
-                        {/* Syntax Validation Status Badge */}
-                        {isConfigFile(openedFile.name) && (
-                          fileValidation.valid ? (
-                            <span className="ml-2 rounded bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/30 font-mono">{tr("✓ Valid Syntax")}</span>
-                          ) : (
-                            <span className="ml-2 rounded bg-rose-500/15 px-2 py-0.5 text-[9px] font-bold text-rose-400 border border-rose-500/40 font-mono truncate max-w-[250px]" title={fileValidation.error}>
-                              ⚠️ {fileValidation.error}
-                            </span>
-                          )
-                        )}
-
-                        {/* Diff / Edit Mode Toggle */}
-                        {fileHasChanges && (
-                          <div className="flex bg-cyber-base/80 border border-cyber-line p-0.5 rounded ml-3 select-none">
-                            <button
-                              type="button"
-                              onClick={() => setViewMode('diff')}
-                              className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded transition-colors ${
-                                viewMode === 'diff'
-                                  ? 'bg-cyber-neon/15 text-cyber-neon shadow-neon-sm'
-                                  : 'text-slate-400 hover:text-slate-200'
-                              }`}
-                            >{tr("Diff")}</button>
-                            <button
-                              type="button"
-                              onClick={() => setViewMode('edit')}
-                              className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded transition-colors ${
-                                viewMode === 'edit'
-                                  ? 'bg-cyber-electric/15 text-cyber-electric shadow-neon-blue-sm'
-                                  : 'text-slate-400 hover:text-slate-200'
-                              }`}
-                            >{tr("Edit")}</button>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex shrink-0 items-center gap-2">
-                        {/* Search toggle button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFileSearchOpen((prev) => !prev);
-                            if (!fileSearchOpen) {
-                              setTimeout(() => fileSearchInputRef.current?.focus(), 50);
-                            }
-                          }}
-                          title={tr("Search in file (Ctrl+F)")}
-                          className={`rounded border px-2 py-1 text-[10px] font-bold uppercase transition font-mono flex items-center gap-1 ${
-                            fileSearchOpen
-                              ? 'border-cyber-electric bg-cyber-electric/15 text-cyber-electric shadow-neon-blue-sm'
-                              : 'border-cyber-line text-slate-400 hover:border-cyber-electric/50 hover:text-slate-200'
-                          }`}
-                        >
-                          <span>🔍</span>
-                          <span>{tr("Find")}</span>
-                        </button>
-
-                        {/* Word wrap toggle button */}
-                        {viewMode === 'edit' && (
-                          <button
-                            type="button"
-                            onClick={() => setFileWordWrap((prev) => !prev)}
-                            title={tr("Toggle word wrapping")}
-                            className={`rounded border px-2 py-1 text-[10px] font-bold uppercase transition font-mono ${
-                              fileWordWrap
-                                ? 'border-cyber-neon/40 bg-cyber-neon/15 text-cyber-neon'
-                                : 'border-cyber-line text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            {fileWordWrap ? tr("↩ Wrap: On") : tr("➡ Wrap: Off")}
-                          </button>
-                        )}
-
-                        {/* Format / Prettify button */}
-                        {viewMode === 'edit' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const res = formatConfigContent(openedFile.name, fileContent);
-                              if (res.error) {
-                                void showMessage(trFeedback(res.error));
-                              } else if (res.changed) {
-                                setFileContent(res.formatted);
-                                setFileFormatToast(tr("Formatted"));
-                                setTimeout(() => setFileFormatToast(null), 2000);
-                              } else {
-                                setFileFormatToast(tr("Clean"));
-                                setTimeout(() => setFileFormatToast(null), 1500);
-                              }
-                            }}
-                            title={tr("Format & clean indentation")}
-                            className="rounded border border-cyber-electric/50 px-2 py-1 text-[10px] font-bold uppercase text-cyber-electric transition hover:bg-cyber-electric/10 font-mono flex items-center gap-1"
-                          >
-                            <span>⚡</span>
-                            <span>{tr("Format")}</span>
-                            {fileFormatToast && (
-                              <span className="text-[9px] text-emerald-400 font-semibold lowercase">({fileFormatToast})</span>
-                            )}
-                          </button>
-                        )}
-                        {viewMode === 'edit' && fileDirty && (
-                          <button
-                            type="button"
-                            onClick={() => setFileContent(fileOriginalContent)}
-                            title={tr("Revert changes")}
-                            className="rounded border border-cyber-warn/50 px-2 py-1 text-[10px] font-bold uppercase text-cyber-warn transition hover:bg-cyber-warn/10 font-mono"
-                          >{tr("Revert")}</button>
-                        )}
-                        {viewMode === 'edit' && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={onSaveFile}
-                              disabled={!fileDirty || isSavingFile}
-                              title={tr("Save file (Ctrl+S)")}
-                              className="rounded border border-cyber-neon/50 px-2.5 py-1 text-[10px] font-bold uppercase text-cyber-neon transition hover:bg-cyber-neon/10 disabled:opacity-30 disabled:cursor-not-allowed shadow-neon-sm-faint font-mono"
-                            >
-                              {isSavingFile ? tr("Saving…") : tr("Save")}
-                            </button>
-
-                            {/* Save & Restart Session button */}
-                            {activeSessionId && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await onSaveFile();
-                                  onSendInput(activeSessionId, '\x03');
-                                }}
-                                disabled={isSavingFile}
-                                title={tr("Save file and send restart signal (Ctrl+C) to active CLI session")}
-                                className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[10px] font-bold uppercase text-amber-400 transition hover:bg-amber-500/20 disabled:opacity-30 font-mono"
-                              >{tr("Save & Restart")}</button>
-                            )}
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          onClick={onCloseFile}
-                          title={tr("Close file")}
-                          className="flex h-6 w-6 items-center justify-center rounded border border-cyber-line bg-cyber-base/40 text-slate-400 hover:text-white transition text-xs font-bold"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* File Search Bar Row (Collapsible) */}
-                    {fileSearchOpen && (
-                      <div className="flex shrink-0 items-center justify-between border-b border-cyber-line/50 bg-[#080d1a] px-4 py-1.5 z-20">
-                        <div className="flex items-center gap-2 flex-1 max-w-lg">
-                          <span className="text-slate-400 text-xs">🔍</span>
-                          <div className="relative flex-1">
-                            <input
-                              ref={fileSearchInputRef}
-                              type="text"
-                              value={fileSearchQuery}
-                              onChange={(e) => setFileSearchQuery(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  scrollToFileMatch(e.shiftKey ? fileSearchMatchIdx - 1 : fileSearchMatchIdx + 1);
-                                }
-                                if (e.key === 'Escape') {
-                                  e.preventDefault();
-                                  setFileSearchOpen(false);
-                                  fileEditorRef.current?.focus();
-                                }
-                              }}
-                              placeholder={tr("Find in file... (Enter = next, Shift+Enter = prev, Esc = close)")}
-                              className="w-full rounded border border-cyber-line bg-cyber-base pl-2.5 pr-7 py-0.5 text-xs text-slate-100 placeholder-slate-500 font-mono outline-none focus:border-cyber-electric transition"
-                            />
-                            {fileSearchQuery && (
-                              <button
-                                type="button"
-                                onClick={() => setFileSearchQuery('')}
-                                className="absolute inset-y-0 right-0 flex items-center pr-2 text-slate-400 hover:text-white text-xs"
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </div>
-
-                          <span className="font-mono text-xs text-slate-400 shrink-0 min-w-[60px] text-center">
-                            {fileSearchQuery.trim()
-                              ? fileMatches.length > 0
-                                ? `${fileSearchMatchIdx + 1} / ${fileMatches.length}`
-                                : tr("No matches")
-                              : ''}
-                          </span>
-
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              disabled={fileMatches.length === 0}
-                              onClick={() => scrollToFileMatch(fileSearchMatchIdx - 1)}
-                              title={tr("Previous match (Shift+Enter)")}
-                              className="rounded border border-cyber-line bg-cyber-base/40 px-1.5 py-0.5 text-xs text-slate-300 hover:bg-cyber-base disabled:opacity-30 transition"
-                            >
-                              ▲
-                            </button>
-                            <button
-                              type="button"
-                              disabled={fileMatches.length === 0}
-                              onClick={() => scrollToFileMatch(fileSearchMatchIdx + 1)}
-                              title={tr("Next match (Enter)")}
-                              className="rounded border border-cyber-line bg-cyber-base/40 px-1.5 py-0.5 text-xs text-slate-300 hover:bg-cyber-base disabled:opacity-30 transition"
-                            >
-                              ▼
-                            </button>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFileSearchOpen(false);
-                            setFileSearchQuery('');
-                          }}
-                          className="text-slate-400 hover:text-slate-200 text-xs px-2 py-0.5 font-mono"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Editor body */}
-                    <div className="relative min-h-0 flex-1 overflow-hidden">
-                      {isFileLoading ? (
-                        <div className="flex h-full items-center justify-center text-xs text-slate-500 italic">{tr("Loading file content…")}</div>
-                      ) : fileLoadError ? (
-                        <div className="p-6 text-xs text-cyber-warn leading-relaxed">
-                          <p className="font-semibold mb-2 text-sm">{tr("Cannot display this file")}</p>
-                          <p className="text-slate-400 break-words font-mono bg-black/30 p-3 rounded border border-cyber-line/20">{trFeedback(fileLoadError ?? '')}</p>
-                        </div>
-                      ) : viewMode === 'diff' ? (
-                        isDiffLoading ? (
-                          <div className="flex h-full items-center justify-center text-xs text-slate-500 italic">{tr("Loading diff…")}</div>
-                        ) : (
-                          <div
-                            key={`diff-${openedFile.path}`}
-                            ref={fileDiffScrollRef}
-                            className="h-full min-h-0 w-full overflow-auto bg-cyber-base/80 p-4 pb-10 font-mono text-xs leading-relaxed text-slate-300 scrollbar-thin select-text"
-                          >
-                            {gitDiffContent ? (
-                              gitDiffContent.split('\n').map((line, idx) => {
-                                let lineClass = 'text-slate-400 pl-2';
-                                if (line.startsWith('+') && !line.startsWith('+++')) {
-                                  lineClass = 'bg-emerald-950/20 text-emerald-400 border-l-2 border-emerald-500 pl-2 font-semibold py-0.5';
-                                } else if (line.startsWith('-') && !line.startsWith('---')) {
-                                  lineClass = 'bg-rose-950/20 text-rose-400 border-l-2 border-rose-500 pl-2 font-semibold py-0.5';
-                                } else if (line.startsWith('@@')) {
-                                  lineClass = 'bg-indigo-950/20 text-indigo-400 italic pl-2 py-0.5';
-                                } else if (line.startsWith('diff') || line.startsWith('index') || line.startsWith('---') || line.startsWith('+++')) {
-                                  lineClass = 'text-slate-500 font-semibold pl-2 py-0.5';
-                                }
-                                return (
-                                  <div key={idx} className={`${lineClass} whitespace-pre-wrap min-h-[20px]`}>
-                                    {line}
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <div className="text-slate-500 italic p-2">{tr("No differences found.")}</div>
-                            )}
-                          </div>
-                        )
-                      ) : (
-                        <div className="flex h-full w-full min-h-0 overflow-hidden bg-cyber-base/80 font-mono text-[13px] leading-relaxed">
-                          {/* Line numbers column */}
-                          <div
-                            ref={lineNumbersRef}
-                            className="shrink-0 select-none overflow-hidden bg-black/40 px-2.5 py-4 text-right text-[11px] font-mono text-slate-600 border-r border-cyber-line/20"
-                            style={{ minWidth: '40px' }}
-                          >
-                            {fileContent.split('\n').map((_, idx) => (
-                              <div key={idx} className="h-[19.5px]">
-                                {idx + 1}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Textarea */}
-                          <textarea
-                            key={`editor-${openedFile.path}`}
-                            ref={fileEditorRef}
-                            value={fileContent}
-                            onChange={(e) => setFileContent(e.target.value)}
-                            onClick={updateFileCursorPos}
-                            onKeyUp={updateFileCursorPos}
-                            onSelect={updateFileCursorPos}
-                            wrap={fileWordWrap ? 'soft' : 'off'}
-                            onScroll={(e) => {
-                              if (lineNumbersRef.current) {
-                                lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
-                              }
-                            }}
-                            onKeyDown={(e) => {
-                              // Ctrl+S to save
-                              if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                                e.preventDefault();
-                                void onSaveFile();
-                                return;
-                              }
-                              // Ctrl+F to find in file
-                              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-                                e.preventDefault();
-                                setFileSearchOpen(true);
-                                setTimeout(() => fileSearchInputRef.current?.focus(), 50);
-                                return;
-                              }
-                              // Tab insert / Shift+Tab outdent
-                              if (e.key === 'Tab') {
-                                e.preventDefault();
-                                const { selectionStart, selectionEnd } = e.currentTarget;
-                                if (e.shiftKey) {
-                                  // Outdent up to 2 leading spaces
-                                  const textBefore = fileContent.substring(0, selectionStart);
-                                  const lineStart = textBefore.lastIndexOf('\n') + 1;
-                                  const linePrefix = fileContent.substring(lineStart, lineStart + 2);
-                                  const spacesToRemove = linePrefix.startsWith('  ') ? 2 : linePrefix.startsWith(' ') ? 1 : 0;
-                                  if (spacesToRemove > 0) {
-                                    const newVal = fileContent.substring(0, lineStart) + fileContent.substring(lineStart + spacesToRemove);
-                                    setFileContent(newVal);
-                                    requestAnimationFrame(() => {
-                                      e.currentTarget.selectionStart = Math.max(lineStart, selectionStart - spacesToRemove);
-                                      e.currentTarget.selectionEnd = Math.max(lineStart, selectionEnd - spacesToRemove);
-                                      updateFileCursorPos();
-                                    });
-                                  }
-                                } else {
-                                  // Indent 2 spaces
-                                  const newVal =
-                                    fileContent.substring(0, selectionStart) +
-                                    '  ' +
-                                    fileContent.substring(selectionEnd);
-                                  setFileContent(newVal);
-                                  requestAnimationFrame(() => {
-                                    e.currentTarget.selectionStart = selectionStart + 2;
-                                    e.currentTarget.selectionEnd = selectionStart + 2;
-                                    updateFileCursorPos();
-                                  });
-                                }
-                              }
-                            }}
-                            spellCheck={false}
-                            className={`h-full min-h-0 flex-1 resize-none bg-transparent p-4 pb-10 font-mono text-[13px] leading-[19.5px] text-slate-200 outline-none placeholder-slate-600 scrollbar-thin selection:bg-cyber-neon/30 ${
-                              fileWordWrap ? 'whitespace-pre-wrap overflow-y-auto' : 'whitespace-pre overflow-auto'
-                            }`}
-                            style={{ caretColor: 'var(--color-cyber-neon, #39ff14)' }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* File Editor Status Bar Footer */}
-                    <div className="flex shrink-0 items-center justify-between border-t border-cyber-line/30 bg-[#060a15] px-4 py-1 text-[10px] font-mono text-slate-500 select-none">
-                      <div className="flex items-center gap-3">
-                        <span className="text-slate-400">Ln {fileCursorPos.line}, Col {fileCursorPos.col}</span>
-                        <span>·</span>
-                        <span>{fileContent.split('\n').length} {tr("lines")}</span>
-                        <span>·</span>
-                        <span>{fileContent.length} {tr("chars")}</span>
-                        {fileMatches.length > 0 && fileSearchQuery.trim() && (
-                          <span className="text-cyber-electric font-semibold">
-                            · {fileMatches.length} {tr("matches")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <span>{openedFile.name.split('.').pop()?.toUpperCase() || 'TXT'}</span>
-                        <span>·</span>
-                        <span>UTF-8</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
-            {multiSelectActive && activeMainView === 'terminal' && !openedFile && (
+            {multiSelectActive && activeMainView === 'terminal' && (
               <div
                 data-terminal-broadcast
                 className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-cyber-electric/40 bg-[#0a0f1f] px-3 py-2 text-xs"
@@ -3269,6 +2761,19 @@ export function TerminalPanel({
                 <button type="button" data-terminal-broadcast-clear onClick={() => { selectedMiniIdsRef.current = []; setSelectedMiniSessionIds([]); }} className="ml-auto text-[10px] text-slate-400 hover:text-white">{tr("Clear selection")}</button>
               </div>
             )}
+
+            {activeMainView === 'terminal' && <TerminalGraph
+              sessions={sessions.filter(s => s.status === 'running')}
+              links={terminalLinks}
+              activeId={visibleSessionId}
+              titleFor={session => getMiniTerminalTitle(session, sessionTitles[session.id], agentSessionTitles[session.id])}
+              onSelect={(id, additive) => {
+                selectMiniSession(id, additive);
+                if (!additive) window.dispatchEvent(new CustomEvent('focus-active-terminal', { detail: { sessionId: id } }));
+              }}
+              onLink={onLinkTerminal}
+              onContextMenu={(event, session) => handleMiniContextMenu(event, session.id, session.panel ?? 'right')}
+            />}
 
             {/* Bottom: SSH Consoles Tray */}
             {(sshSessions.length > 0 || !!activeDragId) && (
@@ -3283,41 +2788,10 @@ export function TerminalPanel({
                   }
                 }}
                 data-mini-terminal-panel="bottom"
-                style={{ height: miniTerminalTitleOnly ? '96px' : sshSessions.length === 0 ? `${Math.round(110 * miniTerminalScale)}px` : `${thumbSizes.cardHeight + 60}px` }}
-                className="shrink-0 border-t border-cyber-line/50 bg-[#070b16] p-3 flex flex-col gap-2 overflow-hidden select-none transition-all duration-300"
+                onContextMenu={(e) => handleMiniContextMenu(e, null, 'bottom')}
+                style={{ height: miniTerminalTitleOnly ? '56px' : sshSessions.length === 0 ? `${Math.round(76 * miniTerminalScale)}px` : `${thumbSizes.cardHeight + 28}px` }}
+                className="shrink-0 border-t border-cyber-line/50 bg-[#070b16] px-3 py-2 flex flex-col overflow-hidden select-none transition-all duration-300"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-display text-[9px] uppercase tracking-[0.15em] text-cyber-electric font-bold">{tr("⚡ CMD (")}{sshSessions.length})
-                    </h3>
-                    <MiniTerminalDisplayControl mode={miniTerminalDisplayMode} onChange={setMiniTerminalDisplayMode} />
-                    <span className="hidden lg:inline text-[9px] text-slate-500">{tr("Ctrl+click to select multiple terminals")}</span>
-                    {!miniTerminalTitleOnly && (
-                    <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-0.5 scale-90 select-none">
-                      <span className="text-[7px] font-mono text-cyber-electric/70 font-semibold tabular-nums min-w-[22px] text-right">{Math.round(miniTerminalScale * 100)}%</span>
-                      <input
-                        type="range"
-                        min="50" max="200" step="5"
-                        value={Math.round(miniTerminalScale * 100)}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value) / 100;
-                          setMiniTerminalScale(v);
-                          localStorage.setItem('clx-mini-terminal-scale', v.toFixed(1));
-                        }}
-                        className="w-14 h-1 accent-cyber-electric cursor-pointer"
-                        title={tr("Mini terminal scale")}
-                      />
-                    </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onQuickSession?.('bottom')}
-                    title={tr("New Terminal (dock to bottom)")}
-                    className="flex items-center gap-0.5 rounded border border-cyber-electric/50 bg-cyber-electric/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-cyber-electric transition hover:bg-cyber-electric/25 hover:border-cyber-electric shadow-neon-blue-sm-faint"
-                  >{tr("+ New")}</button>
-                </div>
-                
                 {sshSessions.length === 0 ? (
                   <div className="flex-1 border-2 border-dashed border-cyber-electric/30 hover:border-cyber-electric/70 rounded-lg flex items-center justify-center text-[10px] text-cyber-electric/80 font-mono italic p-3 animate-pulse transition-colors">{tr("⚡ Drag here to dock CMD sessions at the bottom")}</div>
                 ) : (
@@ -3348,7 +2822,7 @@ export function TerminalPanel({
                             }
                           }}
                           onClick={(event) => selectMiniSession(session.id, event.ctrlKey || event.metaKey)}
-                          onContextMenu={(e) => handleContextMenu(e, session.id)}
+                          onContextMenu={(e) => handleMiniContextMenu(e, session.id, 'bottom')}
                           onMouseDown={(e) => {
                             if (e.button !== 0 || e.ctrlKey || e.metaKey || (e.target as HTMLElement).closest('button')) return;
                             setActiveDragId(session.id);
@@ -3457,6 +2931,7 @@ export function TerminalPanel({
                 )}
               </div>
             )}
+            {miniWebBottom}
           </div>
 
           {/* Right live scaled session thumbnails panel */}
@@ -3476,6 +2951,7 @@ export function TerminalPanel({
               )}
               <div 
                 data-mini-terminal-panel="right"
+                onContextMenu={(e) => handleMiniContextMenu(e, null, 'right')}
                 style={{ width: rightPanelVisible ? (miniTerminalTitleOnly ? '252px' : `${thumbSizes.containerWidth}px`) : '0px' }}
                 onMouseEnter={() => {
                   if (activeDragId) {
@@ -3486,49 +2962,20 @@ export function TerminalPanel({
                     }
                   }
                 }}
-                className={`h-full border-cyber-line bg-cyber-base/40 flex flex-col gap-2 shrink-0 select-none overflow-hidden transition-all duration-300 ease-in-out ${
-                  rightPanelVisible ? 'border-l p-3.5 opacity-100' : 'border-l-0 p-0 opacity-0'
+                className={`h-full border-cyber-line bg-cyber-base/40 flex flex-col gap-1.5 shrink-0 select-none overflow-hidden transition-all duration-300 ease-in-out ${
+                  rightPanelVisible ? 'border-l px-3 py-2 opacity-100' : 'border-l-0 p-0 opacity-0'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <h3 className="font-display text-[8px] uppercase tracking-[0.15em] text-slate-500 font-bold truncate">{tr("AI AGENT (")}{cliSessions.length})
-                    </h3>
-                  {!miniTerminalTitleOnly && (
-                  <div className="flex items-center gap-1 bg-black/45 border border-cyber-line/55 rounded px-1.5 py-1 select-none shrink-0">
-                    <span className="text-[7px] font-mono text-cyber-electric/70 font-semibold tabular-nums min-w-[22px] text-right">{Math.round(miniTerminalScale * 100)}%</span>
-                    <input
-                      type="range"
-                      min="50" max="200" step="5"
-                      value={Math.round(miniTerminalScale * 100)}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value) / 100;
-                        setMiniTerminalScale(v);
-                        localStorage.setItem('clx-mini-terminal-scale', v.toFixed(1));
-                      }}
-                      className="w-14 h-1 accent-cyber-electric cursor-pointer"
-                      title={tr("Mini terminal scale")}
-                    />
-                  </div>
-                  )}
+                <div className="flex items-center justify-end -mr-1">
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelVisible(false)}
+                    title={tr("Collapse panel")}
+                    className="flex items-center justify-center w-5 h-5 text-[10px] text-slate-500 hover:text-cyber-neon hover:bg-white/5 rounded transition shrink-0"
+                  >
+                    ▶
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onQuickSession?.('right')}
-                  title={tr("New Terminal (dock to right)")}
-                  className="flex items-center gap-0.5 rounded border border-cyber-neon/50 bg-cyber-neon/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-cyber-neon transition hover:bg-cyber-neon/25 hover:border-cyber-neon shadow-neon-sm-faint shrink-0"
-                >{tr("+ New")}</button>
-                <button
-                  type="button"
-                  onClick={() => setRightPanelVisible(false)}
-                  title={tr("Collapse panel")}
-                  className="flex items-center justify-center w-5 h-5 text-[10px] text-slate-500 hover:text-cyber-neon hover:bg-white/5 rounded transition ml-1 shrink-0"
-                >
-                  ▶
-                </button>
-              </div>
-              <MiniTerminalDisplayControl mode={miniTerminalDisplayMode} onChange={setMiniTerminalDisplayMode} />
-              <p className="text-[9px] leading-snug text-slate-500">{tr("Ctrl+click to select multiple terminals")}</p>
               
               {cliSessions.length === 0 ? (
                 <div className="flex-1 border-2 border-dashed border-cyber-neon/30 hover:border-cyber-neon/70 rounded-lg flex items-center justify-center text-[10px] text-cyber-neon/80 font-mono italic p-4 text-center animate-pulse transition-colors">{tr("👾 Drag here to dock AI Agents on the right")}</div>
@@ -3560,7 +3007,7 @@ export function TerminalPanel({
                           }
                         }}
                         onClick={(event) => selectMiniSession(session.id, event.ctrlKey || event.metaKey)}
-                        onContextMenu={(e) => handleContextMenu(e, session.id)}
+                        onContextMenu={(e) => handleMiniContextMenu(e, session.id, 'right')}
                         onMouseDown={(e) => {
                           if (e.button !== 0 || e.ctrlKey || e.metaKey || (e.target as HTMLElement).closest('button')) return;
                           setActiveDragId(session.id);
@@ -3670,19 +3117,146 @@ export function TerminalPanel({
             </div>
           </>
           )}
+          {miniWebRight}
         </div>
-      )}
 
       {/* Cyberpunk Right-click Context Menu — lifted state from Dashboard */}
       {contextMenu && (
         <div
+          data-context-menu-source={contextMenu.source ?? 'main'}
           style={(() => {
-            const pos = getContextMenuPosition(contextMenu.x, contextMenu.y, 220, 260);
+            const menuHeight = contextMenu.source === 'mini'
+              ? (contextMenu.sessionId ? 460 : 180)
+              : 520;
+            const pos = getContextMenuPosition(contextMenu.x, contextMenu.y, 252, Math.min(menuHeight, window.innerHeight - 16));
             return { top: `${pos.y}px`, left: `${pos.x}px` };
           })()}
-          className="fixed z-[100] w-52 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
+          className="fixed z-[100] w-[252px] max-h-[calc(100vh-16px)] overflow-y-auto rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
           onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
+          {contextMenu.sessionId && <>
+            {LINKED_TERMINAL_PANELS.map(panel => <button key={panel} type="button" data-terminal-context-action={`linked-${panel}`}
+              onClick={() => {
+                const parent = contextMenu.sessionId;
+                setContextMenu(null);
+                window.dispatchEvent(new CustomEvent(NEW_TERMINAL_EVENT, { detail: { panel, parentSessionId: parent } }));
+                if (panel === 'right') setRightPanelVisible(true);
+              }} className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 hover:text-cyber-electric">
+              <span aria-hidden="true">{panel === 'right' ? '↳' : '↓'}</span>
+              {panel === 'right' ? tr('New linked local terminal: right') : tr('New linked local terminal: bottom')}
+            </button>)}
+            <div className="my-1 border-t border-cyber-line/50" />
+          </>}
+          {contextMenu.workingDir && !sessions.find(s => s.id === contextMenu.sessionId)?.cliName.startsWith('SSH: ') && <button
+            type="button" data-terminal-context-action="vscode" onClick={() => {
+              const path = contextMenu.workingDir!;
+              setContextMenu(null);
+              void openInVSCode(path).catch(error => showMessage(tr('Could not open VS Code: {error}', { error: String(error) })));
+            }} className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 hover:text-cyber-electric">
+            {tr('Open in VS Code')}
+          </button>}
+          {contextMenu.source === 'mini' ? (
+            <>
+              <button
+                type="button"
+                data-mini-context-action="new"
+                onClick={() => {
+                  const targetPanel = contextMenu.panel ?? 'right';
+                  setContextMenu(null);
+                  window.dispatchEvent(new CustomEvent(NEW_TERMINAL_EVENT, { detail: { panel: targetPanel, parentSessionId: contextMenu.sessionId } }));
+                }}
+                className="flex w-full items-center justify-between gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-neon/20 hover:text-cyber-neon transition cursor-pointer"
+              >
+                <span>{tr("➕ New Terminal")}</span>
+                <span className="text-[9px] text-slate-500">Ctrl+`</span>
+              </button>
+              <button
+                type="button"
+                data-mini-context-action="reload"
+                onClick={() => {
+                  if (contextMenu.sessionId) {
+                    refreshMainTerminal(contextMenu.sessionId);
+                    refreshMiniTerminalFromMain(contextMenu.sessionId);
+                  } else {
+                    sessions.forEach((s) => refreshMiniTerminalFromMain(s.id));
+                  }
+                  window.dispatchEvent(new Event('clx-reload-sessions'));
+                  setContextMenu(null);
+                }}
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 hover:text-cyber-electric transition cursor-pointer"
+              >{tr("🔄 Reload")}</button>
+              <button
+                type="button"
+                data-mini-context-action="toggle-display"
+                onClick={() => {
+                  saveMiniTerminalDisplayMode(miniTerminalTitleOnly ? 'preview' : 'title-only');
+                  setContextMenu(null);
+                }}
+                className="flex w-full items-center justify-between gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+              >
+                <span>{miniTerminalTitleOnly ? tr("Mini terminal") : tr("Title only")}</span>
+              </button>
+              <button
+                type="button"
+                data-mini-context-action="config"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('open-settings', { detail: 'appearance' }));
+                  setContextMenu(null);
+                }}
+                className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+              >{tr("⚙️ Config...")}</button>
+
+              {contextMenu.sessionId && (() => {
+                const ctxSession = sessions.find((s) => s.id === contextMenu.sessionId);
+                const currentPanel = ctxSession?.panel ?? 'right';
+                const targetPanel: 'right' | 'bottom' = currentPanel === 'right' ? 'bottom' : 'right';
+                return (
+                  <>
+                    <div className="my-1 border-t border-cyber-line/50" />
+                    <button
+                      type="button"
+                      data-mini-context-action="move-panel"
+                      onClick={() => {
+                        onMoveSessionToPanel?.(contextMenu.sessionId!, targetPanel);
+                        setContextMenu(null);
+                      }}
+                      className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+                    >{currentPanel === 'right' ? tr("⬇️ Move to Bottom Panel") : tr("➡️ Move to Right Panel")}</button>
+                    {contextMenu.workingDir && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void invoke('open_workspace_folder', { path: contextMenu.workingDir! });
+                          setContextMenu(null);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+                      >{tr("📂 Reveal in Explorer")}</button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(contextMenu.sessionId!);
+                        setContextMenu(null);
+                      }}
+                      className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition cursor-pointer"
+                    >{tr("📋 Copy Session ID")}</button>
+                    <div className="my-1 border-t border-cyber-line/50" />
+                    <button
+                      type="button"
+                      data-mini-context-action="close"
+                      onClick={() => {
+                        onStopSession(contextMenu.sessionId!);
+                        setContextMenu(null);
+                      }}
+                      className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 font-bold transition cursor-pointer"
+                    >{tr("❌ Stop / Close Session")}</button>
+                  </>
+                );
+              })()}
+            </>
+          ) : (
+            <>
           {(() => {
             const sid = contextMenu.sessionId;
             const sessionTerminal = sid ? terminalRefs.current[sid]?.term : null;
@@ -3844,6 +3418,8 @@ export function TerminalPanel({
                 }}
                 className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 font-bold transition cursor-pointer"
               >{tr("❌ Stop / Close Session")}</button>
+            </>
+          )}
             </>
           )}
         </div>

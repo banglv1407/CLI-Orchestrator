@@ -77,6 +77,36 @@ directly to that backend; ordinary fallback to other configured backends remains
 Press **Ctrl+P > View: AI Companion** to open chat, or
 **Ctrl+P > Settings: CliProxyAI** to configure backends.
 
+### Web browser
+
+Open the globe icon on the activity bar, or **Ctrl+P > View: Web**. Enter the
+website URL and press **Enter** or **Go**. Direct access needs no proxy setup. The page,
+scripts, styles, images, API calls and WebSockets use the selected connection.
+On Windows, CLX embeds Edge/Chromium WebView2 in its Tauri shell.
+
+Use multiple tabs, Back, Forward, Reload and Stop. **Connection settings** supports
+HTTP/HTTPS proxies, SOCKS4/5 and SSH with password or private key/passphrase.
+SSH requires an exact server fingerprint; the editor can discover it for review.
+Save named connections and select them from the toolbar. Passwords/passphrases
+use Windows account protection. History can be searched, reopened, deleted one
+entry at a time or cleared. Cookies/cache are isolated by connection profile.
+Opening CLX never automatically visits a saved URL. HTTPS sites through an HTTP
+proxy require CONNECT support.
+
+Choose **Add proxy hop** to build an ordered route of up to eight HTTP/HTTPS,
+SOCKS4/5 or SSH hops. Reorder/remove hops before saving the named connection.
+Intermediate HTTP proxies must allow CONNECT to the next hop. Downstream SSH
+fingerprints are fetched through the preceding route.
+
+Choose **Mini web: right / bottom / both** in the Web toolbar to show a separate
+web-preview column beside mini terminals and a separate row below their tray.
+Cards select/close the existing web tabs; they do not create duplicate browsers
+or stop terminal sessions. Preview/Title only and panel placement persist.
+
+This Web view has its own route, independent of CliProxyAI and the OS proxy.
+Website content cannot access CLX commands. The proxy must allow the website and
+all of its required hosts/ports; a failed proxy is reported without direct fallback.
+
 ### SSH server tunneling
 
 When the built-in SSH server is running (default port `2222`), an authenticated
@@ -105,6 +135,11 @@ the server starts. Fetching a fingerprint never rotates an existing host key.
 ### Terminal sessions
 
 Press **Ctrl + `** anywhere in CLX to create and focus a new local terminal.
+The new terminal links to the active session. Right-click a terminal or mini
+card to create a linked local terminal on the right or bottom. **Terminal links**
+shows the graph horizontally or vertically; select a node to switch sessions,
+or change **Parent terminal** to reconnect it. Local terminal and Explorer
+context menus also offer **Open in VS Code** for their recorded folder/file.
 This replaces Ctrl+Shift+N. Editors and dialogs keep their drafts; use
 **Return to previous view** to resume them after opening a terminal.
 

@@ -217,10 +217,16 @@ function removeTab(state: NotepadState, tabId: string): NotepadState {
   return { ...state, activeTabId, tabs };
 }
 
-type Props = { onClose?: () => void };
+type Props = {
+  onClose?: () => void;
+  pinned?: boolean;
+  onTogglePin?: () => void;
+  width?: number;
+};
 
-export function Notepad({ onClose }: Props) {
+export function Notepad({ onClose, pinned = false, onTogglePin, width }: Props) {
   const locale = useLocale();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<NotepadState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(true);
@@ -234,6 +240,7 @@ export function Notepad({ onClose }: Props) {
   // Search states
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -243,6 +250,7 @@ export function Notepad({ onClose }: Props) {
   const renameCancelledRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchComposingRef = useRef(false);
 
   useEffect(() => {
     void (async () => {
@@ -309,11 +317,23 @@ export function Notepad({ onClose }: Props) {
     state?.tabs.find((tab) => tab.id === state.activeTabId) ?? null
   ), [state]);
 
-  // Compute matches in active tab
-  const activeMatches = useMemo(() => {
-    if (!searchQuery.trim() || !activeTab?.text) return [];
-    const q = searchQuery.toLowerCase();
-    const text = activeTab.text.toLowerCase();
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setDebouncedSearchQuery('');
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (!searchComposingRef.current) {
+        setDebouncedSearchQuery(searchQuery);
+      }
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  const computeMatches = useCallback((query: string, sourceText?: string) => {
+    if (!query.trim() || !sourceText) return [];
+    const q = query.toLowerCase();
+    const text = sourceText.toLowerCase();
     const matches: { start: number; end: number }[] = [];
     let idx = 0;
     while ((idx = text.indexOf(q, idx)) !== -1) {
@@ -321,12 +341,18 @@ export function Notepad({ onClose }: Props) {
       idx += q.length;
     }
     return matches;
-  }, [searchQuery, activeTab?.text]);
+  }, []);
+
+  // Compute matches in active tab
+  const activeMatches = useMemo(
+    () => computeMatches(debouncedSearchQuery, activeTab?.text),
+    [computeMatches, debouncedSearchQuery, activeTab?.text],
+  );
 
   // Compute match counts for all tabs
   const tabMatchCounts = useMemo(() => {
-    if (!searchQuery.trim() || !state) return {};
-    const q = searchQuery.toLowerCase();
+    if (!debouncedSearchQuery.trim() || !state) return {};
+    const q = debouncedSearchQuery.toLowerCase();
     const counts: Record<string, number> = {};
     for (const tab of state.tabs) {
       if (!tab.text) continue;
@@ -340,24 +366,24 @@ export function Notepad({ onClose }: Props) {
       if (count > 0) counts[tab.id] = count;
     }
     return counts;
-  }, [searchQuery, state]);
+  }, [debouncedSearchQuery, state]);
 
   const renderedHtml = useMemo(() => {
     if (!activeTab) return '';
     const base = highlight(activeTab.text, activeTab.language);
-    if (searchQuery.trim()) {
-      return applySearchHighlight(base, searchQuery.trim(), currentMatchIdx);
+    if (debouncedSearchQuery.trim()) {
+      return applySearchHighlight(base, debouncedSearchQuery.trim(), currentMatchIdx);
     }
     return base;
-  }, [activeTab, searchQuery, currentMatchIdx]);
+  }, [activeTab, debouncedSearchQuery, currentMatchIdx]);
 
-  const scrollToMatch = useCallback((index: number) => {
-    if (!activeMatches.length) return;
-    const bounded = (index + activeMatches.length) % activeMatches.length;
+  const scrollToMatch = useCallback((index: number, matchesOverride = activeMatches) => {
+    if (!matchesOverride.length) return;
+    const bounded = (index + matchesOverride.length) % matchesOverride.length;
     setCurrentMatchIdx(bounded);
-    const match = activeMatches[bounded];
+    const match = matchesOverride[bounded];
     if (textareaRef.current && !showPreview) {
-      textareaRef.current.focus();
+      // Never steal focus from searchInputRef while typing or stepping through matches!
       textareaRef.current.setSelectionRange(match.start, match.end);
       const textBefore = activeTab?.text.slice(0, match.start) || '';
       const lineIdx = (textBefore.match(/\n/g) || []).length;
@@ -366,14 +392,14 @@ export function Notepad({ onClose }: Props) {
     }
   }, [activeMatches, showPreview, activeTab?.text]);
 
-  // When search query changes, jump to first match
+  // When debounced search query changes, jump to first match without stealing focus
   useEffect(() => {
     if (activeMatches.length > 0) {
-      scrollToMatch(0);
+      scrollToMatch(0, activeMatches);
     } else {
       setCurrentMatchIdx(0);
     }
-  }, [searchQuery, activeTab?.id]);
+  }, [debouncedSearchQuery, activeTab?.id]);
 
   const updateActiveTab = useCallback((patch: Partial<NotepadTab>) => {
     setState((current) => {
@@ -404,6 +430,19 @@ export function Notepad({ onClose }: Props) {
     }
     onClose();
   }, [onClose, persistState, savingClose]);
+
+  const handleTogglePin = useCallback(async () => {
+    if (!onTogglePin || savingClose) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const latest = latestStateRef.current;
+    if (latest && JSON.stringify(latest) !== savedSnapshotRef.current) {
+      setSavingClose(true);
+      const didSave = await persistState(latest);
+      setSavingClose(false);
+      if (!didSave) return;
+    }
+    onTogglePin();
+  }, [onTogglePin, persistState, savingClose]);
 
   const addTab = () => {
     setState((current) => {
@@ -511,18 +550,20 @@ export function Notepad({ onClose }: Props) {
       return;
     }
     if (event.key === 'Escape') {
-      event.preventDefault();
       if (searchOpen) {
+        event.preventDefault();
         setSearchOpen(false);
-      } else {
+      } else if (!pinned) {
+        event.preventDefault();
         void requestClose();
       }
     }
   };
 
-  // Global Ctrl+F listener for Notepad modal
+  // Global Ctrl+F listener for Notepad (scoped to Notepad subtree when pinned beside terminal)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (pinned && !rootRef.current?.contains(document.activeElement)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         setSearchOpen(true);
@@ -531,11 +572,16 @@ export function Notepad({ onClose }: Props) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [pinned]);
+
+  const outerClass = pinned
+    ? 'flex h-full shrink-0 min-w-0'
+    : 'fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-8';
+  const outerStyle = pinned && width ? { width: `${width}px` } : undefined;
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div ref={rootRef} style={outerStyle} className={pinned ? 'flex h-full shrink-0 items-center justify-center rounded-xl border border-cyber-line/50 bg-cyber-panel' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/60'}>
         <span className="text-sm text-slate-400">{tr("Loading notepad...")}</span>
       </div>
     );
@@ -543,7 +589,7 @@ export function Notepad({ onClose }: Props) {
 
   if (!state || !activeTab) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div ref={rootRef} style={outerStyle} className={pinned ? 'flex h-full shrink-0 items-center justify-center rounded-xl border border-cyber-line/50 bg-cyber-panel p-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/60'}>
         <div className="rounded-lg border border-rose-500/40 bg-cyber-panel p-5 text-sm text-rose-300">
           <p className="mb-3">{tr("Could not load Notepad.")}</p>
           <p className="max-w-xl break-words font-mono text-xs text-slate-400">{trFeedback(error ?? '')}</p>
@@ -560,15 +606,18 @@ export function Notepad({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-8"
+      ref={rootRef}
+      data-notepad-pinned={pinned ? 'true' : 'false'}
+      style={outerStyle}
+      className={outerClass}
       onClick={(event) => {
-        if (event.target === event.currentTarget) void requestClose();
+        if (!pinned && event.target === event.currentTarget) void requestClose();
       }}
     >
-      <div className="flex h-[92vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-xl border border-cyber-line/50 bg-cyber-panel shadow-2xl">
+      <div className={pinned ? 'flex h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border border-cyber-line bg-cyber-panel shadow-2xl' : 'flex h-[92vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-xl border border-cyber-line/50 bg-cyber-panel shadow-2xl'}>
         {/* Top Header */}
-        <div className="flex items-center justify-between border-b border-cyber-line/40 bg-cyber-base/70 px-5 py-2.5">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-cyber-line/40 bg-cyber-base/70 ${pinned ? 'px-3 py-2' : 'px-5 py-2.5'}`}>
+          <div className="flex min-w-0 items-center gap-2">
             <h2 className="font-display text-sm uppercase tracking-widest text-cyber-neon font-bold">{tr("Notepad")}</h2>
             <span className={`rounded-full px-2 py-0.5 text-xs font-mono ${
               saved ? 'bg-slate-500/10 text-slate-400' : 'bg-yellow-500/10 text-yellow-400 font-semibold'
@@ -578,7 +627,7 @@ export function Notepad({ onClose }: Props) {
             {error && <span className="max-w-[260px] truncate text-xs text-red-400" title={trFeedback(error ?? '')}>{trFeedback(error ?? '')}</span>}
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {/* Search Toggle Button */}
             <button
               type="button"
@@ -646,13 +695,33 @@ export function Notepad({ onClose }: Props) {
               {showPreview ? tr("Edit") : tr("Preview")}
             </button>
 
+            {onTogglePin && (
+              <button
+                type="button"
+                onClick={() => void handleTogglePin()}
+                disabled={savingClose}
+                data-notepad-pin-toggle
+                aria-pressed={pinned}
+                title={pinned ? tr("Unpin to popup") : tr("Pin beside terminal")}
+                className={`rounded border px-2 py-1 text-xs transition flex items-center gap-1 font-semibold disabled:opacity-50 ${
+                  pinned
+                    ? 'border-cyber-neon/60 bg-cyber-neon/15 text-cyber-neon'
+                    : 'border-cyber-line text-slate-400 hover:border-cyber-neon/40 hover:text-slate-200'
+                }`}
+              >
+                <span aria-hidden="true">📌</span>
+                <span>{pinned ? tr("Pinned") : tr("Pin")}</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => void requestClose()}
               disabled={savingClose}
-              className="rounded border border-cyber-line px-3 py-1 text-xs text-slate-400 transition hover:text-slate-200 hover:border-cyber-line/80 disabled:opacity-50"
+              title={tr("Close")}
+              className="rounded border border-cyber-line px-2.5 py-1 text-xs text-slate-400 transition hover:text-slate-200 hover:border-cyber-line/80 disabled:opacity-50"
             >
-              Esc
+              {pinned ? '✕' : 'Esc'}
             </button>
           </div>
         </div>
@@ -668,10 +737,22 @@ export function Notepad({ onClose }: Props) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onCompositionStart={() => { searchComposingRef.current = true; }}
+                  onCompositionEnd={(e) => {
+                    searchComposingRef.current = false;
+                    setSearchQuery(e.currentTarget.value);
+                  }}
                   onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || searchComposingRef.current) return;
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      scrollToMatch(e.shiftKey ? currentMatchIdx - 1 : currentMatchIdx + 1);
+                      if (debouncedSearchQuery !== searchQuery) {
+                        setDebouncedSearchQuery(searchQuery);
+                        const fresh = computeMatches(searchQuery, activeTab?.text);
+                        scrollToMatch(e.shiftKey ? fresh.length - 1 : 0, fresh);
+                      } else {
+                        scrollToMatch(e.shiftKey ? currentMatchIdx - 1 : currentMatchIdx + 1);
+                      }
                     }
                     if (e.key === 'Escape') {
                       e.preventDefault();
@@ -685,7 +766,11 @@ export function Notepad({ onClose }: Props) {
                 {searchQuery && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setSearchQuery('');
+                      setDebouncedSearchQuery('');
+                    }}
                     className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white text-xs"
                   >
                     ✕
@@ -695,7 +780,7 @@ export function Notepad({ onClose }: Props) {
 
               {/* Match Counter */}
               <span className="font-mono text-xs text-slate-400 shrink-0 min-w-[70px] text-center">
-                {searchQuery.trim()
+                {debouncedSearchQuery.trim()
                   ? activeMatches.length > 0
                     ? `${currentMatchIdx + 1} / ${activeMatches.length}`
                     : tr("No matches")
@@ -706,8 +791,17 @@ export function Notepad({ onClose }: Props) {
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  disabled={activeMatches.length === 0}
-                  onClick={() => scrollToMatch(currentMatchIdx - 1)}
+                  disabled={!searchQuery.trim() || (debouncedSearchQuery === searchQuery && activeMatches.length === 0)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (debouncedSearchQuery !== searchQuery) {
+                      setDebouncedSearchQuery(searchQuery);
+                      const fresh = computeMatches(searchQuery, activeTab?.text);
+                      scrollToMatch(fresh.length - 1, fresh);
+                    } else {
+                      scrollToMatch(currentMatchIdx - 1);
+                    }
+                  }}
                   title={tr("Previous match (Shift+Enter)")}
                   className="rounded border border-cyber-line bg-cyber-base/40 px-2 py-1 text-xs text-slate-300 hover:bg-cyber-base disabled:opacity-30 transition"
                 >
@@ -715,8 +809,17 @@ export function Notepad({ onClose }: Props) {
                 </button>
                 <button
                   type="button"
-                  disabled={activeMatches.length === 0}
-                  onClick={() => scrollToMatch(currentMatchIdx + 1)}
+                  disabled={!searchQuery.trim() || (debouncedSearchQuery === searchQuery && activeMatches.length === 0)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (debouncedSearchQuery !== searchQuery) {
+                      setDebouncedSearchQuery(searchQuery);
+                      const fresh = computeMatches(searchQuery, activeTab?.text);
+                      scrollToMatch(0, fresh);
+                    } else {
+                      scrollToMatch(currentMatchIdx + 1);
+                    }
+                  }}
                   title={tr("Next match (Enter)")}
                   className="rounded border border-cyber-line bg-cyber-base/40 px-2 py-1 text-xs text-slate-300 hover:bg-cyber-base disabled:opacity-30 transition"
                 >
@@ -730,6 +833,7 @@ export function Notepad({ onClose }: Props) {
               onClick={() => {
                 setSearchOpen(false);
                 setSearchQuery('');
+                setDebouncedSearchQuery('');
               }}
               title={tr("Close search")}
               className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 font-mono"
@@ -850,7 +954,9 @@ export function Notepad({ onClose }: Props) {
               </span>
             )}
           </span>
-          <span>{tr("Ctrl+F Find · Double-click tab to rename · Ctrl+Enter Preview · Tab Indent · Esc Close")}</span>
+          {!pinned && (
+            <span>{tr("Ctrl+F Find · Double-click tab to rename · Ctrl+Enter Preview · Tab Indent · Esc Close")}</span>
+          )}
         </div>
       </div>
 

@@ -8,9 +8,10 @@ interface Props {
   local?: boolean;
   value: string;
   onChange: (fingerprint: string) => void;
+  probe?: (host: string, port: number) => Promise<string>;
 }
 
-export function SshFingerprintField({ host = '', port = 0, local = false, value, onChange }: Props) {
+export function SshFingerprintField({ host = '', port = 0, local = false, value, onChange, probe = probeSshFingerprint }: Props) {
   const id = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -33,7 +34,7 @@ export function SshFingerprintField({ host = '', port = 0, local = false, value,
     try {
       const fingerprint = local
         ? await getSshServerFingerprint()
-        : await probeSshFingerprint(host.trim(), port);
+        : await probe(host.trim(), port);
       if (request.current === pending) currentChange.current(fingerprint);
     } catch (error) {
       if (request.current === pending) setError(trFeedback(error instanceof Error ? error.message : String(error)));

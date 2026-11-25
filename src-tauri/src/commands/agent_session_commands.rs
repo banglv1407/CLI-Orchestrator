@@ -78,54 +78,163 @@ fn parse_iso_or_rfc3339(s: &str) -> Option<f64> {
     None
 }
 
-// ── 1. Hermes Sessions ──────────────────────────────────────────────────────────
-
-fn hermes_db_path() -> Option<PathBuf> {
-    let home = home_dir()?;
-    let db = home
-        .join("AppData")
-        .join("Local")
-        .join("hermes")
-        .join("state.db");
-    if db.exists() {
-        Some(db)
+fn truncate_single_line(s: &str, max_chars: usize) -> String {
+    let single = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut chars = single.chars();
+    let head: String = chars.by_ref().take(max_chars).collect();
+    if chars.next().is_some() {
+        format!("{head}…")
     } else {
-        None
+        head
     }
 }
 
-fn load_hermes_sessions() -> Vec<AgentSessionEntry> {
-    let mut entries = Vec::new();
-    let Some(db_path) = hermes_db_path() else {
-        return entries;
-    };
+// ── 1. Hermes Sessions ──────────────────────────────────────────────────────────
 
+fn sqlite_table_columns(
+    conn: &rusqlite::Connection,
+    table: &str,
+) -> std::collections::HashSet<String> {
+    let mut cols = std::collections::HashSet::new();
+    let sql = format!("PRAGMA table_info({table})");
+    if let Ok(mut stmt) = conn.prepare(&sql) {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(1)) {
+            for col in rows.flatten() {
+                cols.insert(col);
+            }
+        }
+    }
+    cols
+}
+
+fn push_unique_existing_db(paths: &mut Vec<PathBuf>, candidate: PathBuf) {
+    if candidate.is_file() && !paths.contains(&candidate) {
+        paths.push(candidate);
+    }
+}
+
+fn collect_hermes_profile_dbs(root: &Path, paths: &mut Vec<PathBuf>) {
+    push_unique_existing_db(paths, root.join("state.db"));
+    let profiles_dir = root.join("profiles");
+    if let Ok(read_dir) = fs::read_dir(profiles_dir) {
+        let mut profile_dirs: Vec<PathBuf> = read_dir
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_dir())
+            .collect();
+        profile_dirs.sort();
+        for dir in profile_dirs {
+            push_unique_existing_db(paths, dir.join("state.db"));
+        }
+    }
+}
+
+fn hermes_db_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let default_home = crate::core::hermes_session_titles::default_hermes_home();
+    collect_hermes_profile_dbs(&default_home, &mut paths);
+
+    if let Some(home) = home_dir() {
+        collect_hermes_profile_dbs(
+            &home.join("AppData").join("Local").join("hermes"),
+            &mut paths,
+        );
+        collect_hermes_profile_dbs(&home.join(".hermes"), &mut paths);
+    }
+
+    paths
+}
+
+fn load_hermes_sessions_from_db(db_path: &Path) -> Vec<AgentSessionEntry> {
+    let mut entries = Vec::new();
     let Ok(conn) = rusqlite::Connection::open_with_flags(
-        &db_path,
+        db_path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     ) else {
         return entries;
     };
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
 
-    let Ok(mut stmt) = conn.prepare(
-        "SELECT id, source, model, title, cwd, message_count, started_at, ended_at, \
-         COALESCE(last_activity_at, ended_at, started_at) as effective_time \
-         FROM sessions \
-         WHERE source IN ('cli', 'subagent', 'oneshot', 'acp') \
+    let session_cols = sqlite_table_columns(&conn, "sessions");
+    if !session_cols.contains("id") {
+        return entries;
+    }
+    let has_messages_table = !sqlite_table_columns(&conn, "messages").is_empty();
+
+    let explicit_title_expr = if session_cols.contains("display_name") {
+        "COALESCE(NULLIF(TRIM(s.display_name), ''), NULLIF(TRIM(s.title), ''))"
+    } else {
+        "NULLIF(TRIM(s.title), '')"
+    };
+
+    let resolved_title_expr = if has_messages_table {
+        format!(
+            "COALESCE({explicit_title_expr}, (\
+                SELECT m.content FROM messages m \
+                WHERE m.session_id = s.id \
+                  AND m.role = 'user' \
+                  AND TRIM(COALESCE(m.content, '')) != '' \
+                  AND m.content NOT LIKE '[CONTEXT COMPACTION%' \
+                ORDER BY m.rowid ASC LIMIT 1\
+            ))"
+        )
+    } else {
+        explicit_title_expr.to_string()
+    };
+
+    let effective_time_expr = if session_cols.contains("last_activity_at") {
+        "COALESCE(s.last_activity_at, s.ended_at, s.started_at)"
+    } else {
+        "COALESCE(s.ended_at, s.started_at)"
+    };
+
+    let mut where_clauses = vec!["COALESCE(s.source, '') NOT IN ('kanban', 'tool')".to_string()];
+    if session_cols.contains("hidden") {
+        where_clauses.push("COALESCE(s.hidden, 0) = 0".to_string());
+    }
+    if session_cols.contains("archived") {
+        where_clauses.push("COALESCE(s.archived, 0) = 0".to_string());
+    }
+    if has_messages_table {
+        where_clauses.push(format!(
+            "(COALESCE(s.message_count, 0) > 0 \
+              OR {explicit_title_expr} IS NOT NULL \
+              OR EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id LIMIT 1))"
+        ));
+    } else {
+        where_clauses.push(format!(
+            "(COALESCE(s.message_count, 0) > 0 OR {explicit_title_expr} IS NOT NULL)"
+        ));
+    }
+
+    // ponytail: 2000-row cap per Hermes DB keeps cold load <5ms; add cursor pagination if >2000 active sessions.
+    let sql = format!(
+        "SELECT s.id, s.source, s.model, {resolved_title_expr} AS resolved_title, \
+                s.cwd, COALESCE(s.message_count, 0), COALESCE(s.started_at, 0.0), s.ended_at, \
+                COALESCE({effective_time_expr}, 0.0) AS effective_time \
+         FROM sessions s \
+         WHERE {} \
          ORDER BY effective_time DESC \
-         LIMIT 200",
-    ) else {
+         LIMIT 2000",
+        where_clauses.join(" AND ")
+    );
+
+    let Ok(mut stmt) = conn.prepare(&sql) else {
         return entries;
     };
 
     let real_path_str = db_path.to_string_lossy().to_string();
     if let Ok(rows) = stmt.query_map([], |row| {
+        let raw_title: Option<String> = row.get(3)?;
+        let title = raw_title
+            .map(|t| truncate_single_line(&t, 100))
+            .filter(|t| !t.is_empty());
         let effective_ts: f64 = row.get(8).unwrap_or_else(|_| row.get(6).unwrap_or(0.0));
         Ok(AgentSessionEntry {
             id: row.get(0)?,
             agent: "hermes".to_string(),
             model: row.get(2)?,
-            title: row.get(3)?,
+            title,
             cwd: row.get(4)?,
             message_count: row.get::<_, i64>(5).unwrap_or(0),
             started_at: effective_ts,
@@ -141,26 +250,75 @@ fn load_hermes_sessions() -> Vec<AgentSessionEntry> {
     entries
 }
 
-fn preview_hermes_messages(session_id: &str, limit: u32) -> Vec<AgentSessionMessage> {
-    let mut messages = Vec::new();
-    let Some(db_path) = hermes_db_path() else {
-        return messages;
-    };
+fn load_hermes_sessions() -> Vec<AgentSessionEntry> {
+    let mut by_id: std::collections::HashMap<String, AgentSessionEntry> =
+        std::collections::HashMap::new();
+    for db_path in hermes_db_paths() {
+        for entry in load_hermes_sessions_from_db(&db_path) {
+            match by_id.get_mut(&entry.id) {
+                Some(existing) if entry.started_at > existing.started_at => *existing = entry,
+                None => {
+                    by_id.insert(entry.id.clone(), entry);
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut entries: Vec<AgentSessionEntry> = by_id.into_values().collect();
+    entries.sort_by(|a, b| {
+        b.started_at
+            .partial_cmp(&a.started_at)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    entries
+}
 
+fn preview_hermes_messages_from_db(
+    db_path: &Path,
+    session_id: &str,
+    limit: u32,
+) -> Vec<AgentSessionMessage> {
+    let mut messages = Vec::new();
     let Ok(conn) = rusqlite::Connection::open_with_flags(
-        &db_path,
+        db_path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     ) else {
         return messages;
     };
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
 
-    let Ok(mut stmt) = conn.prepare(
-        "SELECT role, content, timestamp \
-         FROM messages \
-         WHERE session_id = ?1 AND role IN ('user', 'assistant') AND content IS NOT NULL AND content != '' \
-         ORDER BY rowid \
-         LIMIT ?2",
-    ) else {
+    let msg_cols = sqlite_table_columns(&conn, "messages");
+    if msg_cols.is_empty() {
+        return messages;
+    }
+
+    let ord_col = if msg_cols.contains("id") {
+        "id"
+    } else {
+        "rowid"
+    };
+    let active_clause = if msg_cols.contains("active") && msg_cols.contains("compacted") {
+        " AND (COALESCE(active, 1) = 1 OR COALESCE(compacted, 0) = 1)"
+    } else if msg_cols.contains("active") {
+        " AND COALESCE(active, 1) = 1"
+    } else {
+        ""
+    };
+
+    let sql = format!(
+        "SELECT role, content, COALESCE(timestamp, 0.0) FROM (\
+            SELECT {ord_col} AS ord_id, role, content, timestamp \
+            FROM messages \
+            WHERE session_id = ?1 \
+              AND role IN ('user', 'assistant') \
+              AND content IS NOT NULL AND TRIM(content) != '' \
+              AND content NOT LIKE '[CONTEXT COMPACTION — REFERENCE ONLY]%'{active_clause} \
+            ORDER BY {ord_col} DESC \
+            LIMIT ?2\
+         ) ORDER BY ord_id ASC"
+    );
+
+    let Ok(mut stmt) = conn.prepare(&sql) else {
         return messages;
     };
 
@@ -177,6 +335,29 @@ fn preview_hermes_messages(session_id: &str, limit: u32) -> Vec<AgentSessionMess
     }
 
     messages
+}
+
+fn preview_hermes_messages(
+    session_id: &str,
+    real_path: Option<&str>,
+    limit: u32,
+) -> Vec<AgentSessionMessage> {
+    if let Some(raw) = real_path {
+        let p = PathBuf::from(raw);
+        if p.is_file() {
+            let msgs = preview_hermes_messages_from_db(&p, session_id, limit);
+            if !msgs.is_empty() {
+                return msgs;
+            }
+        }
+    }
+    for db_path in hermes_db_paths() {
+        let msgs = preview_hermes_messages_from_db(&db_path, session_id, limit);
+        if !msgs.is_empty() {
+            return msgs;
+        }
+    }
+    Vec::new()
 }
 
 // ── 2. Claude Code Sessions ───────────────────────────────────────────────────
@@ -285,13 +466,8 @@ fn load_claude_sessions() -> Vec<AgentSessionEntry> {
             });
 
             let title = first_user_prompt
-                .map(|p| {
-                    if p.len() > 80 {
-                        format!("{}…", &p[..80])
-                    } else {
-                        p
-                    }
-                })
+                .map(|p| truncate_single_line(&p, 80))
+                .filter(|t| !t.is_empty())
                 .unwrap_or_else(|| file_stem.clone());
 
             entries.push(AgentSessionEntry {
@@ -970,7 +1146,11 @@ pub fn agent_session_preview(
         "codex" => Ok(preview_codex_messages(&request.session_id, limit)),
         "antigravity" => Ok(preview_antigravity_messages(&request.session_id)),
         "opencode" => Ok(preview_opencode_messages(&request.session_id, limit)),
-        _ => Ok(preview_hermes_messages(&request.session_id, limit)),
+        _ => Ok(preview_hermes_messages(
+            &request.session_id,
+            request.real_path.as_deref(),
+            limit,
+        )),
     }
 }
 
@@ -990,7 +1170,7 @@ pub fn agent_export_session_context(
         "codex" => preview_codex_messages(&request.session_id, 100),
         "antigravity" => preview_antigravity_messages(&request.session_id),
         "opencode" => preview_opencode_messages(&request.session_id, 100),
-        _ => preview_hermes_messages(&request.session_id, 100),
+        _ => preview_hermes_messages(&request.session_id, request.real_path.as_deref(), 100),
     };
 
     let mut md = String::new();
@@ -1065,6 +1245,102 @@ mod tests {
         assert!(t1.is_some(), "t1 failed");
         assert!(t2.is_some(), "t2 failed");
         assert!(t3.is_some(), "t3 failed");
+    }
+
+    #[test]
+    fn test_hermes_local_and_launch_stub_filtering() {
+        let tmp_db = std::env::temp_dir().join(format!(
+            "clx_hermes_sessions_test_{}.db",
+            std::process::id()
+        ));
+        let _ = fs::remove_file(&tmp_db);
+        {
+            let conn = rusqlite::Connection::open(&tmp_db).expect("open temp db");
+            conn.execute_batch(
+                "CREATE TABLE sessions (
+                    id TEXT PRIMARY KEY,
+                    source TEXT,
+                    created_source TEXT,
+                    model TEXT,
+                    title TEXT,
+                    display_name TEXT,
+                    cwd TEXT,
+                    message_count INTEGER,
+                    started_at REAL,
+                    ended_at REAL,
+                    last_activity_at REAL,
+                    hidden INTEGER DEFAULT 0,
+                    archived INTEGER DEFAULT 0
+                );
+                CREATE TABLE messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    role TEXT,
+                    content TEXT,
+                    timestamp REAL,
+                    active INTEGER DEFAULT 1,
+                    compacted INTEGER DEFAULT 0
+                );",
+            )
+            .expect("schema");
+
+            conn.execute(
+                "INSERT INTO sessions VALUES ('local-clx-dev', 'local', 'cli', 'coding', 'CLX-DEV', NULL, 'D:\\CLI-Ochestor', 44, 100.0, NULL, 500.0, 0, 0)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO sessions VALUES ('local-stub', 'cli', 'cli', 'coding', NULL, NULL, 'D:\\CLI-Ochestor', 0, 450.0, 460.0, 460.0, 0, 0)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO sessions VALUES ('tool-internal', 'tool', 'tool', 'coding', 'Internal Worker', NULL, NULL, 5, 490.0, NULL, 490.0, 0, 0)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO sessions VALUES ('legacy-untitled', 'cli', 'cli', 'sss', NULL, NULL, 'D:\\CLI-Ochestor', 2, 200.0, 300.0, 300.0, 0, 0)",
+                [],
+            )
+            .unwrap();
+
+            conn.execute(
+                "INSERT INTO messages (session_id, role, content, timestamp, active, compacted) VALUES
+                 ('local-clx-dev', 'user', 'Build ra file exe', 110.0, 0, 1),
+                 ('local-clx-dev', 'user', '[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns...', 200.0, 1, 0),
+                 ('local-clx-dev', 'assistant', 'Đã build xong duplicate retired', 300.0, 0, 0),
+                 ('local-clx-dev', 'assistant', 'Đã build xong file .exe portable', 301.0, 1, 0),
+                 ('local-clx-dev', 'user', 'kiểm tra chức năng agents session nhé', 400.0, 1, 0),
+                 ('legacy-untitled', 'user', 'Kiểm tra kênh agent-reach hoạt động tiếng Việt', 210.0, 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let loaded = load_hermes_sessions_from_db(&tmp_db);
+        assert_eq!(loaded.len(), 2, "Expected local-clx-dev and legacy-untitled");
+        assert_eq!(loaded[0].id, "local-clx-dev");
+        assert_eq!(loaded[0].title.as_deref(), Some("CLX-DEV"));
+        assert_eq!(loaded[1].id, "legacy-untitled");
+        assert_eq!(
+            loaded[1].title.as_deref(),
+            Some("Kiểm tra kênh agent-reach hoạt động tiếng Việt")
+        );
+
+        let preview = preview_hermes_messages_from_db(&tmp_db, "local-clx-dev", 10);
+        assert_eq!(preview.len(), 3, "Should keep compacted + active, drop retired & compaction dump");
+        assert_eq!(preview[0].content.as_deref(), Some("Build ra file exe"));
+        assert_eq!(
+            preview[1].content.as_deref(),
+            Some("Đã build xong file .exe portable")
+        );
+        assert_eq!(
+            preview[2].content.as_deref(),
+            Some("kiểm tra chức năng agents session nhé")
+        );
+
+        let _ = fs::remove_file(&tmp_db);
     }
 
     #[test]

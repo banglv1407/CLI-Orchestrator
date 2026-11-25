@@ -19,8 +19,47 @@ sessions.
 - New terminals inherit the active local working directory. From remote SSH
   sessions, use the local shell default instead of a remote-only path.
 - Creating a new terminal clears the temporary mini-terminal input group.
+- `Ctrl+Tab` cycles forward through active terminal sessions (ordered across the
+  right panel then bottom tray) and wraps back to the first terminal after the
+  last; `Ctrl+Shift+Tab` cycles backward. Cycling clears any active
+  mini-terminal broadcast group.
+- Right-clicking a mini-terminal card or mini-terminal panel background opens a
+  dedicated mini-terminal context menu with New Terminal, Reload, Preview/Title
+  only display toggle, Config (Appearance settings), panel docking move, and
+  session close.
+- File editor and Notepad search debounce query evaluation (with IME composition
+  guard) and highlight/scroll matches without stealing focus from the search
+  input while typing.
+
+## Linked terminals and VS Code
+
+- Right-click the main terminal or a mini card and choose **New linked local
+  terminal: right / bottom**. The new shell uses the clicked local session's
+  recorded working directory, even when another session is active. A child of
+  an SSH session uses the local shell default directory.
+- Ctrl+Backquote links the new shell to the active running terminal; with no
+  terminal it creates a root. Linking describes navigation and does not enable
+  group input or copy the parent process, environment, or command history.
+- **Terminal links** displays the running sessions as a graph across both trays.
+  Select a node to activate its session. Choose **Horizontal / Vertical**, or
+  **Parent terminal** to reconnect the selected session. **No link** detaches it.
+  Cycles are prevented. Closing a parent leaves its children running as roots.
+  Collapse the graph header to reclaim space; terminals and previews stay mounted.
+- Links and graph direction persist locally for matching session IDs and survive
+  session-list reloads. They do not restore terminated PTYs after an app restart.
+- **Open in VS Code** is available from local terminal/mini context menus and
+  Explorer file/folder context menus. It opens the recorded path in the installed
+  VS Code using literal arguments, with errors surfaced in a dialog. Remote SSH
+  paths are excluded. The directory is the session's recorded start directory;
+  live shell `cd` changes are not tracked.
 
 ## Rendering Contract
+
+- Optional mini web areas have their own right column and bottom row, separate
+  from terminal cards. Their visibility and Preview/Title only choices do not
+  change terminal display, grouping, docking, buffers or PTY sessions. Web cards
+  activate the existing browser tab in the main area. Switching to an empty
+  terminal workspace keeps the browser mounted so its tabs/cards remain available.
 
 - PTY output owns the terminal buffer. App status, session metadata, and helper
   controls must be rendered outside the xterm buffer.

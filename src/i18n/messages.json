@@ -1,4 +1,694 @@
 {
+  "Open in VS Code": ["Open in VS Code", "Mở bằng VS Code", "VS Code에서 열기"],
+  "Could not open VS Code: {error}": ["Could not open VS Code: {error}", "Không thể mở VS Code: {error}", "VS Code를 열 수 없습니다: {error}"],
+  "New linked local terminal: right": ["New linked local terminal: right", "Tạo terminal local liên kết: bên phải", "연결된 로컬 터미널: 오른쪽"],
+  "New linked local terminal: bottom": ["New linked local terminal: bottom", "Tạo terminal local liên kết: bên dưới", "연결된 로컬 터미널: 아래쪽"],
+  "Terminal links": ["Terminal links", "Liên kết terminal", "터미널 연결"],
+  "Parent terminal": ["Parent terminal", "Terminal cha", "부모 터미널"],
+  "No link": ["No link", "Không liên kết", "연결 없음"],
+  "Direction": ["Direction", "Hướng", "방향"],
+  "Horizontal": ["Horizontal", "Ngang", "가로"],
+  "Vertical": ["Vertical", "Dọc", "세로"],
+  "Choose one connection or an ordered proxy chain.": [
+    "Choose one connection or an ordered proxy chain.",
+    "Chọn một kết nối hoặc một chuỗi proxy có thứ tự.",
+    "단일 연결 또는 순서가 있는 프록시 체인을 선택하세요."
+  ],
+  "A proxy chain can contain at most 8 hops.": [
+    "A proxy chain can contain at most 8 hops.",
+    "Chuỗi proxy có tối đa 8 hop.",
+    "프록시 체인은 최대 8개 홉을 포함할 수 있습니다."
+  ],
+  "Connections follow the order below. Intermediate HTTP proxies must allow CONNECT to the next hop.": [
+    "Connections follow the order below. Intermediate HTTP proxies must allow CONNECT to the next hop.",
+    "Kết nối đi theo thứ tự bên dưới. Proxy HTTP trung gian cần cho phép CONNECT tới hop tiếp theo.",
+    "연결은 아래 순서를 따릅니다. 중간 HTTP 프록시는 다음 홉으로의 CONNECT를 허용해야 합니다."
+  ],
+  "Move proxy hop up": [
+    "Move proxy hop up",
+    "Đưa hop lên trước",
+    "프록시 홉 위로 이동"
+  ],
+  "Move proxy hop down": [
+    "Move proxy hop down",
+    "Đưa hop xuống sau",
+    "프록시 홉 아래로 이동"
+  ],
+  "Remove hop": [
+    "Remove hop",
+    "Xóa hop",
+    "홉 삭제"
+  ],
+  "Hop {number}": [
+    "Hop {number}",
+    "Hop {number}",
+    "홉 {number}"
+  ],
+  "Add proxy hop": [
+    "Add proxy hop",
+    "Thêm hop proxy",
+    "프록시 홉 추가"
+  ],
+  "Proxy chain ({count} hops)": [
+    "Proxy chain ({count} hops)",
+    "Chuỗi proxy ({count} hop)",
+    "프록시 체인 ({count}개 홉)"
+  ],
+  "Proxy hop {number} failed: {error}": [
+    "Proxy hop {number} failed: {error}",
+    "Hop proxy {number} thất bại: {error}",
+    "프록시 홉 {number} 실패: {error}"
+  ],
+  "SSH connection is unavailable": [
+    "SSH connection is unavailable",
+    "Kết nối SSH không khả dụng",
+    "SSH 연결을 사용할 수 없습니다"
+  ],
+  "Could not create the web preview.": [
+    "Could not create the web preview.",
+    "Không thể tạo ảnh xem trước trang web.",
+    "웹 미리보기를 생성할 수 없습니다."
+  ],
+  "Mini web panels": [
+    "Mini web panels",
+    "Vùng mini web",
+    "미니 웹 패널"
+  ],
+  "Mini web: hidden": [
+    "Mini web: hidden",
+    "Mini web: ẩn",
+    "미니 웹: 숨김"
+  ],
+  "Mini web: right": [
+    "Mini web: right",
+    "Mini web: bên phải",
+    "미니 웹: 오른쪽"
+  ],
+  "Mini web: bottom": [
+    "Mini web: bottom",
+    "Mini web: bên dưới",
+    "미니 웹: 아래쪽"
+  ],
+  "Mini web: both": [
+    "Mini web: both",
+    "Mini web: cả hai",
+    "미니 웹: 양쪽"
+  ],
+  "Web tabs on the right": [
+    "Web tabs on the right",
+    "Các tab web bên phải",
+    "오른쪽 웹 탭"
+  ],
+  "Web tabs at the bottom": [
+    "Web tabs at the bottom",
+    "Các tab web bên dưới",
+    "아래쪽 웹 탭"
+  ],
+  "Mini web": [
+    "Mini web",
+    "Mini web",
+    "미니 웹"
+  ],
+  "Web preview display": [
+    "Web preview display",
+    "Kiểu hiển thị mini web",
+    "웹 미리보기 표시"
+  ],
+  "Hide web panel": [
+    "Hide web panel",
+    "Ẩn vùng web này",
+    "웹 패널 숨기기"
+  ],
+  "Open web tab: {title}": [
+    "Open web tab: {title}",
+    "Mở tab web: {title}",
+    "웹 탭 열기: {title}"
+  ],
+  "Connection host": [
+    "Connection host",
+    "Máy chủ kết nối",
+    "연결 호스트"
+  ],
+  "Could not load the website. Check its address and the selected connection.": [
+    "Could not load the website. Check its address and the selected connection.",
+    "Không thể tải trang web. Hãy kiểm tra địa chỉ và kết nối đã chọn.",
+    "웹사이트를 로드할 수 없습니다. 주소와 선택한 연결을 확인하세요."
+  ],
+  "Web connection failed: {error}": [
+    "Web connection failed: {error}",
+    "Kết nối duyệt web thất bại: {error}",
+    "웹 연결 실패: {error}"
+  ],
+  "Could not protect browser credentials.": [
+    "Could not protect browser credentials.",
+    "Không thể bảo vệ thông tin xác thực duyệt web.",
+    "브라우저 인증 정보를 보호할 수 없습니다."
+  ],
+  "Could not unlock saved browser credentials.": [
+    "Could not unlock saved browser credentials.",
+    "Không thể mở khóa thông tin xác thực duyệt web đã lưu.",
+    "저장된 브라우저 인증 정보를 해제할 수 없습니다."
+  ],
+  "Secure browser credential storage is unavailable on this platform.": [
+    "Secure browser credential storage is unavailable on this platform.",
+    "Nền tảng này chưa hỗ trợ lưu thông tin xác thực duyệt web an toàn.",
+    "이 플랫폼에서는 브라우저 인증 정보를 안전하게 저장할 수 없습니다."
+  ],
+  "SSH connection or server fingerprint verification failed": [
+    "SSH connection or server fingerprint verification failed",
+    "Không thể kết nối SSH hoặc xác minh fingerprint máy chủ",
+    "SSH 연결 또는 서버 지문 확인에 실패했습니다"
+  ],
+  "Cannot load SSH key (check path and passphrase)": [
+    "Cannot load SSH key (check path and passphrase)",
+    "Không thể đọc khóa SSH (kiểm tra đường dẫn và mật khẩu khóa)",
+    "SSH 키를 읽을 수 없습니다 (경로와 키 암호 확인)"
+  ],
+  "SSH algorithm negotiation failed": [
+    "SSH algorithm negotiation failed",
+    "Thương lượng thuật toán SSH thất bại",
+    "SSH 알고리즘 협상에 실패했습니다"
+  ],
+  "SSH authentication failed": [
+    "SSH authentication failed",
+    "Xác thực SSH thất bại",
+    "SSH 인증에 실패했습니다"
+  ],
+  "SSH authentication rejected": [
+    "SSH authentication rejected",
+    "Máy chủ từ chối xác thực SSH",
+    "SSH 인증이 거부되었습니다"
+  ],
+  "SSH connection/authentication timed out": [
+    "SSH connection/authentication timed out",
+    "Kết nối hoặc xác thực SSH quá thời gian chờ",
+    "SSH 연결 또는 인증 시간이 초과되었습니다"
+  ],
+  "Choose key file": [
+    "Choose key file",
+    "Chọn tệp khóa",
+    "키 파일 선택"
+  ],
+  "Browsing history": [
+    "Browsing history",
+    "Lịch sử duyệt web",
+    "방문 기록"
+  ],
+  "Close history": [
+    "Close history",
+    "Đóng lịch sử",
+    "방문 기록 닫기"
+  ],
+  "Search browsing history": [
+    "Search browsing history",
+    "Tìm trong lịch sử",
+    "방문 기록 검색"
+  ],
+  "Clear browsing history": [
+    "Clear browsing history",
+    "Xóa hết lịch sử",
+    "방문 기록 모두 지우기"
+  ],
+  "No browsing history.": [
+    "No browsing history.",
+    "Chưa có lịch sử duyệt web.",
+    "방문 기록이 없습니다."
+  ],
+  "Delete history entry": [
+    "Delete history entry",
+    "Xóa mục lịch sử",
+    "방문 기록 항목 삭제"
+  ],
+  "Web tabs": [
+    "Web tabs",
+    "Các tab web",
+    "웹 탭"
+  ],
+  "New tab": [
+    "New tab",
+    "Tab mới",
+    "새 탭"
+  ],
+  "Close web tab": [
+    "Close web tab",
+    "Đóng tab web",
+    "웹 탭 닫기"
+  ],
+  "New web tab": [
+    "New web tab",
+    "Mở tab web mới",
+    "새 웹 탭"
+  ],
+  "Connection profile": [
+    "Connection profile",
+    "Cấu hình kết nối",
+    "연결 프로필"
+  ],
+  "Current connection": [
+    "Current connection",
+    "Kết nối hiện tại",
+    "현재 연결"
+  ],
+  "Connection settings": [
+    "Connection settings",
+    "Cấu hình kết nối",
+    "연결 설정"
+  ],
+  "History": [
+    "History",
+    "Lịch sử",
+    "방문 기록"
+  ],
+  "Web connection": [
+    "Web connection",
+    "Kết nối duyệt web",
+    "웹 연결"
+  ],
+  "Saved passwords and key passphrases are protected for your Windows account.": [
+    "Saved passwords and key passphrases are protected for your Windows account.",
+    "Mật khẩu và mật khẩu khóa đã lưu được bảo vệ theo tài khoản Windows của bạn.",
+    "저장된 비밀번호와 키 암호는 Windows 계정으로 보호됩니다."
+  ],
+  "Profile name": [
+    "Profile name",
+    "Tên cấu hình",
+    "프로필 이름"
+  ],
+  "Name this connection": [
+    "Name this connection",
+    "Đặt tên kết nối này",
+    "연결 이름 입력"
+  ],
+  "Save profile": [
+    "Save profile",
+    "Lưu cấu hình",
+    "프로필 저장"
+  ],
+  "Save as new profile": [
+    "Save as new profile",
+    "Lưu thành cấu hình mới",
+    "새 프로필로 저장"
+  ],
+  "Delete profile": [
+    "Delete profile",
+    "Xóa cấu hình",
+    "프로필 삭제"
+  ],
+  "Connection profile saved.": [
+    "Connection profile saved.",
+    "Đã lưu cấu hình kết nối.",
+    "연결 프로필이 저장되었습니다."
+  ],
+  "Enter a website and press Enter": [
+    "Enter a website and press Enter",
+    "Nhập địa chỉ web rồi nhấn Enter",
+    "웹 주소를 입력하고 Enter를 누르세요"
+  ],
+  "Browse directly, or choose a saved connection. Proxy and SSH settings are optional.": [
+    "Browse directly, or choose a saved connection. Proxy and SSH settings are optional.",
+    "Truy cập trực tiếp hoặc chọn cấu hình đã lưu. Không bắt buộc dùng proxy hay SSH.",
+    "직접 접속하거나 저장된 연결을 선택하세요. 프록시와 SSH는 선택 사항입니다."
+  ],
+  "Unsupported hop type": [
+    "Unsupported hop type",
+    "Kiểu kết nối không được hỗ trợ",
+    "지원하지 않는 연결 유형입니다"
+  ],
+  "Proxy password requires a username": [
+    "Proxy password requires a username",
+    "Cần tên đăng nhập khi dùng mật khẩu proxy",
+    "프록시 비밀번호에는 사용자 이름이 필요합니다"
+  ],
+  "SOCKS4 credentials are not supported; use SOCKS5 for authentication": [
+    "SOCKS4 credentials are not supported; use SOCKS5 for authentication",
+    "SOCKS4 không hỗ trợ tài khoản; hãy dùng SOCKS5 để xác thực",
+    "SOCKS4는 인증을 지원하지 않습니다. 인증에는 SOCKS5를 사용하세요"
+  ],
+  "SOCKS5 username and password must be at most 255 bytes.": [
+    "SOCKS5 username and password must be at most 255 bytes.",
+    "Tên đăng nhập và mật khẩu SOCKS5 không được vượt quá 255 byte.",
+    "SOCKS5 사용자 이름과 비밀번호는 각각 255바이트 이하여야 합니다."
+  ],
+  "SSH username is required": [
+    "SSH username is required",
+    "Cần tên đăng nhập SSH",
+    "SSH 사용자 이름이 필요합니다"
+  ],
+  "SSH requires a password or private key path": [
+    "SSH requires a password or private key path",
+    "SSH cần mật khẩu hoặc đường dẫn khóa riêng",
+    "SSH에는 비밀번호 또는 개인 키 경로가 필요합니다"
+  ],
+  "Close a web tab before opening another.": [
+    "Close a web tab before opening another.",
+    "Hãy đóng bớt tab web trước khi mở thêm.",
+    "다른 웹 탭을 열기 전에 기존 탭을 닫으세요."
+  ],
+  "This history entry uses a deleted connection profile. Choose a connection before opening it.": [
+    "This history entry uses a deleted connection profile. Choose a connection before opening it.",
+    "Cấu hình của mục lịch sử này đã bị xóa. Hãy chọn kết nối trước khi mở.",
+    "이 방문 기록의 연결 프로필이 삭제되었습니다. 연결을 선택한 후 여세요."
+  ],
+  "Choose the connection used for this history entry.": [
+    "Choose the connection used for this history entry.",
+    "Hãy chọn đúng kết nối đã dùng cho mục lịch sử này.",
+    "이 방문 기록에 사용한 연결을 선택하세요."
+  ],
+  "Enter a profile name of 1 to 80 characters.": [
+    "Enter a profile name of 1 to 80 characters.",
+    "Nhập tên cấu hình từ 1 đến 80 ký tự.",
+    "프로필 이름을 1~80자로 입력하세요."
+  ],
+  "A connection profile with this name already exists.": [
+    "A connection profile with this name already exists.",
+    "Đã có cấu hình kết nối mang tên này.",
+    "같은 이름의 연결 프로필이 이미 있습니다."
+  ],
+  "Unsupported Web settings version.": [
+    "Unsupported Web settings version.",
+    "Phiên bản cấu hình web không được hỗ trợ.",
+    "지원하지 않는 웹 설정 버전입니다."
+  ],
+  "Could not save Web data.": [
+    "Could not save Web data.",
+    "Không thể lưu dữ liệu duyệt web.",
+    "웹 데이터를 저장할 수 없습니다."
+  ],
+  "Could not read browsing history.": [
+    "Could not read browsing history.",
+    "Không thể đọc lịch sử duyệt web.",
+    "방문 기록을 읽을 수 없습니다."
+  ],
+  "Invalid connection credentials.": [
+    "Invalid connection credentials.",
+    "Thông tin xác thực kết nối không hợp lệ.",
+    "연결 인증 정보가 올바르지 않습니다."
+  ],
+  "HTTP proxy usernames cannot contain a colon.": [
+    "HTTP proxy usernames cannot contain a colon.",
+    "Tên đăng nhập proxy HTTP không được chứa dấu hai chấm.",
+    "HTTP 프록시 사용자 이름에는 콜론을 사용할 수 없습니다."
+  ],
+  "Could not configure the Web connection.": [
+    "Could not configure the Web connection.",
+    "Không thể thiết lập kết nối duyệt web.",
+    "웹 연결을 구성할 수 없습니다."
+  ],
+  "Could not start the Web connection adapter.": [
+    "Could not start the Web connection adapter.",
+    "Không thể khởi tạo bộ chuyển tiếp kết nối web.",
+    "웹 연결 어댑터를 시작할 수 없습니다."
+  ],
+  "Opening the web tab was cancelled.": [
+    "Opening the web tab was cancelled.",
+    "Đã hủy mở tab web.",
+    "웹 탭 열기가 취소되었습니다."
+  ],
+  "SOCKS5 authentication method rejected": [
+    "SOCKS5 authentication method rejected",
+    "Proxy SOCKS5 từ chối cách xác thực",
+    "SOCKS5 인증 방식이 거부되었습니다"
+  ],
+  "SOCKS5 authentication rejected": [
+    "SOCKS5 authentication rejected",
+    "Xác thực SOCKS5 bị từ chối",
+    "SOCKS5 인증이 거부되었습니다"
+  ],
+  "SOCKS5 forwarding to the website failed": [
+    "SOCKS5 forwarding to the website failed",
+    "Không thể chuyển tiếp tới trang web qua SOCKS5",
+    "SOCKS5 웹사이트 연결에 실패했습니다"
+  ],
+  "SOCKS4 forwarding to the website failed": [
+    "SOCKS4 forwarding to the website failed",
+    "Không thể chuyển tiếp tới trang web qua SOCKS4",
+    "SOCKS4 웹사이트 연결에 실패했습니다"
+  ],
+  "SSH forwarding to the website failed": [
+    "SSH forwarding to the website failed",
+    "Không thể chuyển tiếp tới trang web qua SSH",
+    "SSH 웹사이트 연결에 실패했습니다"
+  ],
+  "SOCKS4 does not support IPv6 destinations": [
+    "SOCKS4 does not support IPv6 destinations",
+    "SOCKS4 không hỗ trợ địa chỉ đích IPv6",
+    "SOCKS4는 IPv6 대상 주소를 지원하지 않습니다"
+  ],
+  "HTTPS proxy TLS verification or connection failed": [
+    "HTTPS proxy TLS verification or connection failed",
+    "Không thể xác minh TLS hoặc kết nối tới proxy HTTPS",
+    "HTTPS 프록시 TLS 확인 또는 연결에 실패했습니다"
+  ],
+  "Web connection timed out": [
+    "Web connection timed out",
+    "Kết nối duyệt web quá thời gian chờ",
+    "웹 연결 시간이 초과되었습니다"
+  ],
+  "HTTP proxy rejected the tunnel": [
+    "HTTP proxy rejected the tunnel",
+    "Proxy HTTP từ chối đường hầm kết nối",
+    "HTTP 프록시가 터널 연결을 거부했습니다"
+  ],
+  "Could not load the website through this proxy. Check the proxy and website address.": [
+    "Could not load the website through this proxy. Check the proxy and website address.",
+    "Không thể tải trang web qua proxy này. Hãy kiểm tra proxy và địa chỉ trang web.",
+    "이 프록시로 웹사이트를 로드할 수 없습니다. 프록시와 웹사이트 주소를 확인하세요."
+  ],
+  "Web Browser": [
+    "Web Browser",
+    "Trình duyệt web",
+    "웹 브라우저"
+  ],
+  "View: Web": [
+    "View: Web",
+    "Chế độ xem: Web",
+    "보기: 웹"
+  ],
+  "Browse websites through an HTTP proxy": [
+    "Browse websites through an HTTP proxy",
+    "Duyệt web qua proxy HTTP",
+    "HTTP 프록시로 웹사이트 탐색"
+  ],
+  "Back": [
+    "Back",
+    "Quay lại",
+    "뒤로"
+  ],
+  "Forward": [
+    "Forward",
+    "Tiến tới",
+    "앞으로"
+  ],
+  "Go": [
+    "Go",
+    "Đi",
+    "이동"
+  ],
+  "Stop loading": [
+    "Stop loading",
+    "Dừng tải",
+    "로딩 중지"
+  ],
+  "Reload website": [
+    "Reload website",
+    "Tải lại trang web",
+    "웹사이트 새로고침"
+  ],
+  "Website address": [
+    "Website address",
+    "Địa chỉ trang web",
+    "웹사이트 주소"
+  ],
+  "Website URL": [
+    "Website URL",
+    "URL trang web",
+    "웹사이트 URL"
+  ],
+  "Proxy settings": [
+    "Proxy settings",
+    "Cấu hình proxy",
+    "프록시 설정"
+  ],
+  "Close website": [
+    "Close website",
+    "Đóng trang web",
+    "웹사이트 닫기"
+  ],
+  "HTTP proxy host": [
+    "HTTP proxy host",
+    "Địa chỉ proxy HTTP",
+    "HTTP 프록시 호스트"
+  ],
+  "Proxy hostname or IP": [
+    "Proxy hostname or IP",
+    "Tên máy chủ hoặc IP proxy",
+    "프록시 호스트 이름 또는 IP"
+  ],
+  "Proxy port": [
+    "Proxy port",
+    "Cổng proxy",
+    "프록시 포트"
+  ],
+  "Opening website…": [
+    "Opening website…",
+    "Đang mở trang web…",
+    "웹사이트 여는 중…"
+  ],
+  "Open website": [
+    "Open website",
+    "Mở trang web",
+    "웹사이트 열기"
+  ],
+  "Save configuration": [
+    "Save configuration",
+    "Lưu cấu hình",
+    "설정 저장"
+  ],
+  "Web settings saved.": [
+    "Web settings saved.",
+    "Đã lưu cấu hình duyệt web.",
+    "웹 설정이 저장되었습니다."
+  ],
+  "The entire website uses this HTTP proxy. HTTPS websites require CONNECT support.": [
+    "The entire website uses this HTTP proxy. HTTPS websites require CONNECT support.",
+    "Toàn bộ trang web sử dụng proxy HTTP này. Trang HTTPS cần proxy hỗ trợ CONNECT.",
+    "전체 웹사이트가 이 HTTP 프록시를 사용합니다. HTTPS 웹사이트에는 CONNECT 지원이 필요합니다."
+  ],
+  "Loading website…": [
+    "Loading website…",
+    "Đang tải trang web…",
+    "웹사이트 로딩 중…"
+  ],
+  "Downloaded: {name}": [
+    "Downloaded: {name}",
+    "Đã tải: {name}",
+    "다운로드됨: {name}"
+  ],
+  "Via HTTP proxy": [
+    "Via HTTP proxy",
+    "Qua proxy HTTP",
+    "HTTP 프록시 사용"
+  ],
+  "Browse websites through your proxy": [
+    "Browse websites through your proxy",
+    "Duyệt web qua proxy của bạn",
+    "프록시를 통해 웹사이트 탐색"
+  ],
+  "Enter a website and an HTTP proxy above, then open the page. Your configuration is saved for the next visit.": [
+    "Enter a website and an HTTP proxy above, then open the page. Your configuration is saved for the next visit.",
+    "Nhập địa chỉ trang web và proxy HTTP ở trên rồi mở trang. Cấu hình được lưu để sử dụng lần sau.",
+    "위에 웹사이트 주소와 HTTP 프록시를 입력한 뒤 페이지를 여세요. 다음 방문을 위해 설정이 저장됩니다."
+  ],
+  "Open the CLX desktop app to browse websites.": [
+    "Open the CLX desktop app to browse websites.",
+    "Mở ứng dụng CLX trên máy tính để duyệt web.",
+    "웹사이트를 탐색하려면 CLX 데스크톱 앱을 여세요."
+  ],
+  "Enter a valid HTTP or HTTPS website URL.": [
+    "Enter a valid HTTP or HTTPS website URL.",
+    "Nhập URL trang web HTTP hoặc HTTPS hợp lệ.",
+    "올바른 HTTP 또는 HTTPS 웹사이트 URL을 입력하세요."
+  ],
+  "Enter a proxy hostname or IP and a port from 1 to 65535.": [
+    "Enter a proxy hostname or IP and a port from 1 to 65535.",
+    "Nhập tên máy chủ hoặc IP proxy và cổng từ 1 đến 65535.",
+    "프록시 호스트 이름 또는 IP와 1~65535 범위의 포트를 입력하세요."
+  ],
+  "The Web viewport is not visible.": [
+    "The Web viewport is not visible.",
+    "Vùng hiển thị web chưa sẵn sàng.",
+    "웹 표시 영역이 준비되지 않았습니다."
+  ],
+  "Could not read Web settings.": [
+    "Could not read Web settings.",
+    "Không thể đọc cấu hình duyệt web.",
+    "웹 설정을 읽을 수 없습니다."
+  ],
+  "Could not save Web settings.": [
+    "Could not save Web settings.",
+    "Không thể lưu cấu hình duyệt web.",
+    "웹 설정을 저장할 수 없습니다."
+  ],
+  "Web controls are available only in the CLX window.": [
+    "Web controls are available only in the CLX window.",
+    "Các nút duyệt web chỉ dùng được trong cửa sổ CLX.",
+    "웹 제어 기능은 CLX 창에서만 사용할 수 있습니다."
+  ],
+  "Could not verify the CLX window.": [
+    "Could not verify the CLX window.",
+    "Không thể xác minh cửa sổ CLX.",
+    "CLX 창을 확인할 수 없습니다."
+  ],
+  "Invalid Web session.": [
+    "Invalid Web session.",
+    "Phiên duyệt web không hợp lệ.",
+    "잘못된 웹 세션입니다."
+  ],
+  "Could not create the Web browser profile.": [
+    "Could not create the Web browser profile.",
+    "Không thể tạo hồ sơ trình duyệt web.",
+    "웹 브라우저 프로필을 만들 수 없습니다."
+  ],
+  "Could not close the previous website.": [
+    "Could not close the previous website.",
+    "Không thể đóng trang web trước đó.",
+    "이전 웹사이트를 닫을 수 없습니다."
+  ],
+  "Only HTTP and HTTPS websites can be opened.": [
+    "Only HTTP and HTTPS websites can be opened.",
+    "Chỉ có thể mở trang web HTTP và HTTPS.",
+    "HTTP 및 HTTPS 웹사이트만 열 수 있습니다."
+  ],
+  "The download failed.": [
+    "The download failed.",
+    "Tải tệp thất bại.",
+    "다운로드에 실패했습니다."
+  ],
+  "Could not open the website: {error}": [
+    "Could not open the website: {error}",
+    "Không thể mở trang web: {error}",
+    "웹사이트를 열 수 없습니다: {error}"
+  ],
+  "Could not read Web state.": [
+    "Could not read Web state.",
+    "Không thể đọc trạng thái duyệt web.",
+    "웹 상태를 읽을 수 없습니다."
+  ],
+  "Could not show the website.": [
+    "Could not show the website.",
+    "Không thể hiển thị trang web.",
+    "웹사이트를 표시할 수 없습니다."
+  ],
+  "Could not hide the website.": [
+    "Could not hide the website.",
+    "Không thể ẩn trang web.",
+    "웹사이트를 숨길 수 없습니다."
+  ],
+  "Could not resize the website.": [
+    "Could not resize the website.",
+    "Không thể đổi kích thước vùng web.",
+    "웹사이트 표시 크기를 조정할 수 없습니다."
+  ],
+  "Open a website first.": [
+    "Open a website first.",
+    "Hãy mở một trang web trước.",
+    "먼저 웹사이트를 여세요."
+  ],
+  "Could not navigate the website.": [
+    "Could not navigate the website.",
+    "Không thể điều hướng trang web.",
+    "웹사이트를 탐색할 수 없습니다."
+  ],
+  "Could not close the website.": [
+    "Could not close the website.",
+    "Không thể đóng trang web.",
+    "웹사이트를 닫을 수 없습니다."
+  ],
+  "Web content cannot access CLX commands.": [
+    "Web content cannot access CLX commands.",
+    "Nội dung trang web không được truy cập lệnh CLX.",
+    "웹 콘텐츠는 CLX 명령에 접근할 수 없습니다."
+  ],
   "Agent Sessions": [
     "Agent Sessions",
     "Phiên trợ lý",
@@ -1438,6 +2128,61 @@
     "Git Diff (Changes)",
     "Thay đổi Git",
     "Git 변경 사항"
+  ],
+  "Git Detail": [
+    "Git Detail",
+    "Chi tiết Git",
+    "Git 상세 정보"
+  ],
+  "Not a Git repository.": [
+    "Not a Git repository.",
+    "Không phải kho lưu trữ Git.",
+    "Git 저장소가 아닙니다."
+  ],
+  "Refresh Git status": [
+    "Refresh Git status",
+    "Làm mới trạng thái Git",
+    "Git 상태 새로고침"
+  ],
+  "Clean working tree": [
+    "Clean working tree",
+    "Cây làm việc sạch (không có thay đổi)",
+    "변경 사항 없는 깨끗한 작업 트리"
+  ],
+  "Latest commit": [
+    "Latest commit",
+    "Commit gần nhất",
+    "최근 커밋"
+  ],
+  "Open diff in tab": [
+    "Open diff in tab",
+    "Mở xem diff theo tab",
+    "탭에서 diff 열기"
+  ],
+  "Open file in editor tab": [
+    "Open file in editor tab",
+    "Mở sửa tệp theo tab",
+    "편집기 탭에서 파일 열기"
+  ],
+  "Staged: {v0}": [
+    "Staged: {v0}",
+    "Đã stage: {v0}",
+    "스테이징: {v0}"
+  ],
+  "Modified: {v0}": [
+    "Modified: {v0}",
+    "Đã sửa: {v0}",
+    "수정됨: {v0}"
+  ],
+  "Untracked: {v0}": [
+    "Untracked: {v0}",
+    "Chưa theo dõi: {v0}",
+    "추적 안 됨: {v0}"
+  ],
+  "Deleted: {v0}": [
+    "Deleted: {v0}",
+    "Đã xóa: {v0}",
+    "삭제됨: {v0}"
   ],
   "No changed files in workspace.": [
     "No changed files in workspace.",
@@ -7773,5 +8518,110 @@
     "A valid SSH server SHA256 fingerprint is required.",
     "Cần fingerprint SHA256 hợp lệ của máy chủ SSH.",
     "유효한 SSH 서버 SHA256 지문이 필요합니다."
+  ],
+  "Pin": [
+    "Pin",
+    "Ghim",
+    "고정"
+  ],
+  "Pinned": [
+    "Pinned",
+    "Đã ghim",
+    "고정됨"
+  ],
+  "Pin beside terminal": [
+    "Pin beside terminal",
+    "Ghim cạnh terminal",
+    "터미널 옆에 고정"
+  ],
+  "Unpin to popup": [
+    "Unpin to popup",
+    "Bỏ ghim thành cửa sổ nổi",
+    "팝업으로 고정 해제"
+  ],
+  "Drag to resize Notepad": [
+    "Drag to resize Notepad",
+    "Kéo để chỉnh độ rộng sổ ghi chú",
+    "드래그하여 메모장 너비 조절"
+  ],
+  "➕ New Terminal": [
+    "➕ New Terminal",
+    "➕ Terminal mới",
+    "➕ 새 터미널"
+  ],
+  "🔄 Reload": [
+    "🔄 Reload",
+    "🔄 Tải lại",
+    "🔄 새로 고침"
+  ],
+  "⚙️ Config...": [
+    "⚙️ Config...",
+    "⚙️ Cấu hình...",
+    "⚙️ 설정..."
+  ],
+  "⬇️ Move to Bottom Panel": [
+    "⬇️ Move to Bottom Panel",
+    "⬇️ Chuyển xuống khung dưới",
+    "⬇️ 하단 패널로 이동"
+  ],
+  "➡️ Move to Right Panel": [
+    "➡️ Move to Right Panel",
+    "➡️ Chuyển sang khung phải",
+    "➡️ 오른쪽 패널로 이동"
+  ],
+  "Drag to resize File Editor": [
+    "Drag to resize File Editor",
+    "Kéo để chỉnh độ rộng trình sửa tệp",
+    "드래그하여 파일 편집기 너비 조절"
+  ],
+  "Close all saved tabs": [
+    "Close all saved tabs",
+    "Đóng tất cả tab đã lưu",
+    "저장된 탭 모두 닫기"
+  ],
+  "Close saved": [
+    "Close saved",
+    "Đóng đã lưu",
+    "저장됨 닫기"
+  ],
+  "Save changes to \"{name}\" before closing?": [
+    "Save changes to \"{name}\" before closing?",
+    "Lưu thay đổi cho \"{name}\" trước khi đóng?",
+    "닫기 전에 \"{name}\"의 변경 사항을 저장하시겠습니까?"
+  ],
+  "Discard": [
+    "Discard",
+    "Bỏ thay đổi",
+    "변경 사항 버리기"
+  ],
+  "Save & Close": [
+    "Save & Close",
+    "Lưu & Đóng",
+    "저장 후 닫기"
+  ],
+  "Open file editor ({count} tabs)": [
+    "Open file editor ({count} tabs)",
+    "Mở trình sửa tệp ({count} tab)",
+    "파일 편집기 열기 ({count}개 탭)"
+  ],
+  "📄 {count} tabs": [
+    "📄 {count} tabs",
+    "📄 {count} tab",
+    "📄 탭 {count}개"
+  ],
+  "Opened diff: {v0}": [
+    "Opened diff: {v0}",
+    "Đã mở diff: {v0}",
+    "변경 내용 열림: {v0}"
+  ],
+  "Empty": [
+    "Empty",
+    "Trống",
+    "비어 있음"
+  ],
+  "Pick": [
+    "Pick",
+    "Chọn",
+    "선택"
   ]
 }

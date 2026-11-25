@@ -88,7 +88,21 @@ try {
         const values = {
           list_clis: [{ name: 'CLI User 42', command: 'example-cli', mode: 'interactive', args: [], env: {}, savedDirectories: [] }],
           list_sessions: [], list_project_tags: [], load_ssh_connections: [], list_quickapps: [{ id: 'user-app', name: 'User App 42', command: 'example-app', args: [], workingDir: '', order: 0, iconMissing: true }],
-          get_git_status: [], list_files: [], get_system_logs: [], proxy_get_logs: [], proxy_get_backend_usage: [],
+          get_git_status: [],
+      get_git_detail: {
+        isRepo: true,
+        branch: 'dev',
+        upstream: 'origin/dev',
+        ahead: 1,
+        behind: 0,
+        lastCommitHash: '33c9397',
+        lastCommitMessage: 'feat: workspace shortcuts',
+        lastCommitAuthor: 'Boss',
+        lastCommitRelativeTime: 'just now',
+        totalAdditions: 0,
+        totalDeletions: 0,
+        entries: [],
+      }, list_files: [], get_system_logs: [], proxy_get_logs: [], proxy_get_backend_usage: [],
           agent_list_sessions: [], companion_get_history: [], dashboard_list_monitors: [], dashboard_probe_monitors: [],
           dashboard_get_all_connections: [], dashboard_get_target_connections: [],
           get_notepad: { schemaVersion: 2, activeTabId: 'fixture-note', tabs: [{ id: 'fixture-note', title: 'My user note', text: '', language: 'text' }] },
@@ -268,9 +282,12 @@ try {
   await call('Page.reload');
   await until(() => evaluate('document.querySelectorAll("[data-mini-terminal-session] .xterm").length===3'), 'mini terminal previews');
   assert.equal(await evaluate("localStorage.getItem('clx-mini-terminal-display-mode')"), 'preview');
-  const setMiniMode = async (panel, mode) => {
-    await evaluate(`(() => {const select=document.querySelector('[data-mini-terminal-panel="${panel}"] select');select.value=${JSON.stringify(mode)};select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
-    await until(() => evaluate(`Array.from(document.querySelectorAll('[data-mini-terminal-display]')).every(select=>select.value===${JSON.stringify(mode)})`), 'shared mini display mode');
+  const setMiniMode = async (_panel, mode) => {
+    await evaluate(`localStorage.setItem('ai-cli-settings-active-section','appearance');window.dispatchEvent(new CustomEvent('switch-main-view',{detail:'settings'}))`);
+    await until(() => evaluate('Boolean(document.querySelector("[data-mini-terminal-display]"))'), 'mini display select in settings');
+    await evaluate(`(() => {const select=document.querySelector('[data-mini-terminal-display]');select.value=${JSON.stringify(mode)};select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await until(() => evaluate(`document.querySelector('[data-mini-terminal-display]')?.value===${JSON.stringify(mode)}`), 'shared mini display mode');
+    await evaluate("window.dispatchEvent(new CustomEvent('switch-main-view',{detail:'terminal'}))");
   };
   await evaluate("window.__smokeEmit('cli-output',{sessionId:'mini-right-a',cliName:'Codex',chunk:'OUTPUT_BEFORE_MODE\\r\\n',stream:'stdout'})");
   await until(() => evaluate('document.querySelector("section .xterm")?.textContent.includes("OUTPUT_BEFORE_MODE")'), 'main terminal output before mode change');
@@ -292,8 +309,10 @@ try {
   await until(() => evaluate('document.querySelector("[data-mini-terminal-session=mini-right-b]")?.getAttribute("aria-pressed")==="true"'), 'title row keyboard selection');
   for (let index = 0; index < 3; index++) {
     await selectLanguage(['en', 'vi', 'ko'][index]);
+    await evaluate(`localStorage.setItem('ai-cli-settings-active-section','appearance');window.dispatchEvent(new CustomEvent('switch-main-view',{detail:'settings'}))`);
+    await until(() => evaluate('Boolean(document.querySelector("[data-mini-terminal-display]"))'), 'settings mini display select');
+    assert.deepEqual(await evaluate('Array.from(document.querySelector("[data-mini-terminal-display]").options,option=>option.text)'), [catalog['Mini terminal'][index], catalog['Title only'][index]]);
     await evaluate("window.dispatchEvent(new CustomEvent('switch-main-view',{detail:'terminal'}))");
-    assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-mini-terminal-display]"),select=>Array.from(select.options,option=>option.text))'), Array(2).fill([catalog['Mini terminal'][index], catalog['Title only'][index]]));
     assert.equal(await evaluate('document.querySelector("[data-mini-terminal-session=mini-right-a]").title'), 'Agent Alpha renamed Tiếng Việt 한국어');
   }
   await fs.writeFile(path.join(directory, 'terminal-title-only-ko.png'), Buffer.from((await call('Page.captureScreenshot')).data, 'base64'));

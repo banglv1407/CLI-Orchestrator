@@ -10,9 +10,9 @@ export async function until(read, description, timeout = 25000) {
   throw new Error('Timed out: ' + description);
 }
 
-export async function connectBrowser(port, { enablePage = true } = {}) {
+export async function connectBrowser(port, { enablePage = true, targetId } = {}) {
   const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  const target = targets.find(target => target.type === 'page');
+  const target = targets.find(target => target.type === 'page' && (!targetId || target.id === targetId));
   if (!target) throw new Error('No browser page on port ' + port);
   const socket = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve,reject) => { socket.addEventListener('open',resolve,{once:true}); socket.addEventListener('error',reject,{once:true}); });

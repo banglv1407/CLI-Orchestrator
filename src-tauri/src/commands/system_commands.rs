@@ -1,6 +1,12 @@
-use tauri::{LogicalPosition, LogicalSize, State, WebviewWindow};
+use tauri::{LogicalPosition, LogicalSize, State, Webview, Window};
 
 use crate::{app_state::AppState, core::system_log::SystemLogEntry};
+
+#[tauri::command]
+pub async fn open_in_vscode(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || crate::core::vscode::open(&path))
+        .await.map_err(|e| e.to_string())?
+}
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct AdjustWindowScaleResponse {
@@ -21,11 +27,15 @@ pub struct WindowSizeInfo {
 
 #[tauri::command]
 pub async fn adjust_window_scale(
-    window: WebviewWindow,
+    window: Window,
+    webview: Webview,
     zoom_percent: f64,
     base_width: Option<f64>,
     base_height: Option<f64>,
 ) -> Result<AdjustWindowScaleResponse, String> {
+    let scale = (zoom_percent / 100.0).clamp(0.7, 2.5);
+    let _ = webview.set_zoom(scale);
+
     let is_maximized = window.is_maximized().unwrap_or(false);
     if is_maximized {
         return Ok(AdjustWindowScaleResponse {
@@ -37,7 +47,6 @@ pub async fn adjust_window_scale(
         });
     }
 
-    let scale = (zoom_percent / 100.0).clamp(0.7, 2.5);
     let base_w = base_width.unwrap_or(1440.0).clamp(1024.0, 3840.0);
     let base_h = base_height.unwrap_or(900.0).clamp(640.0, 2160.0);
 
@@ -106,7 +115,7 @@ pub async fn adjust_window_scale(
 
 #[tauri::command]
 pub async fn get_window_size(
-    window: WebviewWindow,
+    window: Window,
 ) -> Result<WindowSizeInfo, String> {
     let is_maximized = window.is_maximized().unwrap_or(false);
     let scale_factor = window.scale_factor().unwrap_or(1.0);

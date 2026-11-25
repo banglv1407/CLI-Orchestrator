@@ -27,6 +27,7 @@ test('fresh navigation includes AI Companion, and a later explicit hide survives
 
 test('legacy navigation gains chat once while preserving custom ordering and other visibility', () => {
   const saved = storage({
+    'ai-cli-sidebar-web-added': 'true',
     'ai-cli-sidebar-tabs-order': JSON.stringify(['settings', 'buzz', 'apiclient', 'cli-manager', 'agent-sessions']),
     'ai-cli-sidebar-visible-tabs': JSON.stringify(['buzz', 'cli-manager', 'settings']),
   });
@@ -42,6 +43,7 @@ test('legacy navigation gains chat once while preserving custom ordering and oth
 
 test('saved AI Companion ordering survives reload; malformed and retired IDs cannot enter navigation', () => {
   const saved = storage({
+    'ai-cli-sidebar-web-added': 'true',
     'ai-cli-sidebar-tabs-order': JSON.stringify(['ai-chat', 'ai-chat', 'settings', 'web-ai', null, {}, 'cli-manager']),
     'ai-cli-sidebar-visible-tabs': JSON.stringify(['ai-chat', 'ai-chat', 'web-ai', {}, 'settings']),
   });
@@ -65,4 +67,15 @@ test('unavailable storage still returns usable navigation defaults', () => {
   };
   assert.deepEqual(loadSidebarOrder(unavailable), DEFAULT_SIDEBAR_ORDER);
   assert.deepEqual(loadVisibleSidebarTabs(unavailable), DEFAULT_VISIBLE_SIDEBAR_TABS);
+});
+
+test('legacy navigation gains Web once and then preserves an explicit hide', () => {
+  const saved = storage({
+    'ai-cli-sidebar-ai-chat-added': 'true',
+    'ai-cli-sidebar-visible-tabs': JSON.stringify(['cli-manager', 'ai-chat', 'settings']),
+  });
+  assert.deepEqual(loadVisibleSidebarTabs(saved), ['cli-manager', 'ai-chat', 'web', 'settings']);
+  saved.setItem('ai-cli-sidebar-visible-tabs', JSON.stringify(['cli-manager', 'settings']));
+  assert.deepEqual(loadVisibleSidebarTabs(saved), ['cli-manager', 'settings']);
+  assert.deepEqual(loadVisibleSidebarTabs(saved), ['cli-manager', 'settings']);
 });

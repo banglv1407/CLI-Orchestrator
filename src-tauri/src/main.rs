@@ -11,6 +11,13 @@ mod ui_language;
 
 use app_state::AppState;
 use commands::language_commands::{set_ui_language, NativeLanguageState};
+use commands::web_browser_commands::{
+    web_browser_action, web_browser_close, web_browser_get_config, web_browser_navigate,
+    web_browser_open, web_browser_save_config, web_browser_set_viewport, web_browser_snapshot,
+    shell_reloaded, WebBrowserState,
+    web_browser_get_settings, web_browser_save_profile, web_browser_delete_profile, web_browser_connection_key,
+    web_browser_get_history, web_browser_record_history, web_browser_delete_history, web_browser_probe_fingerprint, web_browser_preview,
+};
 use commands::{
     agent_session_commands::{
         agent_export_session_context, agent_list_sessions, agent_session_preview,
@@ -24,8 +31,9 @@ use commands::{
     cli_commands::{
         backend_logs_path, create_directory, create_file_content, create_rdp_session,
         create_ssh_session, create_terminal_session, delete_cli, delete_file_or_dir,
-        delete_ssh_file_or_dir, detect_installed_clis, download_ssh_file, get_git_diff,
-        get_git_status, get_remote_system_stats, get_ssh_server_config, get_ssh_server_status,
+        delete_ssh_file_or_dir, detect_installed_clis, download_ssh_file, get_git_detail,
+        get_git_diff, get_git_status, get_remote_system_stats, get_ssh_server_config,
+        get_ssh_server_status,
         get_ssh_server_fingerprint,
         list_all_files_recursive, list_clis, list_directory_files, list_project_tags,
         list_sessions, list_ssh_directory_files, list_ssh_files_recursive, load_ssh_connections,
@@ -62,7 +70,7 @@ use commands::{
         delete_quickapp, launch_quickapp, list_quickapps, reextract_icons, upsert_quickapp,
     },
     rtk_commands::rtk_get_status,
-    system_commands::{adjust_window_scale, get_system_logs, get_window_size},
+    system_commands::{adjust_window_scale, get_system_logs, get_window_size, open_in_vscode},
 };
 use companion::commands::{
     companion_cancel, companion_clear_history, companion_get_catalog, companion_get_config,
@@ -87,6 +95,19 @@ fn cleanup_for_exit(app: &tauri::AppHandle) {
 }
 
 fn main() {
+    let mut context = tauri::generate_context!();
+    // Unlike WEBVIEW2_USER_DATA_FOLDER, this isolates only the trusted shell;
+    // content WebViews must retain their own endpoint-scoped profiles.
+    if let Some(directory) = std::env::var_os("CLX_WEBVIEW_DATA_DIR") {
+        let directory = std::path::PathBuf::from(directory);
+        if directory.is_absolute() {
+            if let Some(window) = context.config_mut().app.windows.iter_mut().find(|window| window.label == "main") {
+                // WindowConfig paths go through relative-path resolution. Use
+                // the native builder in setup for an absolute isolated profile.
+                window.create = false;
+            }
+        }
+    }
     let state = match AppState::new() {
         Ok(state) => state,
         Err(error) => {
@@ -99,7 +120,38 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(state.api_proxy.clone())
         .manage(state)
-        .invoke_handler(tauri::generate_handler![
+        .manage(WebBrowserState::default())
+        .on_page_load(|view, payload| {
+            if view.label() == "main" && matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                let app = view.app_handle().clone();
+                tauri::async_runtime::spawn(shell_reloaded(app));
+            }
+        })
+        .invoke_handler(|invoke| {
+            // Untrusted website content must never invoke custom CLX commands,
+            // including after a navigation to an origin considered local by Tauri.
+            if invoke.message.webview_ref().label().starts_with(core::web_browser::CONTENT_LABEL_PREFIX) {
+                invoke.resolver.reject("Web content cannot access CLX commands.");
+                return true;
+            }
+            let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+            web_browser_get_config,
+            web_browser_get_settings,
+            web_browser_connection_key,
+            web_browser_probe_fingerprint,
+            web_browser_preview,
+            web_browser_save_profile,
+            web_browser_delete_profile,
+            web_browser_get_history,
+            web_browser_record_history,
+            web_browser_delete_history,
+            web_browser_save_config,
+            web_browser_open,
+            web_browser_set_viewport,
+            web_browser_action,
+            web_browser_navigate,
+            web_browser_snapshot,
+            web_browser_close,
             set_ui_language,
             buzz_get_config,
             buzz_set_config,
@@ -175,6 +227,7 @@ fn main() {
             read_file_content,
             write_file_content,
             delete_file_or_dir,
+            get_git_detail,
             get_git_status,
             get_git_diff,
             send_llm_chat,
@@ -184,6 +237,7 @@ fn main() {
             create_ssh_session,
             create_rdp_session,
             open_workspace_folder,
+            open_in_vscode,
             reveal_in_file_manager,
             list_ssh_directory_files,
             read_ssh_file_content,
@@ -257,8 +311,18 @@ fn main() {
             agent_list_sessions,
             agent_session_preview,
             agent_export_session_context,
-        ])
+        ];
+            handler(invoke)
+        })
         .setup(|app| {
+            if let Some(directory) = std::env::var_os("CLX_WEBVIEW_DATA_DIR")
+                .map(std::path::PathBuf::from).filter(|directory| directory.is_absolute()) {
+                if let Some(config) = app.config().app.windows.iter().find(|window| window.label == "main") {
+                    tauri::WebviewWindowBuilder::from_config(app, config)?
+                        .data_directory(directory)
+                        .build()?;
+                }
+            }
             // Initialize companion with app handle for event emission
             if let Some(state) = app.try_state::<AppState>() {
                 state.companion.set_app_handle(app.handle().clone());
@@ -277,7 +341,7 @@ fn main() {
                 drop(qa);
             }
 
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 if let Ok(Some(monitor)) = window.primary_monitor() {
                     let size = monitor.size();
                     let width = (size.width as f64 * 0.75) as u32;
@@ -288,12 +352,17 @@ fn main() {
                 }
             }
 
-            let preference_path = app
+            let default_preference_path = app
                 .state::<AppState>()
                 .registry
                 .data_dirs()
                 .root_dir
                 .join("ui-language");
+            let preference_path = std::env::var_os("CLX_WEBVIEW_DATA_DIR")
+                .map(std::path::PathBuf::from)
+                .filter(|directory| directory.is_absolute())
+                .map(|directory| directory.join("ui-language"))
+                .unwrap_or(default_preference_path);
             let language = UiLanguage::load(&preference_path);
             let copy = language.copy();
             let show = tauri::menu::MenuItem::with_id(app, "show", copy.show, true, None::<&str>)?;
@@ -313,7 +382,7 @@ fn main() {
                 .menu(&tray_menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
+                        if let Some(window) = app.get_window("main") {
                             let _ = window.show();
                             let _ = window.unminimize();
                             let _ = window.set_focus();
@@ -321,7 +390,7 @@ fn main() {
                         }
                     }
                     "hide" => {
-                        if let Some(window) = app.get_webview_window("main") {
+                        if let Some(window) = app.get_window("main") {
                             let _ = window.emit("app-window-visibility", false);
                             let _ = window.hide();
                         }
@@ -339,7 +408,7 @@ fn main() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
+                        if let Some(window) = app.get_window("main") {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.emit("app-window-visibility", false);
                                 let _ = window.hide();
@@ -389,6 +458,6 @@ fn main() {
                     });
             }
         })
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running AI CLI Manager");
 }

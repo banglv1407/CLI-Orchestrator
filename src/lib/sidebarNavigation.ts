@@ -1,13 +1,14 @@
-export type SidebarTab = 'cli-manager' | 'agent-sessions' | 'ai-chat' | 'dashboard' | 'quickapps' | 'buzz' | 'game' | 'apiclient' | 'settings';
+export type SidebarTab = 'cli-manager' | 'agent-sessions' | 'ai-chat' | 'web' | 'dashboard' | 'quickapps' | 'buzz' | 'game' | 'apiclient' | 'settings';
 
 export const DEFAULT_SIDEBAR_ORDER: SidebarTab[] = [
-  'cli-manager', 'agent-sessions', 'ai-chat', 'dashboard', 'quickapps', 'buzz', 'game', 'apiclient', 'settings',
+  'cli-manager', 'agent-sessions', 'ai-chat', 'web', 'dashboard', 'quickapps', 'buzz', 'game', 'apiclient', 'settings',
 ];
-export const DEFAULT_VISIBLE_SIDEBAR_TABS: SidebarTab[] = ['cli-manager', 'agent-sessions', 'ai-chat', 'settings'];
+export const DEFAULT_VISIBLE_SIDEBAR_TABS: SidebarTab[] = ['cli-manager', 'agent-sessions', 'ai-chat', 'web', 'settings'];
 export const PINNED_SIDEBAR_TABS = new Set<SidebarTab>(['settings']);
 
 type SidebarStorage = Pick<Storage, 'getItem' | 'setItem'>;
 const AI_CHAT_ADDED_KEY = 'ai-cli-sidebar-ai-chat-added';
+const WEB_ADDED_KEY = 'ai-cli-sidebar-web-added';
 
 function isSidebarTab(value: unknown): value is SidebarTab {
   return typeof value === 'string' && DEFAULT_SIDEBAR_ORDER.includes(value as SidebarTab);
@@ -50,6 +51,12 @@ export function loadVisibleSidebarTabs(storage: SidebarStorage = localStorage): 
     }
     storage.setItem('ai-cli-sidebar-visible-tabs', JSON.stringify(visible));
     storage.setItem(AI_CHAT_ADDED_KEY, 'true');
+    if (storage.getItem(WEB_ADDED_KEY) !== 'true' && !visible.includes('web')) {
+      const settingsIndex = visible.indexOf('settings');
+      visible.splice(settingsIndex >= 0 ? settingsIndex : visible.length, 0, 'web');
+    }
+    storage.setItem('ai-cli-sidebar-visible-tabs', JSON.stringify(visible));
+    storage.setItem(WEB_ADDED_KEY, 'true');
   } catch { /* Keep navigation usable. */ }
   return visible;
 }

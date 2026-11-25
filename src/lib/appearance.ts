@@ -81,6 +81,32 @@ const STORAGE_KEY_UI_ZOOM = 'clx-ui-zoom';
 const STORAGE_KEY_UI_FONT = 'clx-ui-font-family';
 const STORAGE_KEY_TERM_FONT_SIZE = 'clx-terminal-font-size';
 const STORAGE_KEY_TERM_FONT_FAMILY = 'clx-terminal-font-family';
+const STORAGE_KEY_MINI_TERM_DISPLAY = 'clx-mini-terminal-display-mode';
+const STORAGE_KEY_MINI_TERM_SCALE = 'clx-mini-terminal-scale';
+
+export type MiniTerminalDisplayMode = 'preview' | 'title-only';
+
+export function getMiniTerminalDisplayMode(): MiniTerminalDisplayMode {
+  return localStorage.getItem(STORAGE_KEY_MINI_TERM_DISPLAY) === 'title-only' ? 'title-only' : 'preview';
+}
+
+export function setMiniTerminalDisplayMode(mode: MiniTerminalDisplayMode): void {
+  const valid: MiniTerminalDisplayMode = mode === 'title-only' ? 'title-only' : 'preview';
+  try { localStorage.setItem(STORAGE_KEY_MINI_TERM_DISPLAY, valid); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent('clx-mini-terminal-config-changed', { detail: { displayMode: valid } }));
+}
+
+export function getMiniTerminalScale(): number {
+  const saved = localStorage.getItem(STORAGE_KEY_MINI_TERM_SCALE);
+  const parsed = saved ? parseFloat(saved) : 1.0;
+  return Number.isNaN(parsed) || parsed < 0.5 || parsed > 2.0 ? 1.0 : parsed;
+}
+
+export function setMiniTerminalScale(scale: number): void {
+  const clamped = Math.max(0.5, Math.min(2.0, Math.round(scale * 20) / 20));
+  try { localStorage.setItem(STORAGE_KEY_MINI_TERM_SCALE, clamped.toFixed(2).replace(/0$/, '')); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent('clx-mini-terminal-config-changed', { detail: { scale: clamped } }));
+}
 
 export function recordBaseWindowSize(width: number, height: number): void {
   if (width >= 900 && height >= 500) {
@@ -114,12 +140,7 @@ export function setUiZoom(zoom: number): void {
   const clamped = Math.max(80, Math.min(160, Math.round(zoom)));
   localStorage.setItem(STORAGE_KEY_UI_ZOOM, clamped.toString());
   applyUiZoom(clamped);
-
-  const base = getBaseWindowSize();
-  void adjustWindowScale(clamped, base.width, base.height).catch(() => {
-    // dev or browser mode
-  });
-
+  syncNativeZoomAndWindow(clamped);
   window.dispatchEvent(new CustomEvent('clx-appearance-changed', { detail: { zoom: clamped } }));
 }
 
@@ -170,8 +191,36 @@ export function resetZoom(): void {
   setUiZoom(DEFAULT_UI_ZOOM);
 }
 
+function setCssZoomFallback(zoom: number): void {
+  document.documentElement.style.zoom = zoom === DEFAULT_UI_ZOOM ? '' : `${zoom}%`;
+}
+
+function syncNativeZoomAndWindow(zoom: number): void {
+  if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+    setCssZoomFallback(zoom);
+    return;
+  }
+  const base = getBaseWindowSize();
+  void adjustWindowScale(zoom, base.width, base.height)
+    .then((res) => {
+      if (!res?.success) {
+        setCssZoomFallback(zoom);
+      }
+      window.dispatchEvent(new CustomEvent('clx-appearance-changed', { detail: { zoom } }));
+    })
+    .catch(() => {
+      setCssZoomFallback(zoom);
+    });
+}
+
 export function applyUiZoom(zoom: number): void {
-  document.documentElement.style.zoom = `${zoom}%`;
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  // Native WebView2 zoom (via adjust_window_scale) keeps clientX/getBoundingClientRect and xterm cells 1:1.
+  if (isTauri) {
+    document.documentElement.style.zoom = '';
+  } else {
+    setCssZoomFallback(zoom);
+  }
   document.documentElement.style.overflow = 'hidden';
   document.documentElement.style.height = '100%';
   document.documentElement.style.width = '100%';
@@ -187,7 +236,11 @@ export function applyUiFontFamily(fontFamily: string): void {
 }
 
 export function applyAppearanceSettings(): void {
-  applyUiZoom(getUiZoom());
+  const zoom = getUiZoom();
+  applyUiZoom(zoom);
+  if (zoom !== DEFAULT_UI_ZOOM) {
+    syncNativeZoomAndWindow(zoom);
+  }
   applyUiFontFamily(getUiFontFamily());
 }
 

@@ -20,6 +20,15 @@
       }
     ],
     "security": {
+      "capabilities": [
+        {
+          "identifier": "trusted-clx-shell",
+          "description": "Native permissions for the trusted CLX UI only",
+          "local": true,
+          "webviews": ["main"],
+          "permissions": ["core:default", "dialog:default"]
+        }
+      ],
       "csp": "default-src 'self' customprotocol: asset:; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob: clx-module: http://clx-module.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost clx-module: http://clx-module.localhost data: blob:; font-src 'self' data:; connect-src 'self' ipc: http: https: ws: wss: blob: data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
     }
   },

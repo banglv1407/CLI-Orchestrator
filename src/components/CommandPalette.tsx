@@ -160,6 +160,12 @@ export function CommandPalette({
 
     // Views
     items.push({
+      id: 'action-view-web', type: 'action' as const,
+      label: tr('View: Web'),
+      description: tr('Browse websites through an HTTP proxy'),
+      action: () => window.dispatchEvent(new CustomEvent('open-sidebar-tab', { detail: 'web' })),
+    });
+    items.push({
       id: 'action-view-companion', type: 'action' as const,
       label: tr("View: AI Companion"),
       description: tr("Open AI Companion chat"),

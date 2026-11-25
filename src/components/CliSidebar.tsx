@@ -1,7 +1,8 @@
 import { t as tr, useLocale, getIntlLocale } from '../i18n';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { CliDefinition, SessionInfo, FileEntry, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitStatusEntry, SpecialConfigFile } from '../types';
+import { showMessage } from '../lib/dialogs';
+import type { CliDefinition, SessionInfo, FileEntry, FileOpenOptions, AppTheme, AssistantState, LlmConfig, LlmChatMessage, SshConnection, GitRepoDetail, GitStatusEntry, SpecialConfigFile } from '../types';
 import { loadApiHistory, clearApiHistory, type ApiHistoryEntry, METHOD_COLORS } from '../lib/api-history';
 import { ALL_PETS, getActivePetId, setActivePetId, getPetEnabled, setPetEnabled } from '../lib/mythical-pets';
 import { getContextMenuPosition } from '../lib/contextMenu';
@@ -208,10 +209,14 @@ interface CliSidebarProps {
   onDeleteSsh: (connection: SshConnection) => void;
 
   selectedFilePath: string | null;
+  openFileTabsCount?: number;
+  isFileEditorOpen?: boolean;
+  onOpenFileEditor?: () => void;
+  gitDetail?: GitRepoDetail | null;
   gitStatusList: GitStatusEntry[];
   refreshGitStatus: (repo: string) => Promise<void>;
-  onFileClick: (entry: FileEntry, rootPath: string | null) => Promise<void>;
-  onCloseFile: () => void;
+  onFileClick: (entry: FileEntry, rootPath: string | null, options?: FileOpenOptions) => Promise<void>;
+  onCloseFile: (deletedPath?: string) => void;
   onQuickAppsTabChange?: (isActive: boolean) => void;
   onApiClientTabChange?: (isActive: boolean) => void;
   onProxyTabChange?: (isActive: boolean) => void;
@@ -219,6 +224,7 @@ interface CliSidebarProps {
 }
 
 interface FileContextTarget {
+  isRemote?: boolean;
   path: string;
   isDir: boolean;
   name: string;
@@ -368,6 +374,10 @@ export function CliSidebar({
   onDeleteSsh,
 
   selectedFilePath,
+  openFileTabsCount = 0,
+  isFileEditorOpen = false,
+  onOpenFileEditor,
+  gitDetail = null,
   gitStatusList,
   refreshGitStatus,
   onFileClick,
@@ -398,7 +408,7 @@ export function CliSidebar({
   }, []);
 
   const handleSetActiveTab = useCallback((tab: SidebarTab) => {
-    const tabsWithNoLeftArea = new Set(['quickapps', 'buzz', 'game', 'settings', 'dashboard', 'agent-sessions']);
+    const tabsWithNoLeftArea = new Set(['quickapps', 'buzz', 'game', 'settings', 'dashboard', 'agent-sessions', 'web']);
     
     if (tabsWithNoLeftArea.has(tab)) {
       setIsSidebarCollapsed(true);
@@ -429,6 +439,9 @@ export function CliSidebar({
       }
       else if (tab === 'agent-sessions') {
         window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'agent-sessions' }));
+      }
+      else if (tab === 'web') {
+        window.dispatchEvent(new CustomEvent('switch-main-view', { detail: 'web' }));
       }
     } else {
       if (activeTab === tab && !isSidebarCollapsed) {
@@ -644,6 +657,17 @@ export function CliSidebar({
                 <path strokeLinecap="round" d="M9 11v2m6-2v2m-6 4h6" />
               </svg>
             </div>
+          </button>
+        );
+      case 'web':
+        return (
+          <button key="web" type="button" draggable
+            onDragStart={(e) => handleTabDragStart(e, 'web')}
+            onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleTabDrop(e, 'web')}
+            onClick={() => handleSetActiveTab('web')} title={tr('Web Browser')} aria-label={tr('Web Browser')}
+            aria-pressed={activeTab === 'web'}
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${activeTab === 'web' ? 'text-cyber-neon bg-cyber-neon/10 shadow-neon-sm' : 'text-slate-400 hover:text-cyber-neon hover:bg-cyber-neon/10'}`}>
+            <svg aria-hidden="true" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18M5 6.5h14M5 17.5h14" /></svg>
           </button>
         );
       case 'apiclient':
@@ -1794,7 +1818,7 @@ export function CliSidebar({
           .catch((e) => console.error('Failed to load root files:', e));
       }
       
-      if (gitDiffExpanded && !isSshSession) {
+      if (!isSshSession) {
         void refreshGitStatus(rootPath);
       }
     }
@@ -1879,9 +1903,7 @@ export function CliSidebar({
         await deleteFileOrDir(target.path, target.rootPath);
       }
 
-      if (selectedFilePath && isSameOrDescendantPath(selectedFilePath, target.path)) {
-        onCloseFile();
-      }
+      onCloseFile(target.path);
 
       setAllFiles((prev) => prev.filter((entry) => !isSameOrDescendantPath(entry.path, target.path)));
       setExpandedPaths((prev) => Object.fromEntries(
@@ -1978,6 +2000,7 @@ export function CliSidebar({
                 name: entry.name,
                 rootPath,
                 connection: isSshSession ? sshConnection ?? null : null,
+                isRemote: isSshSession,
                 canDelete: !isSshSession || !!sshConnection,
               },
             });
@@ -2604,7 +2627,7 @@ export function CliSidebar({
                     <div className="flex flex-col h-full overflow-hidden">
                       {/* Workspace Info Banner */}
                       <div className="border-b border-cyber-line/50 bg-cyber-panel/60 p-3 flex flex-col gap-1.5 select-none shrink-0">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-1.5">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className="text-xs">{isSshSession ? '🌐' : '🖥️'}</span>
                             <span className="font-display text-[10px] uppercase font-bold tracking-wider text-cyber-neon truncate">
@@ -2613,10 +2636,27 @@ export function CliSidebar({
                                 : tr("Local Workspace")}
                             </span>
                           </div>
-                          {isSshSession && (
-                            <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-semibold bg-cyber-electric/15 text-cyber-electric border border-cyber-electric/30">{tr("Port ")}{sshConnection?.port || 22}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {openFileTabsCount > 0 && onOpenFileEditor && (
+                              <button
+                                type="button"
+                                data-open-file-editor-tabs
+                                onClick={onOpenFileEditor}
+                                title={tr("Open file editor ({count} tabs)", { count: openFileTabsCount })}
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold border transition ${
+                                  isFileEditorOpen
+                                    ? 'bg-cyber-neon/15 text-cyber-neon border-cyber-neon/40'
+                                    : 'bg-cyber-electric/15 text-cyber-electric border-cyber-electric/40 hover:bg-cyber-electric/25'
+                                }`}
+                              >
+                                {tr("📄 {count} tabs", { count: openFileTabsCount })}
+                              </button>
+                            )}
+                            {isSshSession && (
+                              <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-semibold bg-cyber-electric/15 text-cyber-electric border border-cyber-electric/30">{tr("Port ")}{sshConnection?.port || 22}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center justify-between gap-1 text-[10px] font-mono text-slate-400 bg-cyber-base/60 px-2 py-1 rounded border border-cyber-line/30">
                           <span className="truncate flex-1 text-slate-300" title={rootPath}>
@@ -2659,112 +2699,327 @@ export function CliSidebar({
                         )}
                       </div>
 
-                      {/* Panel 2: Git Diff (Changes) */}
-                      <div className={`flex flex-col overflow-hidden border-t border-cyber-line/30 ${gitDiffExpanded ? 'flex-1 min-h-[120px]' : 'shrink-0'}`}>
+                      {/* Panel 2: Git Detail */}
+                      <div
+                        data-git-detail-section
+                        className={`flex flex-col overflow-hidden border-t border-cyber-line/30 ${gitDiffExpanded ? 'flex-1 min-h-[160px]' : 'shrink-0'}`}
+                      >
                         <button
                           type="button"
+                          data-git-detail-toggle
                           onClick={() => {
                             const nextVal = !gitDiffExpanded;
                             setGitDiffExpanded(nextVal);
-                            if (nextVal && rootPath) {
+                            if (nextVal && rootPath && !isSshSession) {
                               void refreshGitStatus(rootPath);
                             }
                           }}
-                          className="flex w-full items-center justify-between border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 hover:bg-cyber-base/70 transition select-none"
+                          className="flex w-full items-center justify-between gap-2 border-b border-cyber-line/45 bg-cyber-base/40 px-4 py-2 hover:bg-cyber-base/70 transition select-none"
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
                             <FolderArrowIcon isExpanded={gitDiffExpanded} />
-                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300">{tr("Git Diff (Changes)")}</span>
-                          </div>
-                          {gitStatusList.length > 0 && (
-                            <span className="rounded bg-cyber-neon/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-neon border border-cyber-neon/30 font-mono">
-                              {gitStatusList.length}
+                            <span className="font-display text-[9px] uppercase font-bold tracking-[0.15em] text-slate-300 shrink-0">
+                              {tr("Git Detail")}
                             </span>
-                          )}
+                            {!isSshSession && gitDetail?.isRepo && gitDetail.branch && (
+                              <span
+                                data-git-detail-branch-badge
+                                title={gitDetail.upstream ? `${gitDetail.branch} → ${gitDetail.upstream}` : gitDetail.branch}
+                                className="truncate rounded border border-cyber-electric/35 bg-cyber-electric/10 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-cyber-electric"
+                              >
+                                {`🌿 ${gitDetail.branch}`}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            {!isSshSession && gitDetail?.isRepo && (gitDetail.ahead > 0 || gitDetail.behind > 0) && (
+                              <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1 py-0.2 font-mono text-[8px] font-bold text-amber-300">
+                                {[gitDetail.ahead > 0 ? `↑${gitDetail.ahead}` : '', gitDetail.behind > 0 ? `↓${gitDetail.behind}` : ''].filter(Boolean).join(' ')}
+                              </span>
+                            )}
+                            {gitStatusList.length > 0 && (
+                              <span className="rounded bg-cyber-neon/15 px-1.5 py-0.2 text-[8px] font-bold text-cyber-neon border border-cyber-neon/30 font-mono">
+                                {gitStatusList.length}
+                              </span>
+                            )}
+                          </div>
                         </button>
 
                         {gitDiffExpanded && (
-                          <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
-                            {gitStatusList.length === 0 ? (
-                              <p className="px-4 py-3 text-xs italic text-slate-500 font-mono">{tr("No changed files in workspace.")}</p>
+                          <div data-git-detail-panel className="flex-1 overflow-y-auto py-2 scrollbar-thin">
+                            {gitDetail && !gitDetail.isRepo ? (
+                              <p className="px-4 py-3 text-xs italic text-slate-500 font-mono">{tr("Not a Git repository.")}</p>
                             ) : (
-                              <div className="space-y-1">
-                                {(() => {
-                                  const staged = gitStatusList.filter(g => g.staged);
-                                  const unstaged = gitStatusList.filter(g => !g.staged);
+                              <>
+                                {/* Repository Metadata & Diff Summary Card */}
+                                <div
+                                  data-git-detail-summary
+                                  className="mx-3 mb-2 rounded border border-cyber-line/40 bg-cyber-base/45 px-2.5 py-2 text-[10px]"
+                                >
+                                  <div className="flex items-center justify-between gap-1.5">
+                                    <div className="flex min-w-0 items-center gap-1.5 flex-wrap">
+                                      <span
+                                        data-git-detail-branch
+                                        className="font-mono font-bold text-cyber-electric truncate max-w-[140px]"
+                                        title={gitDetail?.branch || 'HEAD'}
+                                      >
+                                        {`🌿 ${gitDetail?.branch || 'HEAD'}`}
+                                      </span>
+                                      {gitDetail?.upstream && (
+                                        <span
+                                          data-git-detail-upstream
+                                          className="font-mono text-[9px] text-slate-400 truncate max-w-[110px]"
+                                          title={gitDetail.upstream}
+                                        >
+                                          {`→ ${gitDetail.upstream}`}
+                                        </span>
+                                      )}
+                                      {(gitDetail?.ahead ?? 0) > 0 && (
+                                        <span className="rounded bg-emerald-500/15 border border-emerald-500/30 px-1 font-mono text-[8px] font-bold text-emerald-300">
+                                          {`↑${gitDetail?.ahead}`}
+                                        </span>
+                                      )}
+                                      {(gitDetail?.behind ?? 0) > 0 && (
+                                        <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1 font-mono text-[8px] font-bold text-amber-300">
+                                          {`↓${gitDetail?.behind}`}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      data-git-detail-refresh
+                                      onClick={() => {
+                                        if (rootPath && !isSshSession) void refreshGitStatus(rootPath);
+                                      }}
+                                      title={tr("Refresh Git status")}
+                                      className="shrink-0 rounded border border-cyber-line/50 bg-cyber-panel/50 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 hover:border-cyber-electric/50 hover:text-cyber-electric transition"
+                                    >
+                                      {'↻'}
+                                    </button>
+                                  </div>
 
-                                  const renderItem = (gitItem: typeof gitStatusList[0]) => {
-                                    const entry: FileEntry = {
-                                      name: gitItem.path.split('/').pop() || gitItem.path,
-                                      path: joinWorkspacePath(rootPath, gitItem.path),
-                                      isDir: false
-                                    };
-                                    const isActive = selectedFilePath === entry.path;
-                                    let statusBadge = '';
-                                    let textClass = 'text-slate-300 hover:text-white';
-                                    if (gitItem.status === 'modified') { statusBadge = 'M'; textClass = 'text-amber-300 hover:text-amber-200 hover:bg-amber-400/5'; }
-                                    else if (gitItem.status === 'added') { statusBadge = 'A'; textClass = 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-400/5'; }
-                                    else if (gitItem.status === 'untracked') { statusBadge = 'U'; textClass = 'text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/5'; }
-                                    else if (gitItem.status === 'deleted') { statusBadge = 'D'; textClass = 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 line-through'; }
+                                  {gitDetail?.lastCommitHash && (
+                                    <div
+                                      data-git-detail-commit
+                                      className="mt-1.5 border-t border-cyber-line/25 pt-1.5 text-[10px]"
+                                      title={`${tr("Latest commit")}: ${gitDetail.lastCommitHash} — ${gitDetail.lastCommitMessage ?? ''}`}
+                                    >
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="shrink-0 rounded bg-slate-800/80 border border-slate-700/60 px-1 font-mono text-[9px] text-cyber-neon">
+                                          {gitDetail.lastCommitHash}
+                                        </span>
+                                        <span className="truncate text-slate-300 font-medium">
+                                          {gitDetail.lastCommitMessage}
+                                        </span>
+                                      </div>
+                                      {(gitDetail.lastCommitAuthor || gitDetail.lastCommitRelativeTime) && (
+                                        <div className="mt-0.5 truncate text-[9px] text-slate-500">
+                                          {[gitDetail.lastCommitAuthor, gitDetail.lastCommitRelativeTime].filter(Boolean).join(' · ')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {(() => {
+                                    const stagedCount = gitStatusList.filter((g) => g.staged).length;
+                                    const modifiedCount = gitStatusList.filter((g) => g.status === 'modified').length;
+                                    const untrackedCount = gitStatusList.filter((g) => g.status === 'untracked').length;
+                                    const deletedCount = gitStatusList.filter((g) => g.status === 'deleted').length;
+                                    const totalAdd = gitDetail?.totalAdditions ?? gitStatusList.reduce((s, g) => s + (g.additions ?? 0), 0);
+                                    const totalDel = gitDetail?.totalDeletions ?? gitStatusList.reduce((s, g) => s + (g.deletions ?? 0), 0);
 
                                     return (
-                                      <button
-                                        key={gitItem.path}
-                                        type="button"
-                                        aria-disabled={gitItem.status === 'deleted'}
-                                        onClick={() => {
-                                          if (gitItem.status !== 'deleted') void onFileClick(entry, rootPath);
-                                        }}
-                                        onContextMenu={(event) => {
-                                          event.preventDefault();
-                                          setFileContextMenu({
-                                            x: event.clientX,
-                                            y: event.clientY,
-                                            target: {
-                                              path: entry.path,
-                                              isDir: false,
-                                              name: entry.name,
-                                              rootPath,
-                                              connection: null,
-                                              canDelete: gitItem.status !== 'deleted',
-                                            },
-                                          });
-                                        }}
-                                        className={`flex w-full items-center justify-between px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 ${
-                                          isActive ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' : `${textClass}`
-                                        }`}>
-                                        <div className="flex flex-col min-w-0">
-                                          <span className="truncate font-semibold text-slate-200">{entry.name}</span>
-                                          <span className="truncate text-[8px] text-slate-500 font-mono mt-0.5" title={gitItem.path}>{gitItem.path}</span>
-                                        </div>
-                                        <span className={`text-[9px] font-bold px-1 py-0.2 rounded border font-mono scale-90 ${
-                                          gitItem.status === 'modified' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
-                                          gitItem.status === 'added' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
-                                          gitItem.status === 'untracked' ? 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20' :
-                                          'text-rose-500 bg-rose-500/10 border-rose-500/20 line-through'
-                                        }`}>{statusBadge}</span>
-                                      </button>
+                                      <div
+                                        data-git-detail-stats
+                                        className="mt-1.5 flex flex-wrap items-center gap-1 border-t border-cyber-line/25 pt-1.5 text-[9px] font-mono"
+                                      >
+                                        {gitStatusList.length === 0 ? (
+                                          <span className="text-emerald-400 font-sans text-[10px]">
+                                            {`✓ ${tr("Clean working tree")}`}
+                                          </span>
+                                        ) : (
+                                          <>
+                                            {(totalAdd > 0 || totalDel > 0) && (
+                                              <span className="mr-1 flex items-center gap-1 rounded bg-black/30 px-1.5 py-0.5 border border-cyber-line/30">
+                                                <span className="text-emerald-400 font-bold">{`+${totalAdd}`}</span>
+                                                <span className="text-rose-400 font-bold">{`-${totalDel}`}</span>
+                                              </span>
+                                            )}
+                                            {stagedCount > 0 && (
+                                              <span className="rounded bg-emerald-500/10 border border-emerald-500/25 px-1 py-0.2 text-emerald-300">
+                                                {tr("Staged: {v0}", { v0: stagedCount })}
+                                              </span>
+                                            )}
+                                            {modifiedCount > 0 && (
+                                              <span className="rounded bg-amber-500/10 border border-amber-500/25 px-1 py-0.2 text-amber-300">
+                                                {tr("Modified: {v0}", { v0: modifiedCount })}
+                                              </span>
+                                            )}
+                                            {untrackedCount > 0 && (
+                                              <span className="rounded bg-cyan-500/10 border border-cyan-500/25 px-1 py-0.2 text-cyan-300">
+                                                {tr("Untracked: {v0}", { v0: untrackedCount })}
+                                              </span>
+                                            )}
+                                            {deletedCount > 0 && (
+                                              <span className="rounded bg-rose-500/10 border border-rose-500/25 px-1 py-0.2 text-rose-300">
+                                                {tr("Deleted: {v0}", { v0: deletedCount })}
+                                              </span>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
                                     );
-                                  };
+                                  })()}
+                                </div>
 
-                                  return (
-                                    <>
-                                      {staged.length > 0 && (
-                                        <div>
-                                          <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-emerald-400 border-b border-cyber-line/20">{tr("Changes to be committed")}</div>
-                                          {staged.map(renderItem)}
-                                        </div>
-                                      )}
-                                      {unstaged.length > 0 && (
-                                        <div>
-                                          <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-rose-400 border-b border-cyber-line/20">{tr("Changes not staged for commit")}</div>
-                                          {unstaged.map(renderItem)}
-                                        </div>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </div>
+                                {gitStatusList.length === 0 ? (
+                                  <p className="px-4 py-1 text-xs italic text-slate-500 font-mono">{tr("No changed files in workspace.")}</p>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {(() => {
+                                      const staged = gitStatusList.filter((g) => g.staged);
+                                      const unstaged = gitStatusList.filter((g) => !g.staged);
+
+                                      const renderItem = (gitItem: GitStatusEntry) => {
+                                        const entry: FileEntry = {
+                                          name: gitItem.path.split(/[/\\]/).pop() || gitItem.path,
+                                          path: joinWorkspacePath(rootPath, gitItem.path),
+                                          isDir: false,
+                                        };
+                                        const isActive = selectedFilePath
+                                          ? normalizeUiPath(selectedFilePath) === normalizeUiPath(entry.path)
+                                          : false;
+                                        let statusBadge = 'M';
+                                        let textClass = 'text-slate-300 hover:text-white';
+                                        if (gitItem.status === 'modified') {
+                                          statusBadge = 'M';
+                                          textClass = 'text-amber-300 hover:text-amber-200 hover:bg-amber-400/5';
+                                        } else if (gitItem.status === 'added') {
+                                          statusBadge = 'A';
+                                          textClass = 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-400/5';
+                                        } else if (gitItem.status === 'untracked') {
+                                          statusBadge = 'U';
+                                          textClass = 'text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/5';
+                                        } else if (gitItem.status === 'deleted') {
+                                          statusBadge = 'D';
+                                          textClass = 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/5';
+                                        }
+
+                                        return (
+                                          <div
+                                            key={`${gitItem.staged ? 'staged' : 'unstaged'}-${gitItem.path}`}
+                                            data-git-detail-file={gitItem.path}
+                                            role="button"
+                                            tabIndex={0}
+                                            title={tr("Open diff in tab")}
+                                            onClick={() => {
+                                              void onFileClick(entry, rootPath, {
+                                                preferDiff: true,
+                                                gitStatus: gitItem.status,
+                                              });
+                                            }}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                void onFileClick(entry, rootPath, {
+                                                  preferDiff: true,
+                                                  gitStatus: gitItem.status,
+                                                });
+                                              }
+                                            }}
+                                            onContextMenu={(event) => {
+                                              event.preventDefault();
+                                              setFileContextMenu({
+                                                x: event.clientX,
+                                                y: event.clientY,
+                                                target: {
+                                                  path: entry.path,
+                                                  isDir: false,
+                                                  name: entry.name,
+                                                  rootPath,
+                                                  connection: null,
+                                                  canDelete: gitItem.status !== 'deleted',
+                                                },
+                                              });
+                                            }}
+                                            className={`group flex w-full items-center justify-between gap-2 px-4 py-1.5 text-left transition text-xs font-mono border-b border-cyber-line/10 cursor-pointer ${
+                                              isActive ? 'bg-cyber-neon/10 text-cyber-neon border-l-2 border-cyber-neon pl-3.5' : textClass
+                                            }`}
+                                          >
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                              <span className={`truncate font-semibold text-slate-200 ${gitItem.status === 'deleted' ? 'line-through opacity-80' : ''}`}>
+                                                {entry.name}
+                                              </span>
+                                              <span className="truncate text-[8px] text-slate-500 font-mono mt-0.5" title={gitItem.path}>
+                                                {gitItem.path}
+                                              </span>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-1">
+                                              {(gitItem.additions !== undefined || gitItem.deletions !== undefined) && (
+                                                <span className="flex items-center gap-0.5 font-mono text-[9px]">
+                                                  {(gitItem.additions ?? 0) > 0 && (
+                                                    <span className="text-emerald-400">{`+${gitItem.additions}`}</span>
+                                                  )}
+                                                  {(gitItem.deletions ?? 0) > 0 && (
+                                                    <span className="text-rose-400">{`-${gitItem.deletions}`}</span>
+                                                  )}
+                                                </span>
+                                              )}
+                                              {gitItem.status !== 'deleted' && (
+                                                <button
+                                                  type="button"
+                                                  data-git-detail-edit={gitItem.path}
+                                                  title={tr("Open file in editor tab")}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void onFileClick(entry, rootPath, {
+                                                      preferDiff: false,
+                                                      gitStatus: gitItem.status,
+                                                    });
+                                                  }}
+                                                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 rounded border border-cyber-line/50 bg-cyber-base/70 px-1 py-0.2 text-[9px] text-slate-300 hover:border-cyber-electric/50 hover:text-cyber-electric transition"
+                                                >
+                                                  {'✎'}
+                                                </button>
+                                              )}
+                                              <span
+                                                className={`text-[9px] font-bold px-1 py-0.2 rounded border font-mono scale-90 ${
+                                                  gitItem.status === 'modified'
+                                                    ? 'text-amber-400 bg-amber-400/10 border-amber-400/20'
+                                                    : gitItem.status === 'added'
+                                                      ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20'
+                                                      : gitItem.status === 'untracked'
+                                                        ? 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20'
+                                                        : 'text-rose-500 bg-rose-500/10 border-rose-500/20'
+                                                }`}
+                                              >
+                                                {statusBadge}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        );
+                                      };
+
+                                      return (
+                                        <>
+                                          {staged.length > 0 && (
+                                            <div>
+                                              <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-emerald-400 border-b border-cyber-line/20">{tr("Changes to be committed")}</div>
+                                              {staged.map(renderItem)}
+                                            </div>
+                                          )}
+                                          {unstaged.length > 0 && (
+                                            <div>
+                                              <div className="px-4 py-1 text-[9px] uppercase tracking-wider font-bold text-rose-400 border-b border-cyber-line/20">{tr("Changes not staged for commit")}</div>
+                                              {unstaged.map(renderItem)}
+                                            </div>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         )}
@@ -2891,7 +3146,7 @@ export function CliSidebar({
       {fileContextMenu && (
         <div
           style={(() => {
-            const pos = getContextMenuPosition(fileContextMenu.x, fileContextMenu.y, 200, 160);
+            const pos = getContextMenuPosition(fileContextMenu.x, fileContextMenu.y, 200, 200);
             return { top: `${pos.y}px`, left: `${pos.x}px` };
           })()}
           className="fixed z-[150] w-48 rounded-lg border border-cyber-neon/40 bg-cyber-panel/95 p-1 text-slate-100 shadow-2xl backdrop-blur-md select-none font-mono text-[11px]"
@@ -2905,6 +3160,18 @@ export function CliSidebar({
             }}
             className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
           >{tr("📋 Copy Path")}</button>
+          {!fileContextMenu.target.isRemote && !fileContextMenu.target.connection && (
+            <button
+              type="button"
+              data-file-context-action="vscode"
+              onClick={() => {
+                const path = fileContextMenu.target.path;
+                setFileContextMenu(null);
+                void invoke('open_in_vscode', { path }).catch(error => showMessage(tr('Could not open VS Code: {error}', { error: String(error) })));
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left hover:bg-cyber-electric/20 transition"
+            >{tr('Open in VS Code')}</button>
+          )}
           {!fileContextMenu.target.connection && (
             <button
               type="button"

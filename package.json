@@ -27,7 +27,11 @@
     "test:terminal-search:ui": "node scripts/terminal-search-smoke.mjs",
     "test:terminal-shortcuts": "node --test scripts/terminal-shortcuts.test.mjs",
     "test:terminal-shortcuts:ui": "node scripts/terminal-shortcuts-smoke.mjs",
-    "test:ssh-fingerprint:ui": "node scripts/ssh-fingerprint-smoke.mjs"
+    "test:terminal-links": "node --test scripts/terminal-links.test.mjs",
+    "test:terminal-links:ui": "node scripts/terminal-links-smoke.mjs",
+    "test:ssh-fingerprint:ui": "node scripts/ssh-fingerprint-smoke.mjs",
+    "test:web-browser": "node --test scripts/web-browser.test.mjs scripts/sidebar-navigation.test.mjs",
+    "test:web-browser:native": "node scripts/web-browser-native-smoke.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

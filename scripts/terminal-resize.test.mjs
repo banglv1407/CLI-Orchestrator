@@ -7,7 +7,13 @@ import { build } from 'esbuild';
 globalThis.self = globalThis;
 const { Terminal } = createRequire(import.meta.url)('@xterm/xterm');
 const bundled = await build({ entryPoints: ['src/lib/terminalResize.ts'], bundle: true, write: false, platform: 'node', format: 'esm' });
-const { ConptyResizeAddon, INITIAL_TERMINAL_SIZE, TerminalResizeQueue } = await import(
+const {
+  ConptyResizeAddon,
+  INITIAL_TERMINAL_SIZE,
+  normalizeTerminalMouseCoords,
+  TerminalMouseZoomAddon,
+  TerminalResizeQueue,
+} = await import(
   `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`
 );
 const write = (term, text) => new Promise(resolve => term.write(text, resolve));
@@ -160,4 +166,60 @@ test('failed dimensions can be retried and other PTYs resize independently', asy
   assert.equal(calls.length, 2);
   assert.equal(secondCalls.length, 1);
   first.dispose(); second.dispose();
+});
+
+test('normalizeTerminalMouseCoords and TerminalMouseZoomAddon keep selection coordinates aligned under CSS zoom', () => {
+  const unzoomed = { clientX: 293.075, clientY: 102.5 };
+  assert.equal(
+    normalizeTerminalMouseCoords(unzoomed, { left: 60, top: 40, width: 572, height: 300 }, 572, 300),
+    unzoomed,
+    '100% zoom passes event reference unchanged',
+  );
+
+  for (const zoom of [1.15, 1.25, 1.5]) {
+    const rect = { left: 60 * zoom, top: 40 * zoom, width: 572 * zoom, height: 300 * zoom };
+    const zoomedClick = {
+      clientX: rect.left + 30.5 * 7.15 * zoom,
+      clientY: rect.top + 3.5 * 15 * zoom,
+    };
+    const normalized = normalizeTerminalMouseCoords(zoomedClick, rect, 572, 300);
+    assert.ok(Math.abs((normalized.clientX - rect.left) - 30.5 * 7.15) < 1e-6, `zoom ${zoom}x X offset`);
+    assert.ok(Math.abs((normalized.clientY - rect.top) - 3.5 * 15) < 1e-6, `zoom ${zoom}x Y offset`);
+  }
+
+  const seen = [];
+  const fakeService = {
+    getCoords(event) { seen.push(['coords', event]); return [31, 4]; },
+    getMouseReportCoords(event) { seen.push(['report', event]); return { col: 30, row: 3, x: 218, y: 52 }; },
+  };
+  let opened = false;
+  const fakeTerminal = {
+    _core: {},
+    open() {
+      opened = true;
+      this._core._mouseService = fakeService;
+    },
+  };
+  const origOpen = fakeTerminal.open;
+  const origGetCoords = fakeService.getCoords;
+  const addon = new TerminalMouseZoomAddon();
+  addon.activate(fakeTerminal);
+  fakeTerminal.open({});
+  assert.equal(opened, true);
+
+  const fakeElement = {
+    offsetWidth: 572,
+    offsetHeight: 300,
+    getBoundingClientRect: () => ({ left: 75, top: 50, width: 715, height: 375 }),
+  };
+  fakeService.getCoords({ clientX: 75 + 200 * 1.25, clientY: 50 + 60 * 1.25 }, fakeElement, 80, 20, true);
+  fakeService.getMouseReportCoords({ clientX: 75 + 100 * 1.25, clientY: 50 + 30 * 1.25 }, fakeElement);
+  assert.ok(Math.abs(seen[0][1].clientX - 275) < 1e-6);
+  assert.ok(Math.abs(seen[0][1].clientY - 110) < 1e-6);
+  assert.ok(Math.abs(seen[1][1].clientX - 175) < 1e-6);
+  assert.ok(Math.abs(seen[1][1].clientY - 80) < 1e-6);
+
+  addon.dispose();
+  assert.equal(fakeTerminal.open, origOpen);
+  assert.equal(fakeService.getCoords, origGetCoords);
 });

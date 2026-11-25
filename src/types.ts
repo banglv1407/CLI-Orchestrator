@@ -111,8 +111,30 @@ export interface RipgrepMatch {
 
 export interface GitStatusEntry {
   path: string;
-  status: 'modified' | 'added' | 'deleted' | 'untracked';
+  status: 'modified' | 'added' | 'deleted' | 'untracked' | string;
   staged: boolean;
+  additions?: number;
+  deletions?: number;
+}
+
+export interface GitRepoDetail {
+  isRepo: boolean;
+  branch: string;
+  upstream?: string | null;
+  ahead: number;
+  behind: number;
+  lastCommitHash?: string | null;
+  lastCommitMessage?: string | null;
+  lastCommitAuthor?: string | null;
+  lastCommitRelativeTime?: string | null;
+  totalAdditions: number;
+  totalDeletions: number;
+  entries: GitStatusEntry[];
+}
+
+export interface FileOpenOptions {
+  preferDiff?: boolean;
+  gitStatus?: GitStatusEntry['status'];
 }
 
 export interface FolderHistoryEntry {

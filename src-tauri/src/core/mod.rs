@@ -24,4 +24,10 @@ pub mod ssh_server;
 pub mod ssh_fingerprint;
 pub mod stream_assembler;
 pub mod system_log;
+pub mod vscode;
+pub mod web_browser;
+mod web_browser_secrets;
+pub mod web_browser_relay;
+pub mod web_browser_chain;
+pub mod web_browser_store;
 

@@ -118,6 +118,105 @@ export class ConptyResizeAddon implements ITerminalAddon {
   }
 }
 
+export interface MouseCoordsPoint {
+  clientX: number;
+  clientY: number;
+}
+
+interface InternalMouseService {
+  getCoords(
+    event: MouseCoordsPoint,
+    element: HTMLElement,
+    colCount: number,
+    rowCount: number,
+    isSelection?: boolean,
+  ): [number, number] | undefined;
+  getMouseReportCoords(
+    event: MouseCoordsPoint,
+    element: HTMLElement,
+  ): { col: number; row: number; x: number; y: number } | undefined;
+}
+
+export function normalizeTerminalMouseCoords<T extends MouseCoordsPoint>(
+  event: T,
+  rect: { left: number; top: number; width: number; height: number },
+  layoutWidth: number,
+  layoutHeight: number,
+): T | MouseCoordsPoint {
+  const scaleX = layoutWidth > 0 && rect.width > 0 ? rect.width / layoutWidth : 1;
+  const scaleY = layoutHeight > 0 && rect.height > 0 ? rect.height / layoutHeight : 1;
+  if (Math.abs(scaleX - 1) < 0.001 && Math.abs(scaleY - 1) < 0.001) return event;
+  // ponytail: covers CSS zoom/scale on ancestors; add full 2D matrix inverse only if rotated terminals ever exist.
+  return {
+    clientX: rect.left + (event.clientX - rect.left) / scaleX,
+    clientY: rect.top + (event.clientY - rect.top) / scaleY,
+  };
+}
+
+export class TerminalMouseZoomAddon implements ITerminalAddon {
+  private terminal?: Terminal;
+  private originalOpen?: Terminal['open'];
+  private openWrapper?: Terminal['open'];
+  private mouseService?: InternalMouseService;
+  private originalGetCoords?: InternalMouseService['getCoords'];
+  private originalGetMouseReportCoords?: InternalMouseService['getMouseReportCoords'];
+
+  activate(terminal: Terminal): void {
+    this.terminal = terminal;
+    const patchMouseService = () => {
+      const svc = (terminal as unknown as {
+        _core?: { _mouseService?: InternalMouseService };
+      })._core?._mouseService;
+      if (!svc || this.mouseService === svc) return;
+      this.mouseService = svc;
+      const origCoords = svc.getCoords;
+      const origReport = svc.getMouseReportCoords;
+      this.originalGetCoords = origCoords;
+      this.originalGetMouseReportCoords = origReport;
+      svc.getCoords = (event, element, colCount, rowCount, isSelection) =>
+        origCoords.call(
+          svc,
+          normalizeTerminalMouseCoords(event, element.getBoundingClientRect(), element.offsetWidth, element.offsetHeight),
+          element,
+          colCount,
+          rowCount,
+          isSelection,
+        );
+      svc.getMouseReportCoords = (event, element) =>
+        origReport.call(
+          svc,
+          normalizeTerminalMouseCoords(event, element.getBoundingClientRect(), element.offsetWidth, element.offsetHeight),
+          element,
+        );
+    };
+
+    patchMouseService();
+    const originalOpen = terminal.open;
+    this.originalOpen = originalOpen;
+    this.openWrapper = (parent) => {
+      originalOpen.call(terminal, parent);
+      patchMouseService();
+    };
+    terminal.open = this.openWrapper;
+  }
+
+  dispose(): void {
+    if (this.terminal && this.terminal.open === this.openWrapper && this.originalOpen) {
+      this.terminal.open = this.originalOpen;
+    }
+    if (this.mouseService) {
+      if (this.originalGetCoords) this.mouseService.getCoords = this.originalGetCoords;
+      if (this.originalGetMouseReportCoords) this.mouseService.getMouseReportCoords = this.originalGetMouseReportCoords;
+    }
+    this.terminal = undefined;
+    this.originalOpen = undefined;
+    this.openWrapper = undefined;
+    this.mouseService = undefined;
+    this.originalGetCoords = undefined;
+    this.originalGetMouseReportCoords = undefined;
+  }
+}
+
 function sameSize(first: TerminalSize | undefined, second: TerminalSize): boolean {
   return first?.cols === second.cols && first.rows === second.rows;
 }

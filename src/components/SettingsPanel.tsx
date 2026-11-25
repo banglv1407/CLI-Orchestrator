@@ -43,6 +43,10 @@ import {
   setTerminalFontSize,
   getTerminalFontFamily,
   setTerminalFontFamily,
+  getMiniTerminalDisplayMode,
+  setMiniTerminalDisplayMode,
+  getMiniTerminalScale,
+  setMiniTerminalScale,
   UI_ZOOM_PRESETS,
   UI_FONT_OPTIONS,
   TERMINAL_FONT_SIZES,
@@ -165,6 +169,8 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
   const [uiFont, setUiFontState] = useState(getUiFontFamily);
   const [termFontSize, setTermFontSizeState] = useState(getTerminalFontSize);
   const [termFontFamily, setTermFontFamilyState] = useState(getTerminalFontFamily);
+  const [miniDisplayMode, setMiniDisplayModeState] = useState(getMiniTerminalDisplayMode);
+  const [miniScale, setMiniScaleState] = useState(getMiniTerminalScale);
 
   useEffect(() => {
     const onAppChange = () => {
@@ -175,11 +181,17 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
       setTermFontSizeState(getTerminalFontSize());
       setTermFontFamilyState(getTerminalFontFamily());
     };
+    const onMiniChange = () => {
+      setMiniDisplayModeState(getMiniTerminalDisplayMode());
+      setMiniScaleState(getMiniTerminalScale());
+    };
     window.addEventListener('clx-appearance-changed', onAppChange);
     window.addEventListener('clx-terminal-font-changed', onTermChange);
+    window.addEventListener('clx-mini-terminal-config-changed', onMiniChange);
     return () => {
       window.removeEventListener('clx-appearance-changed', onAppChange);
       window.removeEventListener('clx-terminal-font-changed', onTermChange);
+      window.removeEventListener('clx-mini-terminal-config-changed', onMiniChange);
     };
   }, []);
 
@@ -683,6 +695,53 @@ export function SettingsPanel({ theme, setTheme }: SettingsPanelProps) {
                       </select>
                     </div>
                     <p className="text-[10px] text-slate-500">{tr("Phông chữ monospace hiển thị trong cửa sổ terminal.")}</p>
+                  </div>
+
+                  <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-2 text-xs text-slate-200">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{tr("Mini terminal display")}</span>
+                      <select
+                        value={miniDisplayMode}
+                        onChange={(e) => setMiniTerminalDisplayMode(e.target.value === 'title-only' ? 'title-only' : 'preview')}
+                        aria-label={tr("Mini terminal display")}
+                        data-mini-terminal-display
+                        className="rounded border border-cyber-line bg-cyber-base px-2.5 py-1 font-semibold text-cyber-neon outline-none transition focus:border-cyber-neon cursor-pointer text-xs max-w-[160px] truncate"
+                      >
+                        <option value="preview">{tr("Mini terminal")}</option>
+                        <option value="title-only">{tr("Title only")}</option>
+                      </select>
+                    </div>
+                    <p className="text-[10px] text-slate-500">{tr("Ctrl+click to select multiple terminals")}</p>
+                  </div>
+
+                  <div className="rounded-lg border border-cyber-line/60 bg-cyber-base/40 p-4 space-y-2 text-xs text-slate-200">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{tr("Mini terminal scale")}</span>
+                      <span className="font-mono font-bold text-cyber-neon bg-cyber-neon/10 border border-cyber-neon/40 rounded px-2 py-0.5">
+                        {Math.round(miniScale * 100)}%
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2.0"
+                        step="0.05"
+                        disabled={miniDisplayMode === 'title-only'}
+                        value={miniScale}
+                        onChange={(e) => setMiniTerminalScale(parseFloat(e.target.value))}
+                        className="flex-1 h-1.5 accent-cyber-neon cursor-pointer disabled:opacity-40"
+                      />
+                      {Math.round(miniScale * 100) !== 100 && (
+                        <button
+                          type="button"
+                          onClick={() => setMiniTerminalScale(1.0)}
+                          className="rounded border border-slate-600/60 bg-slate-800/40 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 hover:text-slate-200 transition"
+                        >
+                          100%
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1218,6 +1277,7 @@ const TAB_LABELS: Record<string, { label: string; icon: string; desc: string }> 
   'cli-manager': { label: 'Terminal Orchestor', icon: '💻', desc: 'Quản lý terminal, agent CLI và tác vụ' },
   'agent-sessions': { label: 'Agent Sessions', icon: '🗂', desc: 'Lịch sử hội thoại & resume agent CLI' },
   'ai-chat': { label: 'AI Companion', icon: '🤖', desc: 'Open AI Companion chat' },
+  'web': { label: 'Web Browser', icon: '🌐', desc: 'Browse websites through an HTTP proxy' },
   'dashboard': { label: 'Dashboard', icon: '📊', desc: 'Bảng điều khiển & giám sát hệ thống' },
   'quickapps': { label: 'Quick Apps', icon: '⚡', desc: 'Trình khởi chạy nhanh các ứng dụng ưa thích' },
   'buzz': { label: 'Buzz Workspace', icon: '💬', desc: 'Không gian làm việc cộng tác & chat P2P' },

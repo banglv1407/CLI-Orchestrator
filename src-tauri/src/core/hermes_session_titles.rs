@@ -262,8 +262,15 @@ fn owned_session_id(
 }
 
 fn read_title(conn: &Connection, id: &str) -> Option<String> {
-    conn.query_row("SELECT title FROM sessions WHERE id = ?1", [id], |row| {
-        row.get::<_, Option<String>>(0)
+    conn.query_row(
+        "SELECT COALESCE(NULLIF(TRIM(display_name), ''), NULLIF(TRIM(title), '')) FROM sessions WHERE id = ?1",
+        [id],
+        |row| row.get::<_, Option<String>>(0),
+    )
+    .or_else(|_| {
+        conn.query_row("SELECT title FROM sessions WHERE id = ?1", [id], |row| {
+            row.get::<_, Option<String>>(0)
+        })
     })
     .optional()
     .ok()

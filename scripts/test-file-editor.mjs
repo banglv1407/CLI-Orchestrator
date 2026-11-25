@@ -1,4 +1,6 @@
 import assert from 'assert';
+import fs from 'fs';
+import path from 'path';
 
 function formatConfigContent(fileName, content) {
   const ext = fileName.split('.').pop()?.toLowerCase();
@@ -83,5 +85,24 @@ const outdented = outdentLine(indentedText, pos);
 assert.strictEqual(outdented.newContent, 'line1\n  indented line\nline3');
 assert.strictEqual(outdented.newPos, 8);
 console.log('✓ Shift+Tab outdent test passed');
+
+// Test 5: Standalone multi-tab + pin/unpin FileEditorPanel integration checks
+const editorSrc = fs.readFileSync(path.resolve('src/components/FileEditorPanel.tsx'), 'utf8');
+const terminalSrc = fs.readFileSync(path.resolve('src/components/TerminalPanel.tsx'), 'utf8');
+const dashboardSrc = fs.readFileSync(path.resolve('src/pages/Dashboard.tsx'), 'utf8');
+const sidebarSrc = fs.readFileSync(path.resolve('src/components/CliSidebar.tsx'), 'utf8');
+
+assert.ok(!terminalSrc.includes('openedFile'), 'TerminalPanel must not embed openedFile overlay');
+assert.ok(editorSrc.includes('export interface OpenedFileTab'), 'FileEditorPanel exports OpenedFileTab');
+assert.ok(editorSrc.includes('data-file-editor-tab='), 'FileEditorPanel renders multi-file tab strip');
+assert.ok(editorSrc.includes('data-file-editor-pin'), 'FileEditorPanel supports Pin/Unpin toggle');
+assert.ok(editorSrc.includes('data-file-search') && editorSrc.includes('data-file-search-count'), 'FileEditorPanel preserves debounced file search attributes');
+assert.ok(editorSrc.includes('Save & Close') && editorSrc.includes('Close saved'), 'FileEditorPanel supports dirty tab confirm & Close saved');
+assert.ok(dashboardSrc.includes('clx-file-editor-pinned') && dashboardSrc.includes('data-file-editor-resizer'), 'Dashboard persists pinned mode and resizer');
+assert.ok(sidebarSrc.includes('data-open-file-editor-tabs'), 'CliSidebar Explorer exposes open tabs pill button');
+assert.ok(sidebarSrc.includes('data-git-detail-section') && sidebarSrc.includes('data-git-detail-branch') && sidebarSrc.includes('data-git-detail-commit'), 'CliSidebar Explorer renders Git Detail panel with branch and latest commit metadata');
+assert.ok(sidebarSrc.includes('preferDiff: true') && sidebarSrc.includes('preferDiff: false'), 'Git Detail delegates diff/edit opening to unified onFileClick handler');
+assert.ok(dashboardSrc.includes('getGitDetail') && dashboardSrc.includes('options?: FileOpenOptions'), 'Dashboard fetches GitRepoDetail and supports FileOpenOptions in unified handleFileClick');
+console.log('✓ Standalone multi-tab + pin/unpin + Git Detail architecture checks passed');
 
 console.log('ALL FILE EDITOR TESTS PASSED!');

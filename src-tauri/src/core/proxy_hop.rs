@@ -330,7 +330,7 @@ use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use tokio::{net::TcpListener, task::JoinHandle};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ProxyHop {
     pub kind: String,
@@ -504,7 +504,7 @@ impl Drop for Transport {
     }
 }
 
-struct PinnedKey(String);
+pub(crate) struct PinnedKey(String);
 impl client::Handler for PinnedKey {
     type Error = russh::Error;
     async fn check_server_key(
@@ -516,6 +516,45 @@ impl client::Handler for PinnedKey {
             .to_string()
             == self.0)
     }
+}
+
+pub(crate) async fn connect_ssh(hop: &ProxyHop) -> Result<client::Handle<PinnedKey>, String> {
+    hop.validate()?;
+    if hop.kind != "ssh" { return Err("Unsupported hop type".into()); }
+    let host = super::ssh_fingerprint::validate_address(&hop.host, hop.port)?;
+    let config = Arc::new(client::Config {
+        keepalive_interval: Some(Duration::from_secs(20)), keepalive_max: 3,
+        ..Default::default()
+    });
+    authenticate_ssh(hop, client::connect(config, (host, hop.port), PinnedKey(hop.host_key.clone()))).await
+}
+
+pub(crate) async fn connect_ssh_stream<S>(hop: &ProxyHop, stream: S) -> Result<client::Handle<PinnedKey>, String>
+where S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static {
+    hop.validate()?;
+    if hop.kind != "ssh" { return Err("Unsupported hop type".into()); }
+    let config = Arc::new(client::Config { keepalive_interval: Some(Duration::from_secs(20)), keepalive_max: 3, ..Default::default() });
+    authenticate_ssh(hop, client::connect_stream(config, stream, PinnedKey(hop.host_key.clone()))).await
+}
+
+async fn authenticate_ssh<F>(hop: &ProxyHop, connection: F) -> Result<client::Handle<PinnedKey>, String>
+where F: std::future::Future<Output=Result<client::Handle<PinnedKey>,russh::Error>> {
+    tokio::time::timeout(Duration::from_secs(30), async {
+        let mut ssh = connection.await.map_err(|_| "SSH connection or server fingerprint verification failed")?;
+        let auth = if hop.auth_mode == "password" {
+            ssh.authenticate_password(&hop.username, &hop.secret).await
+        } else {
+            let key = russh::keys::load_secret_key(&hop.key_path,
+                if hop.secret.is_empty() { None } else { Some(hop.secret.as_str()) })
+                .map_err(|_| "Cannot load SSH key (check path and passphrase)")?;
+            let hash = ssh.best_supported_rsa_hash().await
+                .map_err(|_| "SSH algorithm negotiation failed")?.flatten();
+            ssh.authenticate_publickey(&hop.username, PrivateKeyWithHashAlg::new(Arc::new(key), hash)).await
+        }.map_err(|_| "SSH authentication failed")?;
+        if !auth.success() { return Err("SSH authentication rejected"); }
+        Ok(ssh)
+    }).await.map_err(|_| "SSH connection/authentication timed out")?
+        .map_err(str::to_string)
 }
 
 pub async fn transport(hop: Option<&ProxyHop>, target: &str) -> Result<Transport, String> {
@@ -533,7 +572,6 @@ pub async fn transport(hop: Option<&ProxyHop>, target: &str) -> Result<Transport
                     .map_err(|_| "Invalid outbound proxy configuration")?,
             );
         } else {
-            let ssh_host = super::ssh_fingerprint::validate_address(&hop.host, hop.port)?;
             let target = Url::parse(target).map_err(|_| "Invalid upstream URL")?;
             if !["http", "https"].contains(&target.scheme()) {
                 return Err("SSH upstream must use HTTP or HTTPS".into());
@@ -545,51 +583,7 @@ pub async fn transport(hop: Option<&ProxyHop>, target: &str) -> Result<Transport
             let port = target
                 .port_or_known_default()
                 .ok_or("Missing upstream port")?;
-            let ssh_config = Arc::new(client::Config {
-                keepalive_interval: Some(Duration::from_secs(20)),
-                keepalive_max: 3,
-                ..Default::default()
-            });
-            let connect = async {
-                let mut ssh = client::connect(
-                    ssh_config,
-                    (ssh_host, hop.port),
-                    PinnedKey(hop.host_key.clone()),
-                )
-                .await
-                .map_err(|_| "SSH connection or server fingerprint verification failed")?;
-                let auth = if hop.auth_mode == "password" {
-                    ssh.authenticate_password(&hop.username, &hop.secret).await
-                } else {
-                    let key = russh::keys::load_secret_key(
-                        &hop.key_path,
-                        if hop.secret.is_empty() {
-                            None
-                        } else {
-                            Some(hop.secret.as_str())
-                        },
-                    )
-                    .map_err(|_| "Cannot load SSH key (check path and passphrase)")?;
-                    let hash = ssh
-                        .best_supported_rsa_hash()
-                        .await
-                        .map_err(|_| "SSH algorithm negotiation failed")?
-                        .flatten();
-                    ssh.authenticate_publickey(
-                        &hop.username,
-                        PrivateKeyWithHashAlg::new(Arc::new(key), hash),
-                    )
-                    .await
-                }
-                .map_err(|_| "SSH authentication failed")?;
-                if !auth.success() {
-                    return Err("SSH authentication rejected");
-                }
-                Ok(ssh)
-            };
-            let ssh = tokio::time::timeout(Duration::from_secs(30), connect)
-                .await
-                .map_err(|_| "SSH connection/authentication timed out")??;
+            let ssh = connect_ssh(hop).await?;
             let listener = TcpListener::bind(("127.0.0.1", 0))
                 .await
                 .map_err(|_| "Cannot bind SSH loopback tunnel")?;

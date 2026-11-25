@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+
 import type {
   CatalogResponse,
   CliDefinition,
@@ -189,12 +190,42 @@ export function openWorkspaceFolder(path: string): Promise<void> {
   return invoke('open_workspace_folder', { path });
 }
 
+export function openInVSCode(path: string): Promise<void> {
+  return invoke('open_in_vscode', { path });
+}
+
 export function revealInFileManager(path: string): Promise<void> {
   return invoke('reveal_in_file_manager', { path });
 }
 
-export function getGitStatus(repoPath: string): Promise<any[]> {
-  return invoke('get_git_status', { repoPath });
+export function getGitStatus(repoPath: string): Promise<GitStatusEntry[]> {
+  return invoke<GitStatusEntry[]>('get_git_status', { repoPath });
+}
+
+export async function getGitDetail(repoPath: string): Promise<import('../types').GitRepoDetail> {
+  try {
+    const detail = await invoke<import('../types').GitRepoDetail | null>('get_git_detail', { repoPath });
+    if (detail && typeof detail === 'object' && Array.isArray(detail.entries)) {
+      return detail;
+    }
+  } catch {
+    // Fallback to get_git_status when running against minimal mocks
+  }
+  const entries = (await getGitStatus(repoPath)) ?? [];
+  return {
+    isRepo: entries.length > 0,
+    branch: entries.length > 0 ? 'HEAD' : '',
+    upstream: null,
+    ahead: 0,
+    behind: 0,
+    lastCommitHash: null,
+    lastCommitMessage: null,
+    lastCommitAuthor: null,
+    lastCommitRelativeTime: null,
+    totalAdditions: entries.reduce((sum, e) => sum + (e.additions ?? 0), 0),
+    totalDeletions: entries.reduce((sum, e) => sum + (e.deletions ?? 0), 0),
+    entries,
+  };
 }
 
 export function getGitDiff(repoPath: string, filePath: string, isUntracked: boolean): Promise<string> {

@@ -1,5 +1,5 @@
 import { tFeedback as trFeedback, t as tr, useLocale } from '../i18n';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { confirm, showMessage } from '../lib/dialogs';
@@ -10,6 +10,7 @@ import { TerminalPanel } from '../components/TerminalPanel';
 import { SshConnectionModal } from '../components/SshConnectionModal';
 import { MythicalPet } from '../components/MythicalPet';
 import { Notepad } from '../components/Notepad';
+import { FileEditorPanel, type OpenedFileTab } from '../components/FileEditorPanel';
 import { CommandPalette } from '../components/CommandPalette';
 import {
   createTerminalSession,
@@ -25,7 +26,7 @@ import {
   saveSshConnections,
   createSshSession,
   createRdpSession,
-  getGitStatus,
+  getGitDetail,
   getGitDiff,
   readFileContent,
   writeFileContent,
@@ -35,12 +36,19 @@ import {
   createFileContent,
 } from '../lib/tauri';
 import { zoomIn, zoomOut, resetZoom } from '../lib/appearance';
-import { NEW_TERMINAL_EVENT } from '../lib/terminalShortcuts';
+import { canLinkTerminal, readTerminalLinks, saveTerminalLinks, type TerminalLinks } from '../lib/terminalLinks';
+import {
+  NEW_TERMINAL_EVENT,
+  CYCLE_TERMINAL_EVENT,
+  cycleTerminalSessionId,
+} from '../lib/terminalShortcuts';
 import type {
   AssistantState,
   CliDefinition,
   CliSavedDirectory,
   CliStatusEvent,
+  FileOpenOptions,
+  GitRepoDetail,
   GitStatusEntry,
   SessionInfo,
   SshConnection,
@@ -53,6 +61,17 @@ export function Dashboard() {
   const locale = useLocale();
   const [clis, setClis] = useState<CliDefinition[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [terminalLinks, setTerminalLinks] = useState<TerminalLinks>(readTerminalLinks);
+  useEffect(() => { saveTerminalLinks(terminalLinks); }, [terminalLinks]);
+  const handleLinkTerminal = useCallback((child: string, parent: string | null) => {
+    setTerminalLinks(current => {
+      if (parent && !canLinkTerminal(current, child, parent)) return current;
+      const next = { ...current };
+      if (parent) next[child] = parent;
+      else delete next[child];
+      return next;
+    });
+  }, []);
   const [pendingSessions, setPendingSessions] = useState<SessionInfo[]>([]);
   const [activeCli, setActiveCli] = useState(() => localStorage.getItem('ai-cli-last-cli') ?? '');
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -74,10 +93,24 @@ export function Dashboard() {
   const [sshConnections, setSshConnections] = useState<SshConnection[]>([]);
   const [sshModalOpen, setSshModalOpen] = useState(false);
   const [editingSsh, setEditingSsh] = useState<SshConnection | null>(null);
-  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'buzz' | 'game' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote' | 'dashboard' | 'agent-sessions'>('terminal');
-  const [showNotepad, setShowNotepad] = useState(false);
+  const [activeMainView, setActiveMainView] = useState<'terminal' | 'quickapps' | 'buzz' | 'game' | 'apiclient' | 'proxy' | 'logs' | 'settings' | 'remote' | 'dashboard' | 'agent-sessions' | 'web'>('terminal');
+  const [notepadPinned, setNotepadPinned] = useState<boolean>(() => localStorage.getItem('clx-notepad-pinned') === 'true');
+  const [showNotepad, setShowNotepad] = useState<boolean>(() => (
+    localStorage.getItem('clx-notepad-pinned') === 'true' && localStorage.getItem('clx-notepad-pinned-open') !== 'false'
+  ));
+  const [notepadWidth, setNotepadWidth] = useState<number>(() => {
+    const saved = parseInt(localStorage.getItem('clx-notepad-width') || '420', 10);
+    return Number.isNaN(saved) || saved < 280 || saved > 900 ? 420 : saved;
+  });
+  const [fileEditorPinned, setFileEditorPinned] = useState<boolean>(() => localStorage.getItem('clx-file-editor-pinned') === 'true');
+  const [showFileEditor, setShowFileEditor] = useState<boolean>(false);
+  const [fileEditorWidth, setFileEditorWidth] = useState<number>(() => {
+    const saved = parseInt(localStorage.getItem('clx-file-editor-width') || '560', 10);
+    return Number.isNaN(saved) || saved < 320 || saved > 1100 ? 560 : saved;
+  });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [terminalShortcutOrigin, setTerminalShortcutOrigin] = useState<{ view: typeof activeMainView; focus: HTMLElement | null } | null>(null);
+  const terminalShortcutReturnRafRef = useRef<number | null>(null);
   const sshGroups = useMemo(() => Array.from(new Set(sshConnections.map(connection => connection.group || 'Default'))), [sshConnections]);
 
   // ── Global right-click context menu ──
@@ -86,6 +119,8 @@ export function Dashboard() {
     y: number;
     sessionId: string | null;
     workingDir: string | null;
+    source?: 'main' | 'mini';
+    panel?: 'right' | 'bottom';
   } | null>(null);
 
   // ── New File/Directory modal ──
@@ -443,6 +478,57 @@ export function Dashboard() {
   }, [theme]);
 
   useEffect(() => {
+    localStorage.setItem('clx-notepad-pinned', String(notepadPinned));
+    if (notepadPinned) localStorage.setItem('clx-notepad-pinned-open', String(showNotepad));
+  }, [notepadPinned, showNotepad]);
+
+  useEffect(() => {
+    localStorage.setItem('clx-file-editor-pinned', String(fileEditorPinned));
+  }, [fileEditorPinned]);
+
+  const startNotepadResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = notepadWidth;
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(900, Math.max(280, Math.round(startWidth + (startX - ev.clientX))));
+      setNotepadWidth(next);
+      localStorage.setItem('clx-notepad-width', String(next));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [notepadWidth]);
+
+  const startFileEditorResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = fileEditorWidth;
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(1100, Math.max(320, Math.round(startWidth + (startX - ev.clientX))));
+      setFileEditorWidth(next);
+      localStorage.setItem('clx-file-editor-width', String(next));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [fileEditorWidth]);
+
+  useEffect(() => {
     const handleZoomKeys = (e: KeyboardEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       if (e.altKey) return;
@@ -563,19 +649,20 @@ export function Dashboard() {
     [setSessions, setActiveSessionId],
   );
 
-  // --- File Editor States ---
-  const [openedFile, setOpenedFile] = useState<{ path: string; name: string } | null>(null);
-  const [openedFileRootPath, setOpenedFileRootPath] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string>('');
-  const [fileOriginalContent, setFileOriginalContent] = useState<string>('');
-  const [isSavingFile, setIsSavingFile] = useState(false);
-  const [fileLoadError, setFileLoadError] = useState<string | null>(null);
-  const [isFileLoading, setIsFileLoading] = useState(false);
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'edit' | 'diff'>('edit');
-  const [gitDiffContent, setGitDiffContent] = useState<string>('');
-  const [isDiffLoading, setIsDiffLoading] = useState(false);
+  // --- Multi-Tab File Editor States ---
+  const [fileTabs, setFileTabs] = useState<OpenedFileTab[]>([]);
+  const fileTabsRef = useRef<OpenedFileTab[]>([]);
+  fileTabsRef.current = fileTabs;
+  const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const [gitStatusList, setGitStatusList] = useState<GitStatusEntry[]>([]);
+  const [gitDetail, setGitDetail] = useState<GitRepoDetail | null>(null);
+
+  const activeFileTab = useMemo(
+    () => fileTabs.find((t) => t.id === activeFileTabId) ?? fileTabs[0] ?? null,
+    [fileTabs, activeFileTabId],
+  );
+  const selectedFilePath = showFileEditor ? (activeFileTab?.path ?? null) : null;
+  const hasUnpinnedFileEditor = showFileEditor && !fileEditorPinned && fileTabs.length > 0;
 
   const activeSession = useMemo(() => sessions.find((s) => s.id === activeSessionId), [sessions, activeSessionId]);
   const isSshSession = useMemo(() => !!activeSession?.cliName.startsWith('SSH: '), [activeSession]);
@@ -585,111 +672,259 @@ export function Dashboard() {
   // Path helper
   const getRelativePath = useCallback((fullPath: string, root: string) => {
     let rel = fullPath.replace(root, '');
-    rel = rel.replace(/^[/\\\\]+/, '');
-    return rel.replace(/\\\\/g, '/');
+    rel = rel.replace(/^[/\\]+/, '');
+    return rel.replace(/\\/g, '/');
   }, []);
 
-  // Fetch Git Status
+  const buildFileTabId = useCallback((path: string, sshConn: SshConnection | null) => {
+    const normalized = path.replace(/\\/g, '/');
+    return `${sshConn ? `ssh:${sshConn.id}` : 'local'}:${normalized}`;
+  }, []);
+
+  // Fetch Git Detail + Status
   const refreshGitStatus = useCallback(async (repo: string) => {
     try {
-      const status = await getGitStatus(repo);
-      setGitStatusList(status);
+      const detail = await getGitDetail(repo);
+      setGitDetail(detail);
+      setGitStatusList(detail.entries);
     } catch (e) {
-      console.error('Failed to get git status:', e);
+      console.error('Failed to get git detail:', e);
     }
   }, []);
 
-  // Click file inside tree
-  const handleFileClick = useCallback(async (entry: { path: string; name: string }, rootPath: string | null) => {
+  const loadTabGitDiff = useCallback(async (
+    tabId: string,
+    fullPath: string,
+    rootPath: string | null,
+    sshConn: SshConnection | null,
+    statusHint?: string,
+  ) => {
+    if (!rootPath || sshConn) return;
+    const relPath = getRelativePath(fullPath, rootPath);
+    const isUntracked = statusHint
+      ? statusHint === 'untracked'
+      : gitStatusList.find((g) => g.path === relPath)?.status === 'untracked';
+    setFileTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, diffLoading: true } : t)));
+    try {
+      let diff = await getGitDiff(rootPath, relPath, isUntracked);
+      if (!diff && isUntracked) {
+        const raw = await readFileContent(fullPath).catch(() => '');
+        if (raw) {
+          const lines = raw.split('\n').map((l) => l.trimEnd());
+          diff = `--- /dev/null\n+++ b/${relPath}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => `+${l}`).join('\n')}`;
+        }
+      }
+      setFileTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? { ...t, gitDiffContent: diff || 'No changes or empty file.', diffLoading: false }
+            : t,
+        ),
+      );
+    } catch (e) {
+      console.error('Failed to load git diff:', e);
+      setFileTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId ? { ...t, gitDiffContent: 'Error loading diff.', diffLoading: false } : t,
+        ),
+      );
+    }
+  }, [getRelativePath, gitStatusList]);
+
+  // Unified multi-tab file opener used by both Workspace Files and Git Detail
+  const handleFileClick = useCallback(async (
+    entry: { path: string; name: string },
+    rootPath: string | null,
+    options?: FileOpenOptions,
+  ) => {
     setTerminalShortcutOrigin(null);
-    if (openedFile?.path === entry.path) return;
-    setSelectedFilePath(entry.path);
-    setOpenedFile({ path: entry.path, name: entry.name });
-    setOpenedFileRootPath(rootPath);
-    setFileLoadError(null);
-    setIsFileLoading(true);
-    setFileContent('');
-    setFileOriginalContent('');
-    setGitDiffContent('');
-    
+    const sshConn = isSshSession && activeSshConnection ? activeSshConnection : null;
+    const tabId = buildFileTabId(entry.path, sshConn);
     const relPath = rootPath ? getRelativePath(entry.path, rootPath) : '';
     const gitItem = gitStatusList.find((g) => g.path === relPath);
-    const hasGitChanges = !isSshSession && !!gitItem;
+    const resolvedGitStatus = options?.gitStatus ?? gitItem?.status;
+    const isDeleted = !sshConn && resolvedGitStatus === 'deleted';
+    const hasGitChanges = !sshConn && (!!gitItem || !!options?.preferDiff || !!resolvedGitStatus);
 
-    if (hasGitChanges) {
-      setViewMode('diff');
-    } else {
-      setViewMode('edit');
-    }
-
-    try {
-      let content = '';
-      if (isSshSession && activeSshConnection) {
-        content = await readSshFileContent(activeSshConnection, entry.path);
-      } else {
-        content = await readFileContent(entry.path);
+    const existing = fileTabsRef.current.find((t) => t.id === tabId);
+    if (existing) {
+      const nextMode: 'edit' | 'diff' | undefined =
+        options?.preferDiff === true
+          ? 'diff'
+          : options?.preferDiff === false
+            ? 'edit'
+            : undefined;
+      if (nextMode) {
+        setFileTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, viewMode: nextMode } : t)));
+        if (nextMode === 'diff' && rootPath && !sshConn) {
+          void loadTabGitDiff(tabId, entry.path, rootPath, null, resolvedGitStatus);
+        }
       }
-      setFileContent(content);
-      setFileOriginalContent(content);
-      setAssistantText(`Opened: ${entry.name}`);
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : String(e);
-      setFileLoadError(errMsg);
-      setAssistantText(`Cannot read file: ${entry.name}`);
-    } finally {
-      setIsFileLoading(false);
+      setActiveFileTabId(existing.id);
+      setShowFileEditor(true);
+      return;
     }
 
-    if (hasGitChanges && rootPath && !isSshSession && gitItem) {
-      setIsDiffLoading(true);
+    const initialViewMode: 'edit' | 'diff' =
+      options?.preferDiff === true || isDeleted ? 'diff' : 'edit';
+
+    const newTab: OpenedFileTab = {
+      id: tabId,
+      path: entry.path,
+      name: entry.name,
+      rootPath,
+      sshConnection: sshConn,
+      content: '',
+      originalContent: '',
+      loading: !isDeleted,
+      saving: false,
+      loadError: null,
+      viewMode: initialViewMode,
+      gitDiffContent: '',
+      diffLoading: hasGitChanges,
+    };
+
+    setFileTabs((prev) => (prev.some((t) => t.id === tabId) ? prev : [...prev, newTab]));
+    setActiveFileTabId(tabId);
+    setShowFileEditor(true);
+
+    if (!isDeleted) {
       try {
-        const diff = await getGitDiff(rootPath, relPath, gitItem.status === 'untracked');
-        setGitDiffContent(diff || 'No changes or empty file.');
+        const content = sshConn
+          ? await readSshFileContent(sshConn, entry.path)
+          : await readFileContent(entry.path);
+        setFileTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId
+              ? { ...t, content, originalContent: content, loading: false, loadError: null }
+              : t,
+          ),
+        );
+        setAssistantText(`Opened: ${entry.name}`);
       } catch (e) {
-        console.error('Failed to load git diff:', e);
-        setGitDiffContent('Error loading diff.');
-      } finally {
-        setIsDiffLoading(false);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        setFileTabs((prev) =>
+          prev.map((t) => (t.id === tabId ? { ...t, loading: false, loadError: errMsg } : t)),
+        );
+        setAssistantText(`Cannot read file: ${entry.name}`);
       }
+    } else {
+      setAssistantText(`Opened diff: ${entry.name}`);
     }
-  }, [gitStatusList, getRelativePath, isSshSession, activeSshConnection, openedFile]);
 
-  const handleCloseFile = useCallback(() => {
-    setTerminalShortcutOrigin(null);
-    setOpenedFile(null);
-    setOpenedFileRootPath(null);
-    setFileContent('');
-    setFileOriginalContent('');
-    setFileLoadError(null);
-    setSelectedFilePath(null);
+    if (hasGitChanges && rootPath && !sshConn) {
+      void loadTabGitDiff(tabId, entry.path, rootPath, sshConn, resolvedGitStatus);
+    }
+  }, [gitStatusList, getRelativePath, isSshSession, activeSshConnection, buildFileTabId, loadTabGitDiff]);
+
+  const handleChangeTabContent = useCallback((tabId: string, content: string) => {
+    setFileTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, content } : t)));
   }, []);
 
-  const handleSaveFile = useCallback(async () => {
-    if (!openedFile || isSavingFile) return;
-    setIsSavingFile(true);
-    try {
-      if (isSshSession && activeSshConnection) {
-        await writeSshFileContent(activeSshConnection, openedFile.path, fileContent);
+  const handleChangeTabViewMode = useCallback((tabId: string, mode: 'edit' | 'diff') => {
+    const tab = fileTabsRef.current.find((t) => t.id === tabId);
+    setFileTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, viewMode: mode } : t)));
+    if (mode === 'diff' && tab && tab.rootPath && !tab.sshConnection) {
+      void loadTabGitDiff(tab.id, tab.path, tab.rootPath, null);
+    }
+  }, [loadTabGitDiff]);
+
+  const handleCloseFileTab = useCallback((tabId: string) => {
+    setFileTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === tabId);
+      if (idx === -1) return prev;
+      const next = prev.filter((t) => t.id !== tabId);
+      if (next.length === 0) {
+        setActiveFileTabId(null);
+        setShowFileEditor(false);
       } else {
-        await writeFileContent(openedFile.path, fileContent);
+        setActiveFileTabId((currId) => {
+          if (currId !== tabId) return currId;
+          const fallback = next[Math.min(idx, next.length - 1)];
+          return fallback?.id ?? next[0].id;
+        });
       }
-      setFileOriginalContent(fileContent);
-      
-      if (openedFileRootPath && !isSshSession) {
-        void refreshGitStatus(openedFileRootPath);
+      return next;
+    });
+  }, []);
+
+  const handleCloseAllCleanFileTabs = useCallback(() => {
+    setFileTabs((prev) => {
+      const dirtyTabs = prev.filter((t) => t.content !== t.originalContent);
+      if (dirtyTabs.length === 0) {
+        setActiveFileTabId(null);
+        setShowFileEditor(false);
+        return [];
+      }
+      setActiveFileTabId((currId) =>
+        dirtyTabs.some((t) => t.id === currId) ? currId : dirtyTabs[0].id,
+      );
+      return dirtyTabs;
+    });
+  }, []);
+
+  const handleCloseFile = useCallback((deletedPath?: string) => {
+    setTerminalShortcutOrigin(null);
+    if (deletedPath) {
+      const normTarget = deletedPath.replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase();
+      setFileTabs((prev) => {
+        const next = prev.filter((t) => {
+          const normTab = t.path.replace(/\\/g, '/').toLowerCase();
+          return !(normTab === normTarget || normTab.startsWith(normTarget + '/'));
+        });
+        if (next.length === 0) {
+          setActiveFileTabId(null);
+          setShowFileEditor(false);
+        } else {
+          setActiveFileTabId((curr) => (next.some((t) => t.id === curr) ? curr : next[0].id));
+        }
+        return next;
+      });
+      return;
+    }
+    if (!fileEditorPinned) {
+      setShowFileEditor(false);
+    }
+  }, [fileEditorPinned]);
+
+  const handleSaveFileTab = useCallback(async (tabId: string, contentOverride?: string): Promise<boolean> => {
+    const tab = fileTabsRef.current.find((t) => t.id === tabId);
+    if (!tab || tab.saving) return false;
+    const nextContent = contentOverride ?? tab.content;
+    setFileTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, saving: true } : t)));
+    try {
+      if (tab.sshConnection) {
+        await writeSshFileContent(tab.sshConnection, tab.path, nextContent);
+      } else {
+        await writeFileContent(tab.path, nextContent);
+      }
+      setFileTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? { ...t, content: nextContent, originalContent: nextContent, saving: false }
+            : t,
+        ),
+      );
+
+      if (tab.rootPath && !tab.sshConnection) {
+        void refreshGitStatus(tab.rootPath);
+        if (tab.viewMode === 'diff') {
+          void loadTabGitDiff(tab.id, tab.path, tab.rootPath, null);
+        }
       }
 
       setAssistantState('Done');
-      setAssistantText(`Saved: ${openedFile.name}`);
+      setAssistantText(`Saved: ${tab.name}`);
       setTimeout(() => setAssistantState('Idle'), 2500);
+      return true;
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
+      setFileTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, saving: false } : t)));
       setAssistantState('Error');
       setAssistantText(`Save failed: ${errMsg}`);
-    } finally {
-      setIsSavingFile(false);
+      return false;
     }
-  }, [openedFile, isSavingFile, fileContent, openedFileRootPath, refreshGitStatus, isSshSession, activeSshConnection]);
+  }, [refreshGitStatus, loadTabGitDiff]);
 
   // Drag-and-drop session reordering handlers
   const handleReorderSessions = useCallback((draggedId: string, targetId: string) => {
@@ -805,17 +1040,19 @@ export function Dashboard() {
     [refreshSidebarData]
   );
 
-  const handleQuickSession = useCallback(async (panel: 'bottom' | 'right' = 'right') => {
+  const handleQuickSession = useCallback(async (panel: 'bottom' | 'right' = 'right', parentSessionId?: string | null) => {
     let workingDir: string | undefined;
-    if (activeSessionId) {
-      const activeSess = sessions.find((s) => s.id === activeSessionId);
+    const sourceId = parentSessionId === undefined ? (activeSessionId ?? sessions.find(s => s.status === 'running')?.id) : parentSessionId;
+    const parent = sessions.find(s => s.id === sourceId && s.status === 'running');
+    if (parent) {
+      const activeSess = parent;
       if (activeSess && !activeSess.cliName.startsWith('SSH: ') && activeSess.workingDir) {
         workingDir = activeSess.workingDir;
       }
     }
 
     const cliName = 'Quick - shell';
-    const pendingId = `pending-quick-${Date.now()}`;
+    const pendingId = `pending-quick-${crypto.randomUUID()}`;
     const fakeSession: SessionInfo = {
       id: pendingId,
       cliName,
@@ -836,33 +1073,75 @@ export function Dashboard() {
 
       setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
       mergeCliIntoState({ ...session, panel });
+      if (parent) handleLinkTerminal(session.id, parent.id);
       void refreshSidebarData();
       setAssistantState('Done');
       setAssistantText('Quick CLI session started.');
       return session;
     } catch (error) {
       setPendingSessions((current) => current.filter((item) => item.id !== pendingId));
-      setActiveSessionId(null);
+      setActiveSessionId(current => current === pendingId ? (parent?.id ?? null) : current);
       const message = error instanceof Error ? error.message : String(error);
       setAssistantState('Error');
       setAssistantText(`Failed to start Quick CLI: ${message}`);
     }
-  }, [activeSessionId, sessions, refreshSidebarData, mergeCliIntoState]);
+  }, [activeSessionId, sessions, refreshSidebarData, mergeCliIntoState, handleLinkTerminal]);
 
   useEffect(() => {
-    const openTerminal = async () => {
-      if (activeMainView !== 'terminal' || openedFile || paletteOpen || showNotepad || cliEditorOpen || cliStartModalOpen || sshModalOpen || newFileModal || rewriteModal) {
+    const openTerminal = async (event: Event) => {
+      if (terminalShortcutReturnRafRef.current !== null) {
+        cancelAnimationFrame(terminalShortcutReturnRafRef.current);
+        terminalShortcutReturnRafRef.current = null;
+      }
+      if (activeMainView !== 'terminal' || hasUnpinnedFileEditor || paletteOpen || (showNotepad && !notepadPinned) || cliEditorOpen || cliStartModalOpen || sshModalOpen || newFileModal || rewriteModal) {
         const focus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         setTerminalShortcutOrigin(current => current ?? { view: activeMainView, focus });
       }
       setContextMenu(null);
       setActiveMainView('terminal');
-      const session = await handleQuickSession('right');
+      const detail = (event as CustomEvent<{ panel?: 'right' | 'bottom'; parentSessionId?: string | null }>).detail;
+      const session = await handleQuickSession(detail?.panel === 'bottom' ? 'bottom' : 'right', detail?.parentSessionId);
       if (session) window.dispatchEvent(new CustomEvent('focus-active-terminal', { detail: { sessionId: session.id } }));
     };
     window.addEventListener(NEW_TERMINAL_EVENT, openTerminal);
     return () => window.removeEventListener(NEW_TERMINAL_EVENT, openTerminal);
-  }, [activeMainView, openedFile, paletteOpen, showNotepad, cliEditorOpen, cliStartModalOpen, sshModalOpen, newFileModal, rewriteModal, handleQuickSession]);
+  }, [activeMainView, hasUnpinnedFileEditor, paletteOpen, showNotepad, notepadPinned, cliEditorOpen, cliStartModalOpen, sshModalOpen, newFileModal, rewriteModal, handleQuickSession]);
+
+  useEffect(() => {
+    const cycleTerminal = (e: Event) => {
+      if (sessions.length === 0) return;
+      if (terminalShortcutReturnRafRef.current !== null) {
+        cancelAnimationFrame(terminalShortcutReturnRafRef.current);
+        terminalShortcutReturnRafRef.current = null;
+      }
+      const step: -1 | 1 = (e as CustomEvent<{ step?: -1 | 1 }>).detail?.step === -1 ? -1 : 1;
+      const orderedIds = [
+        ...sessions.filter((s) => (s.panel ?? 'right') === 'right').map((s) => s.id),
+        ...sessions.filter((s) => (s.panel ?? 'right') === 'bottom').map((s) => s.id),
+      ];
+      const currentId = activeSessionId && sessions.some((s) => s.id === activeSessionId)
+        ? activeSessionId
+        : (sessions[0]?.id ?? null);
+      const nextId = cycleTerminalSessionId(orderedIds, currentId, step);
+      if (!nextId) return;
+      if (activeMainView !== 'terminal' || hasUnpinnedFileEditor || paletteOpen || (showNotepad && !notepadPinned) || cliEditorOpen || cliStartModalOpen || sshModalOpen || newFileModal || rewriteModal) {
+        const focus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        setTerminalShortcutOrigin((current) => current ?? { view: activeMainView, focus });
+      }
+      setContextMenu(null);
+      setActiveSessionId(nextId);
+      setActiveMainView('terminal');
+      window.dispatchEvent(new CustomEvent('focus-active-terminal', { detail: { sessionId: nextId } }));
+    };
+    window.addEventListener(CYCLE_TERMINAL_EVENT, cycleTerminal);
+    return () => window.removeEventListener(CYCLE_TERMINAL_EVENT, cycleTerminal);
+  }, [sessions, activeSessionId, activeMainView, hasUnpinnedFileEditor, paletteOpen, showNotepad, notepadPinned, cliEditorOpen, cliStartModalOpen, sshModalOpen, newFileModal, rewriteModal]);
+
+  useEffect(() => {
+    const reloadSessions = () => { void refreshSidebarData(); };
+    window.addEventListener('clx-reload-sessions', reloadSessions);
+    return () => window.removeEventListener('clx-reload-sessions', reloadSessions);
+  }, [refreshSidebarData]);
 
   const handleAddCli = useCallback(() => {
     setTerminalShortcutOrigin(null);
@@ -1083,6 +1362,13 @@ export function Dashboard() {
         onDeleteSsh={handleDeleteSshConnection}
 
         selectedFilePath={selectedFilePath}
+        openFileTabsCount={fileTabs.length}
+        isFileEditorOpen={showFileEditor && !terminalShortcutOrigin}
+        onOpenFileEditor={() => {
+          setTerminalShortcutOrigin(null);
+          setShowFileEditor((v) => !v);
+        }}
+        gitDetail={gitDetail}
         gitStatusList={gitStatusList}
         refreshGitStatus={refreshGitStatus}
         onFileClick={handleFileClick}
@@ -1099,55 +1385,120 @@ export function Dashboard() {
           <div className="shrink-0 border-b border-cyber-line/50 px-3 py-1.5 text-[11px]">
             <button type="button" data-terminal-shortcut-return onClick={() => {
               const origin = terminalShortcutOrigin;
+              const activeAtClick = document.activeElement;
               setTerminalShortcutOrigin(null);
               setActiveMainView(origin.view);
-              requestAnimationFrame(() => { if (origin.focus?.isConnected) origin.focus.focus(); });
+              if (terminalShortcutReturnRafRef.current !== null) {
+                cancelAnimationFrame(terminalShortcutReturnRafRef.current);
+              }
+              terminalShortcutReturnRafRef.current = requestAnimationFrame(() => {
+                terminalShortcutReturnRafRef.current = null;
+                if (document.activeElement && document.activeElement !== document.body && document.activeElement !== activeAtClick) {
+                  return;
+                }
+                if (origin.focus?.isConnected && origin.focus.getClientRects().length > 0) {
+                  origin.focus.focus();
+                }
+              });
             }} className="text-cyber-electric hover:underline">{tr("Return to previous view")}</button>
           </div>
         )}
-        <div className="min-h-0 flex-1">
-        <TerminalPanel
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelectSession={(sessId) => {
-            setActiveSessionId(sessId);
-            handleCloseFile();
-            setActiveMainView('terminal');
-          }}
-          onSendInput={handleSendTerminalInput}
-          onStopSession={handleStopSession}
-          onSaveTag={handleSaveProjectTag}
-          sshConnections={sshConnections}
-          onQuickSession={handleQuickSession}
-
-          openedFile={terminalShortcutOrigin ? null : openedFile}
-          openedFileRootPath={openedFileRootPath}
-          fileContent={fileContent}
-          setFileContent={setFileContent}
-          fileOriginalContent={fileOriginalContent}
-          isSavingFile={isSavingFile}
-          fileLoadError={trFeedback(fileLoadError ?? '')}
-          isFileLoading={isFileLoading}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          gitDiffContent={gitDiffContent}
-          isDiffLoading={isDiffLoading}
-          gitStatusList={gitStatusList}
-          onSaveFile={handleSaveFile}
-          onCloseFile={handleCloseFile}
-
-          onReorderSessions={handleReorderSessions}
-          onMoveSessionToPanel={handleMoveSessionToPanel}
-          activeMainView={activeMainView}
-          theme={theme}
-          setTheme={setTheme}
-          contextMenu={contextMenu}
-          setContextMenu={setContextMenu}
-        />
+        <div className="min-h-0 flex-1 flex overflow-hidden">
+          <div className="min-w-0 flex-1 h-full overflow-hidden">
+            <TerminalPanel
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelectSession={(sessId) => {
+                setActiveSessionId(sessId);
+                handleCloseFile();
+                setActiveMainView('terminal');
+              }}
+              onSendInput={handleSendTerminalInput}
+              onStopSession={handleStopSession}
+              onSaveTag={handleSaveProjectTag}
+              sshConnections={sshConnections}
+              terminalLinks={terminalLinks}
+              onLinkTerminal={handleLinkTerminal}
+              onReorderSessions={handleReorderSessions}
+              onMoveSessionToPanel={handleMoveSessionToPanel}
+              activeMainView={activeMainView}
+              nativeBrowserSuspended={paletteOpen || cliEditorOpen || cliStartModalOpen || sshModalOpen || !!newFileModal || !!rewriteModal || (showNotepad && !notepadPinned) || (showFileEditor && !fileEditorPinned) || !!contextMenu}
+              theme={theme}
+              setTheme={setTheme}
+              contextMenu={contextMenu}
+              setContextMenu={setContextMenu}
+            />
+          </div>
+          {showFileEditor && fileEditorPinned && fileTabs.length > 0 && (
+            <>
+              <div
+                onMouseDown={startFileEditorResize}
+                data-file-editor-resizer
+                title={tr("Drag to resize File Editor")}
+                className="w-2 shrink-0 cursor-col-resize flex items-center justify-center group"
+              >
+                <div className="h-12 w-0.5 rounded-full bg-cyber-line/60 group-hover:bg-cyber-neon group-active:bg-cyber-neon transition-colors" />
+              </div>
+              <FileEditorPanel
+                pinned
+                width={fileEditorWidth}
+                tabs={fileTabs}
+                activeTabId={activeFileTabId}
+                gitStatusList={gitStatusList}
+                activeSessionId={activeSessionId}
+                onSelectTab={setActiveFileTabId}
+                onChangeTabContent={handleChangeTabContent}
+                onChangeTabViewMode={handleChangeTabViewMode}
+                onSaveTab={handleSaveFileTab}
+                onSendInput={handleSendTerminalInput}
+                onCloseTab={handleCloseFileTab}
+                onCloseAllCleanTabs={handleCloseAllCleanFileTabs}
+                onTogglePin={() => setFileEditorPinned(false)}
+                onHidePanel={() => setShowFileEditor(false)}
+              />
+            </>
+          )}
+          {showNotepad && notepadPinned && (
+            <>
+              <div
+                onMouseDown={startNotepadResize}
+                data-notepad-resizer
+                title={tr("Drag to resize Notepad")}
+                className="w-2 shrink-0 cursor-col-resize flex items-center justify-center group"
+              >
+                <div className="h-12 w-0.5 rounded-full bg-cyber-line/60 group-hover:bg-cyber-neon group-active:bg-cyber-neon transition-colors" />
+              </div>
+              <Notepad
+                pinned
+                width={notepadWidth}
+                onTogglePin={() => setNotepadPinned(false)}
+                onClose={() => setShowNotepad(false)}
+              />
+            </>
+          )}
         </div>
       </section>
 
       <div data-terminal-shortcut-dialogs className={terminalShortcutOrigin ? 'hidden' : 'contents'}>
+      {/* File Editor modal (unpinned) */}
+      {showFileEditor && !fileEditorPinned && fileTabs.length > 0 && (
+        <FileEditorPanel
+          tabs={fileTabs}
+          activeTabId={activeFileTabId}
+          gitStatusList={gitStatusList}
+          activeSessionId={activeSessionId}
+          onSelectTab={setActiveFileTabId}
+          onChangeTabContent={handleChangeTabContent}
+          onChangeTabViewMode={handleChangeTabViewMode}
+          onSaveTab={handleSaveFileTab}
+          onSendInput={handleSendTerminalInput}
+          onCloseTab={handleCloseFileTab}
+          onCloseAllCleanTabs={handleCloseAllCleanFileTabs}
+          onTogglePin={() => setFileEditorPinned(true)}
+          onHidePanel={() => setShowFileEditor(false)}
+        />
+      )}
+
       <CliEditorModal
         isOpen={cliEditorOpen}
         initialCli={editingCli}
@@ -1170,8 +1521,13 @@ export function Dashboard() {
         onClose={() => setSshModalOpen(false)}
         onSave={handleSaveSshConnection}
       />
-      {/* Notepad modal */}
-      {showNotepad && <Notepad onClose={() => setShowNotepad(false)} />}
+      {/* Notepad modal (unpinned) */}
+      {showNotepad && !notepadPinned && (
+        <Notepad
+          onTogglePin={() => setNotepadPinned(true)}
+          onClose={() => setShowNotepad(false)}
+        />
+      )}
 
       <CommandPalette
         isOpen={paletteOpen}

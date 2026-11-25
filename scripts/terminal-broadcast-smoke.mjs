@@ -253,7 +253,7 @@ try {
   await key('Enter',2);
   assert.deepEqual((await state()).selected,['multi-b','multi-bottom','multi-c']);
   assert.equal((await state()).input.length,0);
-  await evaluate('(() => {const select=document.querySelector("[data-mini-terminal-display]");select.value="title-only";select.dispatchEvent(new Event("change",{bubbles:true}));})()');
+  await evaluate('localStorage.setItem("clx-mini-terminal-display-mode","title-only");window.dispatchEvent(new CustomEvent("clx-mini-terminal-config-changed",{detail:{displayMode:"title-only"}}));');
   await until(()=>evaluate('document.querySelectorAll("[data-mini-terminal-session] .xterm").length===0'), 'title-only mode');
   assert.deepEqual((await state()).selected,['multi-b','multi-bottom','multi-c']);
   await click(selector('multi-c'),2);
